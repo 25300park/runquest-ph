@@ -20,6 +20,12 @@ export type CoursePointInput = {
   type: 'start' | 'checkpoint' | 'finish';
 };
 
+export type CoursePointRow = Database['public']['Tables']['course_points']['Row'];
+export type CourseRow = Database['public']['Tables']['courses']['Row'];
+export type CourseWithPoints = CourseRow & {
+  course_points: CoursePointRow[];
+};
+
 function toCoursePointInput(point: LatLngTuple, index: number, total: number): CoursePointInput {
   return {
     lat: point[0],
@@ -84,6 +90,25 @@ export async function getCoursesByArea(area: CourseArea) {
   }
 
   return data;
+}
+
+export async function getCourses(): Promise<CourseWithPoints[]> {
+  const client = requireSupabaseClient();
+  const { data, error } = await client
+    .from('courses')
+    .select('*, course_points(*)')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((course) => ({
+    ...course,
+    course_points: [...(course.course_points ?? [])].sort(
+      (firstPoint, secondPoint) => firstPoint.order_index - secondPoint.order_index
+    )
+  }));
 }
 
 export async function saveRouteAsCourse(input: CreateCourseInput, routePoints: LatLngTuple[]) {

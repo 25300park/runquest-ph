@@ -112,28 +112,44 @@ export default function ExplorationMap({
         );
       })}
 
-      {selectedCourse.checkpoints.map((checkpoint) => (
-        <CircleMarker
-          key={checkpoint.id}
-          center={checkpoint.position}
-          radius={checkpoint.type === 'START' || checkpoint.type === 'FINISH' ? 11 : 8}
-          pathOptions={{
-            color: '#111816',
-            fillColor: checkpointColors[checkpoint.type],
-            fillOpacity: 1,
-            weight: 3
-          }}
-        >
-          <Popup>
-            <strong>{checkpoint.type}</strong>
-            <br />
-            {checkpoint.name}
-          </Popup>
-        </CircleMarker>
-      ))}
+      {courses.flatMap((course) =>
+        course.checkpoints.map((checkpoint) => {
+          const isSelected = course.id === selectedCourse.id;
+
+          return (
+            <CircleMarker
+              key={`${course.id}-${checkpoint.id}`}
+              center={checkpoint.position}
+              radius={
+                checkpoint.type === 'START' || checkpoint.type === 'FINISH'
+                  ? isSelected
+                    ? 11
+                    : 8
+                  : isSelected
+                    ? 8
+                    : 5
+              }
+              pathOptions={{
+                color: '#111816',
+                fillColor: checkpointColors[checkpoint.type],
+                fillOpacity: isSelected ? 1 : 0.72,
+                weight: isSelected ? 3 : 2
+              }}
+            >
+              <Popup>
+                <strong>{checkpoint.type}</strong>
+                <br />
+                {course.name}
+                <br />
+                {checkpoint.name}
+              </Popup>
+            </CircleMarker>
+          );
+        })
+      )}
 
       <Marker position={userPosition} icon={userIcon}>
-        <Popup>Mock current position</Popup>
+        <Popup>Route preview position</Popup>
       </Marker>
     </MapContainer>
   );
