@@ -1,36 +1,83 @@
-import { confirm, npmCommand, runChecked } from './pipeline-utils.js';
+import { spawnSync } from 'node:child_process';
+import readline from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
 
-const commitMessage = 'auto update: RunQuest PH course system improvements';
+const commitMessage = 'auto: safe push update';
+
+function run(command, args, options = {}) {
+  const result = spawnSync(command, args, {
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+    stdio: options.stdio ?? 'pipe'
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  return result;
+}
+
+function runRequired(command, args) {
+  console.log(`\n$ ${command} ${args.join(' ')}`);
+  const result = run(command, args, { stdio: 'inherit' });
+
+  if (result.status !== 0) {
+    throw new Error(`Command failed: ${command} ${args.join(' ')}`);
+  }
+}
+
+function commandOutput(command, args) {
+  const result = run(command, args);
+
+  if (result.status !== 0) {
+    const message = result.stderr || result.stdout || `Command failed: ${command} ${args.join(' ')}`;
+    throw new Error(message.trim());
+  }
+
+  return result.stdout.trim();
+}
+
+async function askConfirmation() {
+  const rl = readline.createInterface({ input, output });
+  const answer = await rl.question('Changes detected. Do you want to commit and push? (y/n) ');
+  rl.close();
+
+  return answer.trim().toLowerCase() === 'y';
+}
 
 async function main() {
-  console.log('RunQuest PH safe production push');
+  console.log('RunQuest PH semi-automated safe push');
 
-  runChecked('node', ['scripts/pre-deploy-check.js'], { stdio: 'inherit' });
-  runChecked('node', ['scripts/supabase-migration-check.js'], { stdio: 'inherit' });
-  runChecked('node', ['scripts/generate-changelog.js'], { stdio: 'inherit' });
+  console.log('\n$ git status --short');
+  const status = commandOutput('git', ['status', '--short']);
+  console.log(status || 'No changes detected.');
 
-  runChecked('git', ['status', '--short'], { stdio: 'inherit' });
-  runChecked('git', ['diff', '--stat'], { stdio: 'inherit' });
+  console.log('\n$ git diff --stat');
+  const diffSummary = commandOutput('git', ['diff', '--stat']);
+  console.log(diffSummary || 'No unstaged diff summary.');
 
-  const proceed = await confirm('\nProceed with deployment? (y/n) ');
-
-  if (!proceed) {
-    console.log('Deployment aborted safely. Nothing was staged, committed, pushed, or tagged.');
+  if (!status) {
+    console.log('\nNothing to commit or push.');
     return;
   }
 
-  runChecked('node', ['scripts/release-version.js', '--prepare-only'], { stdio: 'inherit' });
-  runChecked(npmCommand(), ['run', 'build'], { stdio: 'inherit' });
-  runChecked('git', ['add', '.'], { stdio: 'inherit' });
-  runChecked('git', ['commit', '-m', commitMessage], { stdio: 'inherit' });
-  runChecked('git', ['push', 'origin', 'main'], { stdio: 'inherit' });
-  runChecked('node', ['scripts/release-version.js', '--tag-current', '--push'], { stdio: 'inherit' });
+  const confirmed = await askConfirmation();
 
-  console.log('\nSafe production push completed.');
+  if (!confirmed) {
+    console.log('Push cancelled by user');
+    return;
+  }
+
+  runRequired('git', ['add', '.']);
+  runRequired('git', ['commit', '-m', commitMessage]);
+  runRequired('git', ['push', 'origin', 'main']);
+
+  console.log('\nSafe push completed.');
 }
 
 main().catch((error) => {
-  console.error('\nSafe production push failed.');
+  console.error('\nSafe push failed.');
   console.error(error.message);
   process.exitCode = 1;
 });
