@@ -1,4 +1,5 @@
 import type { LatLngTuple } from '../types/area';
+import type { Difficulty } from '../types/course';
 
 const earthRadiusKm = 6371;
 
@@ -27,6 +28,44 @@ export function calculateHaversineDistanceKm(from: LatLngTuple, to: LatLngTuple)
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return earthRadiusKm * c;
+}
+
+export function calculateRouteDistanceKm(route: LatLngTuple[]) {
+  return route.slice(1).reduce((totalDistance, point, index) => {
+    return totalDistance + calculateHaversineDistanceKm(route[index], point);
+  }, 0);
+}
+
+export function estimateRouteDifficulty(distanceKm: number): Difficulty {
+  if (distanceKm < 3) {
+    return 'Easy';
+  }
+
+  if (distanceKm < 6) {
+    return 'Normal';
+  }
+
+  if (distanceKm < 10) {
+    return 'Hard';
+  }
+
+  return 'Challenge';
+}
+
+export function estimatePaceLabel(distanceKm: number) {
+  if (distanceKm < 2.5) {
+    return 'Easy walk/jog · 10:30 min/km';
+  }
+
+  if (distanceKm < 5) {
+    return 'Steady run · 8:30 min/km';
+  }
+
+  if (distanceKm < 8) {
+    return 'Endurance pace · 7:45 min/km';
+  }
+
+  return 'Challenge pace · 7:00 min/km';
 }
 
 export function calculateRouteProgress(position: LatLngTuple, route: LatLngTuple[]) {

@@ -21,10 +21,10 @@ function AppShell({ children }: { children: ReactNode }) {
             <span>RunQuest PH</span>
           </Link>
           <Link
-            to="/rewards"
+            to="/advanced-courses"
             className="rounded-full border border-stone-700 bg-stone-900 px-3 py-2 text-sm font-black text-amber-100"
           >
-            Rewards
+            Advanced
           </Link>
         </header>
 

@@ -194,5 +194,60 @@ export const mockCourses: Course[] = [
     ],
     pois: [],
     safetyNotes: 'Bring water and choose cooler hours when walking near the bay.'
+  },
+  {
+    id: 'course-makati-ayala-avenue-run',
+    areaId: 'area-makati',
+    areaName: 'Makati / Ayala Triangle',
+    name: 'Ayala Avenue Sunday Run',
+    description: 'A real-like city route inspired by Sunday morning runs along Ayala Avenue.',
+    courseType: 'running',
+    distanceKm: 4.2,
+    estimatedTimeMin: 42,
+    difficulty: 'Normal',
+    xpReward: 520,
+    explorationReward: 7,
+    startPoint: [14.5568, 121.0231],
+    finishPoint: [14.5568, 121.0231],
+    routeCoordinates: [
+      [14.5568, 121.0231],
+      [14.5559, 121.0206],
+      [14.5549, 121.0181],
+      [14.5539, 121.0157],
+      [14.5552, 121.0184],
+      [14.5568, 121.0231]
+    ],
+    checkpoints: [
+      {
+        id: 'ayala-run-start',
+        name: 'Ayala Triangle Start',
+        type: 'START',
+        position: [14.5568, 121.0231],
+        distanceFromStartKm: 0
+      },
+      {
+        id: 'ayala-run-cp1',
+        name: 'Ayala Avenue Turn',
+        type: 'CHECKPOINT',
+        position: [14.5549, 121.0181],
+        distanceFromStartKm: 1.8
+      },
+      {
+        id: 'ayala-run-finish',
+        name: 'Ayala Triangle Finish',
+        type: 'FINISH',
+        position: [14.5568, 121.0231],
+        distanceFromStartKm: 4.2
+      }
+    ],
+    pois: [
+      {
+        id: 'ayala-run-poi-cafe',
+        name: 'Post-run cafe area',
+        type: 'cafe',
+        position: [14.5562, 121.0221]
+      }
+    ],
+    safetyNotes: 'Best for organized pedestrian-friendly hours. Use crossings and follow marshals.'
   }
 ];
