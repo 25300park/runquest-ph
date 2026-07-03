@@ -1,7 +1,7 @@
-import { gpx } from 'togeojson';
 import type { LatLngTuple } from '../types/area';
 import type { CourseCheckpoint, Difficulty } from '../types/course';
-import { calculateRouteDistanceKm, estimatePaceLabel, estimateRouteDifficulty } from '../utils/route';
+import { convertToCourseFormat, parseGPX } from '../services/gpxService';
+import { calculateRouteDistanceKm } from '../utils/route';
 
 export type GeneratedCourseMetadata = {
   name: string;
@@ -15,26 +15,6 @@ export type GeneratedCourseMetadata = {
 type GPXUploaderProps = {
   onRouteImported: (coordinates: LatLngTuple[], metadata: GeneratedCourseMetadata) => void;
 };
-
-function extractCoordinates(featureCollection: GeoJSON.FeatureCollection): LatLngTuple[] {
-  const routeCoordinates: LatLngTuple[] = [];
-
-  featureCollection.features.forEach((feature) => {
-    if (feature.geometry.type === 'LineString') {
-      feature.geometry.coordinates.forEach(([lng, lat]) => {
-        routeCoordinates.push([lat, lng]);
-      });
-    }
-
-    if (feature.geometry.type === 'MultiLineString') {
-      feature.geometry.coordinates.flat().forEach(([lng, lat]) => {
-        routeCoordinates.push([lat, lng]);
-      });
-    }
-  });
-
-  return routeCoordinates;
-}
 
 function generateCheckpoints(coordinates: LatLngTuple[]) {
   if (coordinates.length === 0) {
@@ -70,20 +50,6 @@ function generateCheckpoints(coordinates: LatLngTuple[]) {
   }));
 }
 
-function createGeneratedMetadata(fileName: string, coordinates: LatLngTuple[]): GeneratedCourseMetadata {
-  const distanceKm = calculateRouteDistanceKm(coordinates);
-  const difficulty = estimateRouteDifficulty(distanceKm);
-
-  return {
-    name: fileName.replace(/\.gpx$/i, '').replace(/[-_]/g, ' ') || 'Imported GPX Course',
-    distanceKm,
-    difficulty,
-    paceEstimate: estimatePaceLabel(distanceKm),
-    xpReward: Math.round(distanceKm * 100),
-    checkpoints: generateCheckpoints(coordinates)
-  };
-}
-
 export default function GPXUploader({ onRouteImported }: GPXUploaderProps) {
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -92,13 +58,19 @@ export default function GPXUploader({ onRouteImported }: GPXUploaderProps) {
       return;
     }
 
-    const gpxText = await file.text();
-    const gpxDocument = new DOMParser().parseFromString(gpxText, 'application/xml');
-    const featureCollection = gpx(gpxDocument);
-    const coordinates = extractCoordinates(featureCollection);
+    const parsedGPX = await parseGPX(file);
+    const generatedCourse = convertToCourseFormat(parsedGPX, 'BGC');
+    const coordinates = generatedCourse.routePoints;
 
     if (coordinates.length > 0) {
-      onRouteImported(coordinates, createGeneratedMetadata(file.name, coordinates));
+      onRouteImported(coordinates, {
+        name: generatedCourse.name,
+        distanceKm: generatedCourse.distance,
+        difficulty: generatedCourse.difficulty,
+        paceEstimate: generatedCourse.paceEstimate,
+        xpReward: generatedCourse.xpReward,
+        checkpoints: generateCheckpoints(coordinates)
+      });
     }
   }
 

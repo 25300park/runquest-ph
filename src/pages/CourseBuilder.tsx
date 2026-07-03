@@ -5,6 +5,13 @@ import { mockAreas } from '../data/mockAreas';
 import { mockCourses } from '../data/mockCourses';
 import type { LatLngTuple } from '../types/area';
 import type { CheckpointType, CourseCheckpoint, Difficulty } from '../types/course';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { saveRouteAsCourse, type CourseArea } from '../services/courseService';
+import {
+  testFetchCourses,
+  testInsertCourse,
+  testSaveGPXCourse
+} from '../services/supabaseTestService';
 import { calculateRouteDistanceKm, estimatePaceLabel } from '../utils/route';
 
 type SavedCourse = {
@@ -14,9 +21,22 @@ type SavedCourse = {
   difficulty: Difficulty;
   routePoints: LatLngTuple[];
   checkpoints: CourseCheckpoint[];
+  databaseId?: string;
 };
 
 const difficulties: Difficulty[] = ['Easy', 'Normal', 'Hard', 'Challenge'];
+
+function toDatabaseArea(areaName: string): CourseArea {
+  if (areaName.includes('Makati')) {
+    return 'Makati';
+  }
+
+  if (areaName.includes('MOA')) {
+    return 'MOA';
+  }
+
+  return 'BGC';
+}
 
 function buildCheckpoints(routePoints: LatLngTuple[]): CourseCheckpoint[] {
   if (routePoints.length === 0) {
@@ -47,6 +67,10 @@ export default function CourseBuilder() {
   const [routePoints, setRoutePoints] = useState<LatLngTuple[]>([]);
   const [gpxCheckpoints, setGpxCheckpoints] = useState<CourseCheckpoint[]>([]);
   const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
+  const [saveStatus, setSaveStatus] = useState('');
+  const [testStatus, setTestStatus] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
   const selectedArea = mockAreas.find((area) => area.id === areaId) ?? mockAreas[0];
   const checkpoints = useMemo(
     () => (gpxCheckpoints.length > 0 ? gpxCheckpoints : buildCheckpoints(routePoints)),
@@ -70,22 +94,78 @@ export default function CourseBuilder() {
     setGeneratedMetadata(metadata);
   }
 
-  function saveCourse() {
+  async function saveCourse() {
     if (routePoints.length < 2) {
       return;
     }
 
+    setIsSaving(true);
+    setSaveStatus('');
+    let databaseId: string | undefined;
+    const databaseArea = toDatabaseArea(selectedArea.name);
+    const distance = routeDistanceKm;
+    const fallbackId = `saved-course-${Date.now()}`;
+
+    try {
+      databaseId = await saveRouteAsCourse(
+        {
+          name: courseName.trim() || 'Creator Route',
+          area: databaseArea,
+          difficulty,
+          distance
+        },
+        routePoints
+      );
+      setSaveStatus(`Saved to Supabase: ${databaseId}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Supabase save error.';
+      setSaveStatus(
+        isSupabaseConfigured
+          ? `Supabase save failed. Saved locally only. ${message}`
+          : 'Saved locally only. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env to enable database saves.'
+      );
+    }
+
     setSavedCourses((courses) => [
       {
-        id: `saved-course-${Date.now()}`,
+        id: databaseId ?? fallbackId,
         name: courseName.trim() || 'Creator Route',
         areaName: selectedArea.name,
         difficulty,
         routePoints,
-        checkpoints
+        checkpoints,
+        databaseId
       },
       ...courses
     ]);
+    setIsSaving(false);
+  }
+
+  async function runSupabaseTest(testName: 'insert' | 'fetch' | 'gpx') {
+    setIsTestingSupabase(true);
+    setTestStatus(`Running ${testName} test...`);
+
+    try {
+      if (testName === 'insert') {
+        const result = await testInsertCourse();
+        setTestStatus(`INSERT RESULT success: ${result.id}`);
+      }
+
+      if (testName === 'fetch') {
+        const result = await testFetchCourses();
+        setTestStatus(`FETCH RESULT success: ${result.length} courses found`);
+      }
+
+      if (testName === 'gpx') {
+        const result = await testSaveGPXCourse(routePoints);
+        setTestStatus(`GPX SAVE RESULT success: ${result.courseId}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Supabase test error.';
+      setTestStatus(`${testName.toUpperCase()} test failed: ${message}`);
+    } finally {
+      setIsTestingSupabase(false);
+    }
   }
 
   return (
@@ -143,6 +223,52 @@ export default function CourseBuilder() {
         </div>
 
         <GPXUploader onRouteImported={importRoute} />
+
+        <div className="rounded-2xl border border-amber-200/30 bg-stone-900 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase text-amber-200">Supabase test panel</p>
+              <h2 className="mt-1 text-xl font-black">End-to-end DB checks</h2>
+            </div>
+            <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-black text-quest-teal">
+              {isSupabaseConfigured ? 'Configured' : 'Missing env'}
+            </span>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-stone-400">
+            Buttons log INSERT RESULT, FETCH RESULT, and GPX SAVE RESULT in the browser console.
+          </p>
+          <div className="mt-4 grid gap-2">
+            <button
+              type="button"
+              onClick={() => runSupabaseTest('insert')}
+              disabled={isTestingSupabase}
+              className="rounded-2xl bg-quest-teal px-4 py-3 font-black text-white disabled:bg-stone-800 disabled:text-stone-500"
+            >
+              Test Insert Course
+            </button>
+            <button
+              type="button"
+              onClick={() => runSupabaseTest('fetch')}
+              disabled={isTestingSupabase}
+              className="rounded-2xl bg-stone-950 px-4 py-3 font-black text-stone-100 disabled:text-stone-500"
+            >
+              Test Fetch Courses
+            </button>
+            <button
+              type="button"
+              onClick={() => runSupabaseTest('gpx')}
+              disabled={isTestingSupabase}
+              className="rounded-2xl border border-amber-200 bg-amber-300 px-4 py-3 font-black text-stone-950 disabled:border-stone-700 disabled:bg-stone-800 disabled:text-stone-500"
+            >
+              Test GPX Save
+            </button>
+          </div>
+          {testStatus && (
+            <div className="mt-4 rounded-xl bg-stone-950 p-3 text-sm font-bold text-stone-300">
+              {testStatus}
+            </div>
+          )}
+        </div>
 
         {generatedMetadata && (
           <div className="rounded-2xl border border-amber-200/30 bg-amber-300 p-4 text-stone-950">
@@ -221,12 +347,18 @@ export default function CourseBuilder() {
           <button
             type="button"
             onClick={saveCourse}
-            disabled={routePoints.length < 2}
+            disabled={routePoints.length < 2 || isSaving}
             className="rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 font-black text-stone-950 disabled:border-stone-700 disabled:bg-stone-800 disabled:text-stone-500"
           >
-            Save Course
+            {isSaving ? 'Saving...' : 'Save Course'}
           </button>
         </div>
+
+        {saveStatus && (
+          <div className="rounded-2xl border border-teal-200/30 bg-teal-950/30 p-4 text-sm font-bold text-teal-100">
+            {saveStatus}
+          </div>
+        )}
 
         <div>
           <h2 className="font-black">Saved mock courses</h2>
@@ -252,6 +384,9 @@ export default function CourseBuilder() {
                   <p className="mt-3 text-sm text-stone-400">
                     {course.routePoints.length} points · {course.checkpoints.length} checkpoints
                   </p>
+                  {course.databaseId && (
+                    <p className="mt-2 text-xs text-quest-teal">Database ID: {course.databaseId}</p>
+                  )}
                 </article>
               ))
             )}
