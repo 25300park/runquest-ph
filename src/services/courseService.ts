@@ -26,6 +26,36 @@ export type CourseWithPoints = CourseRow & {
   course_points: CoursePointRow[];
 };
 
+async function getCoursePoints(courseId: string): Promise<CoursePointRow[]> {
+  const client = requireSupabaseClient();
+  const { data, error } = await client
+    .from('course_points')
+    .select('*')
+    .eq('course_id', courseId)
+    .order('order_index', { ascending: true });
+
+  console.log('COURSE POINTS:', {
+    courseId,
+    points: data ?? []
+  });
+
+  if (error) {
+    console.log('SUPABASE ERROR:', error);
+    throw error;
+  }
+
+  return data ?? [];
+}
+
+async function attachCoursePoints(courses: CourseRow[]): Promise<CourseWithPoints[]> {
+  return Promise.all(
+    courses.map(async (course) => ({
+      ...course,
+      course_points: await getCoursePoints(course.id)
+    }))
+  );
+}
+
 function toCoursePointInput(point: LatLngTuple, index: number, total: number): CoursePointInput {
   return {
     lat: point[0],
@@ -81,15 +111,18 @@ export async function getCoursesByArea(area: CourseArea) {
   const client = requireSupabaseClient();
   const { data, error } = await client
     .from('courses')
-    .select('*, course_points(*)')
+    .select('*')
     .eq('area', area)
     .order('created_at', { ascending: false });
 
+  console.log('COURSES:', data ?? []);
+
   if (error) {
+    console.log('SUPABASE ERROR:', error);
     throw error;
   }
 
-  return data;
+  return attachCoursePoints(data ?? []);
 }
 
 export async function getCourses(): Promise<CourseWithPoints[]> {
@@ -98,20 +131,17 @@ export async function getCourses(): Promise<CourseWithPoints[]> {
 
   const { data, error } = await client
     .from('courses')
-    .select('*, course_points(*)')
+    .select('*')
     .order('created_at', { ascending: false });
 
+  console.log('COURSES:', data ?? []);
+
   if (error) {
-    console.error('FETCH COURSES ERROR', error);
+    console.log('SUPABASE ERROR:', error);
     throw error;
   }
 
-  const courses = (data ?? []).map((course) => ({
-    ...course,
-    course_points: [...(course.course_points ?? [])].sort(
-      (firstPoint, secondPoint) => firstPoint.order_index - secondPoint.order_index
-    )
-  }));
+  const courses = await attachCoursePoints(data ?? []);
 
   console.log('FETCHED COURSES', courses);
   console.log(
