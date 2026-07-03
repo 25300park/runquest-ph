@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { MapContainer, Marker, Polyline, Popup, TileLayer } from 'react-leaflet';
 import { getCourseById, type CourseWithPoints } from '../services/courseService';
 import type { LatLngTuple } from '../types/area';
+import type { Course, CourseCheckpoint } from '../types/course';
 
 const areaNameByArea: Record<CourseWithPoints['area'], string> = {
   BGC: 'BGC',
   Makati: 'Makati / Ayala Triangle',
   MOA: 'MOA / Pasay'
+};
+
+const areaIdByArea: Record<CourseWithPoints['area'], string> = {
+  BGC: 'area-bgc',
+  Makati: 'area-makati',
+  MOA: 'area-moa'
 };
 
 function estimateTimeMinutes(distanceKm: number) {
@@ -16,6 +23,7 @@ function estimateTimeMinutes(distanceKm: number) {
 
 export default function CourseDetailPage() {
   const { courseId } = useParams();
+  const navigate = useNavigate();
   const [course, setCourse] = useState<CourseWithPoints | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -71,6 +79,57 @@ export default function CourseDetailPage() {
   const distanceKm = course ? Number(course.distance.toFixed(2)) : 0;
   const xpReward = Math.round(distanceKm * 100);
   const explorationReward = Math.max(3, Math.round(distanceKm * 5));
+  const activityCourse = useMemo<Course | null>(() => {
+    if (!course || routeCoordinates.length < 2) {
+      return null;
+    }
+
+    const checkpoints: CourseCheckpoint[] = course.course_points.map((point, index) => ({
+      id: point.id,
+      name:
+        point.type === 'start'
+          ? 'Start Gate'
+          : point.type === 'finish'
+            ? 'Finish Gate'
+            : `Checkpoint ${index}`,
+      type:
+        point.type === 'start' ? 'START' : point.type === 'finish' ? 'FINISH' : 'CHECKPOINT',
+      position: [point.lat, point.lng],
+      distanceFromStartKm:
+        routeCoordinates.length > 1
+          ? Number(((distanceKm / (routeCoordinates.length - 1)) * index).toFixed(2))
+          : 0
+    }));
+
+    return {
+      id: course.id,
+      areaId: areaIdByArea[course.area],
+      areaName: areaNameByArea[course.area],
+      name: course.name,
+      description: `A community-created ${course.area} route loaded from Supabase.`,
+      courseType: 'city',
+      distanceKm,
+      estimatedTimeMin: estimateTimeMinutes(distanceKm),
+      difficulty: course.difficulty,
+      xpReward,
+      explorationReward,
+      startPoint: routeCoordinates[0],
+      finishPoint: routeCoordinates[routeCoordinates.length - 1],
+      routeCoordinates,
+      checkpoints,
+      pois: [],
+      safetyNotes: 'Review the route before running and stay aware of local traffic conditions.'
+    };
+  }, [course, distanceKm, explorationReward, routeCoordinates, xpReward]);
+
+  function startCourse() {
+    if (!activityCourse) {
+      navigate('/map');
+      return;
+    }
+
+    navigate('/run', { state: activityCourse });
+  }
 
   if (isLoading) {
     return (
@@ -151,12 +210,13 @@ export default function CourseDetailPage() {
         </p>
       </div>
 
-      <Link
-        to={`/activity/${course.id}`}
+      <button
+        type="button"
+        onClick={startCourse}
         className="block rounded-xl bg-quest-teal px-4 py-3 text-center font-bold text-white"
       >
         Start Course
-      </Link>
+      </button>
 
       <p className="text-center text-xs text-slate-500">Explore reward: +{explorationReward}%</p>
     </section>

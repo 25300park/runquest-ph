@@ -34,6 +34,7 @@ export const appRoutes = (
     <Route path="/test-mode/bgc" element={<BgcTestModePage />} />
     <Route path="/course-viral" element={<CourseViralHubPage />} />
     <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+    <Route path="/run" element={<ActivityTrackingPage />} />
     <Route path="/activity/:courseId" element={<ActivityTrackingPage />} />
     <Route path="/completed/:courseId" element={<QuestCompletedPage />} />
     <Route path="/profile" element={<ProfilePage />} />

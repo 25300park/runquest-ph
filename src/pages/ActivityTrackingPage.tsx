@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { MapContainer, Marker, Polyline, TileLayer } from 'react-leaflet';
-import { mockCourses } from '../data/mockCourses';
 import type { ActivityState, CompletedActivitySummary, TrackingMode } from '../types/activity';
 import type { LatLngTuple } from '../types/area';
+import type { Course } from '../types/course';
 import { calculateActivityReward, getGameProgress } from '../utils/gameProgress';
 import { calculateHaversineDistanceKm, calculateRouteProgress } from '../utils/route';
 
@@ -30,40 +30,47 @@ function formatPace(distanceKm: number, elapsedSeconds: number) {
 }
 
 export default function ActivityTrackingPage() {
-  const { courseId } = useParams();
   const navigate = useNavigate();
-  const course = mockCourses.find((item) => item.id === courseId) ?? mockCourses[0];
+  const location = useLocation();
+  const course = location.state as Course | null;
   const [activityState, setActivityState] = useState<ActivityState>('idle');
   const [trackingMode, setTrackingMode] = useState<TrackingMode>('gps');
   const [distanceKm, setDistanceKm] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [currentPosition, setCurrentPosition] = useState<LatLngTuple>(course.startPoint);
+  const [currentPosition, setCurrentPosition] = useState<LatLngTuple>(
+    course?.startPoint ?? [14.5503, 121.0507]
+  );
   const previousGpsPositionRef = useRef<LatLngTuple | null>(null);
   const [gpsStatus, setGpsStatus] = useState('GPS ready');
   const progressSnapshot = getGameProgress();
-  const rewardPreview = calculateActivityReward(
-    course,
-    distanceKm,
-    progressSnapshot.completedActivities
-  );
+  const rewardPreview = course
+    ? calculateActivityReward(course, distanceKm, progressSnapshot.completedActivities)
+    : { baseXp: 0, difficultyBonusXp: 0, consistencyBonusXp: 0, totalXp: 0 };
   const xpEarned = rewardPreview.totalXp;
-  const routeMatch = calculateRouteProgress(currentPosition, course.routeCoordinates);
-  const distanceProgress = Math.min(distanceKm / course.distanceKm, 1);
+  const routeCoordinates = course?.routeCoordinates ?? [];
+  const routeMatch = calculateRouteProgress(currentPosition, routeCoordinates);
+  const distanceProgress = course ? Math.min(distanceKm / course.distanceKm, 1) : 0;
   const routeProgress = Math.max(routeMatch.progressPercent / 100, distanceProgress);
   const mockCompletedPointCount = Math.max(
     1,
-    Math.ceil(distanceProgress * course.routeCoordinates.length)
+    Math.ceil(distanceProgress * routeCoordinates.length)
   );
   const completedSegment =
     trackingMode === 'gps'
       ? routeMatch.completedSegment
-      : course.routeCoordinates.slice(0, mockCompletedPointCount);
+      : routeCoordinates.slice(0, mockCompletedPointCount);
   const nextCheckpoint = useMemo(
     () =>
-      course.checkpoints.find((checkpoint) => checkpoint.distanceFromStartKm > distanceKm) ??
-      course.checkpoints[course.checkpoints.length - 1],
-    [course.checkpoints, distanceKm]
+      course?.checkpoints.find((checkpoint) => checkpoint.distanceFromStartKm > distanceKm) ??
+      course?.checkpoints[course.checkpoints.length - 1],
+    [course, distanceKm]
   );
+
+  useEffect(() => {
+    if (!course) {
+      navigate('/map', { replace: true });
+    }
+  }, [course, navigate]);
 
   useEffect(() => {
     if (activityState !== 'running') {
@@ -78,7 +85,7 @@ export default function ActivityTrackingPage() {
   }, [activityState]);
 
   useEffect(() => {
-    if (activityState !== 'running' || trackingMode !== 'mock') {
+    if (!course || activityState !== 'running' || trackingMode !== 'mock') {
       return undefined;
     }
 
@@ -96,10 +103,10 @@ export default function ActivityTrackingPage() {
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [activityState, course.distanceKm, course.routeCoordinates, distanceKm, trackingMode]);
+  }, [activityState, course, distanceKm, trackingMode]);
 
   useEffect(() => {
-    if (activityState !== 'running' || trackingMode !== 'gps') {
+    if (!course || activityState !== 'running' || trackingMode !== 'gps') {
       return undefined;
     }
 
@@ -138,10 +145,10 @@ export default function ActivityTrackingPage() {
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [activityState, course.distanceKm, trackingMode]);
+  }, [activityState, course, trackingMode]);
 
   useEffect(() => {
-    if (distanceKm >= course.distanceKm && activityState === 'running') {
+    if (course && distanceKm >= course.distanceKm && activityState === 'running') {
       completeActivity();
     }
   });
@@ -160,6 +167,11 @@ export default function ActivityTrackingPage() {
   }
 
   function completeActivity() {
+    if (!course) {
+      navigate('/map', { replace: true });
+      return;
+    }
+
     const summary: CompletedActivitySummary = {
       activityId: `activity-${course.id}-${Date.now()}`,
       courseId: course.id,
@@ -169,6 +181,10 @@ export default function ActivityTrackingPage() {
 
     setActivityState('completed');
     navigate(`/completed/${course.id}`, { state: summary });
+  }
+
+  if (!course) {
+    return null;
   }
 
   const primaryAction =
