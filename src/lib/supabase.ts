@@ -6,6 +6,17 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undef
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
+function maskValue(value: string | undefined) {
+  if (!value) {
+    return 'MISSING';
+  }
+
+  return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : 'PRESENT';
+}
+
+console.log('VITE_SUPABASE_URL', supabaseUrl ?? 'MISSING');
+console.log('VITE_SUPABASE_ANON_KEY', maskValue(supabaseAnonKey));
+
 export const supabase = isSupabaseConfigured
   ? createClient<Database>(supabaseUrl!, supabaseAnonKey!)
   : null;

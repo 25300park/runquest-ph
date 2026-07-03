@@ -7,7 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "push:confirm": "node scripts/git-push-confirm.js"
+    "push:confirm": "node scripts/git-push-confirm.js",
+    "changelog": "node scripts/generate-changelog.js",
+    "predeploy": "node scripts/pre-deploy-check.js",
+    "migration:check": "node scripts/supabase-migration-check.js",
+    "release:version": "node scripts/release-version.js",
+    "safe-push": "node scripts/safe-push.js",
+    "push:supabase-map": "node scripts/supabase-map-safe-push.js",
+    "rollback": "node scripts/rollback.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",

@@ -94,21 +94,36 @@ export async function getCoursesByArea(area: CourseArea) {
 
 export async function getCourses(): Promise<CourseWithPoints[]> {
   const client = requireSupabaseClient();
+  console.log('FETCHING COURSES FROM SUPABASE');
+
   const { data, error } = await client
     .from('courses')
     .select('*, course_points(*)')
     .order('created_at', { ascending: false });
 
   if (error) {
+    console.error('FETCH COURSES ERROR', error);
     throw error;
   }
 
-  return (data ?? []).map((course) => ({
+  const courses = (data ?? []).map((course) => ({
     ...course,
     course_points: [...(course.course_points ?? [])].sort(
       (firstPoint, secondPoint) => firstPoint.order_index - secondPoint.order_index
     )
   }));
+
+  console.log('FETCHED COURSES', courses);
+  console.log(
+    'COURSE POINTS LOADED',
+    courses.map((course) => ({
+      id: course.id,
+      name: course.name,
+      points: course.course_points.length
+    }))
+  );
+
+  return courses;
 }
 
 export async function saveRouteAsCourse(input: CreateCourseInput, routePoints: LatLngTuple[]) {

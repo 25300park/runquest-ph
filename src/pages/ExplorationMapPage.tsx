@@ -48,6 +48,11 @@ function toMapCourse(course: CourseWithPoints): Course | null {
   );
 
   if (routeCoordinates.length < 2) {
+    console.warn('COURSE SKIPPED: NOT ENOUGH COURSE POINTS', {
+      id: course.id,
+      name: course.name,
+      points: routeCoordinates.length
+    });
     return null;
   }
 
@@ -105,16 +110,6 @@ export default function ExplorationMapPage() {
         setCourseLoadError(null);
 
         const supabaseCourses = await getCourses();
-        console.log('FETCHED COURSES', supabaseCourses);
-        console.log(
-          'COURSE POINTS LOADED',
-          supabaseCourses.map((course) => ({
-            id: course.id,
-            name: course.name,
-            points: course.course_points.length
-          }))
-        );
-
         const mappedCourses = supabaseCourses
           .map(toMapCourse)
           .filter((course): course is Course => Boolean(course));
@@ -124,8 +119,17 @@ export default function ExplorationMapPage() {
         }
 
         setCourses(mappedCourses);
-        setSelectedCourseId((currentCourseId) => currentCourseId ?? mappedCourses[0]?.id ?? null);
-        console.log('MAP UPDATED FROM SUPABASE', mappedCourses);
+        setSelectedCourseId((currentCourseId) => {
+          const currentCourseStillExists = mappedCourses.some(
+            (course) => course.id === currentCourseId
+          );
+
+          return currentCourseStillExists ? currentCourseId : mappedCourses[0]?.id ?? null;
+        });
+        console.log('MAP UPDATED FROM SUPABASE', {
+          renderedCourses: mappedCourses.length,
+          courseIds: mappedCourses.map((course) => course.id)
+        });
       } catch (error) {
         if (!isMounted) {
           return;
@@ -160,9 +164,7 @@ export default function ExplorationMapPage() {
   function selectArea(areaId: string) {
     setSelectedAreaId(areaId);
     const firstCourse = courses.find((course) => course.areaId === areaId);
-    if (firstCourse) {
-      setSelectedCourseId(firstCourse.id);
-    }
+    setSelectedCourseId(firstCourse?.id ?? null);
   }
 
   function selectCourse(courseId: string) {
