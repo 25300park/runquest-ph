@@ -84,6 +84,36 @@ export default function CourseBuilder() {
     setGeneratedMetadata(null);
   }
 
+  function moveRoutePoint(index: number, position: LatLngTuple) {
+    setRoutePoints((currentPoints) =>
+      currentPoints.map((point, pointIndex) => (pointIndex === index ? position : point))
+    );
+    setGpxCheckpoints([]);
+    setGeneratedMetadata(null);
+  }
+
+  function deleteRoutePoint(index: number) {
+    setRoutePoints((currentPoints) =>
+      currentPoints.filter((_, pointIndex) => pointIndex !== index)
+    );
+    setGpxCheckpoints([]);
+    setGeneratedMetadata(null);
+  }
+
+  function undoLastPoint() {
+    setRoutePoints((currentPoints) => currentPoints.slice(0, -1));
+    setGpxCheckpoints([]);
+    setGeneratedMetadata(null);
+  }
+
+  function clearRoute() {
+    setRoutePoints([]);
+    setGpxCheckpoints([]);
+    setGeneratedMetadata(null);
+    setGeneratedXpReward(0);
+    setPaceEstimate('Waiting for route');
+  }
+
   function importRoute(coordinates: LatLngTuple[], metadata: GeneratedCourseMetadata) {
     setRoutePoints(coordinates);
     setCourseName(metadata.name);
@@ -299,6 +329,8 @@ export default function CourseBuilder() {
           routePoints={routePoints}
           checkpoints={checkpoints}
           onAddRoutePoint={addRoutePoint}
+          onMoveRoutePoint={moveRoutePoint}
+          onDeleteRoutePoint={deleteRoutePoint}
         />
       </div>
 
@@ -330,27 +362,55 @@ export default function CourseBuilder() {
           </div>
         </div>
 
+        <div className="rounded-2xl border border-amber-200/30 bg-stone-900 p-4">
+          <p className="text-xs font-black uppercase text-amber-200">Editor controls</p>
+          <p className="mt-1 text-sm text-stone-400">
+            Drag markers to reposition. Click a marker to delete it.
+          </p>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={undoLastPoint}
+              disabled={routePoints.length === 0}
+              className="rounded-2xl bg-stone-950 px-3 py-4 font-black text-stone-200 disabled:text-stone-600"
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              onClick={clearRoute}
+              disabled={routePoints.length === 0}
+              className="rounded-2xl bg-stone-950 px-3 py-4 font-black text-stone-200 disabled:text-stone-600"
+            >
+              Clear All
+            </button>
+            <button
+              type="button"
+              onClick={saveCourse}
+              disabled={routePoints.length < 2 || isSaving}
+              className="rounded-2xl border border-amber-200 bg-amber-300 px-3 py-4 font-black text-stone-950 disabled:border-stone-700 disabled:bg-stone-800 disabled:text-stone-500"
+            >
+              {isSaving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => {
-              setRoutePoints([]);
-              setGpxCheckpoints([]);
-              setGeneratedMetadata(null);
-              setGeneratedXpReward(0);
-              setPaceEstimate('Waiting for route');
-            }}
+            onClick={undoLastPoint}
+            disabled={routePoints.length === 0}
             className="rounded-2xl bg-stone-900 px-4 py-4 font-black text-stone-300"
           >
-            Clear Route
+            Undo Last Point
           </button>
           <button
             type="button"
-            onClick={saveCourse}
-            disabled={routePoints.length < 2 || isSaving}
-            className="rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 font-black text-stone-950 disabled:border-stone-700 disabled:bg-stone-800 disabled:text-stone-500"
+            onClick={clearRoute}
+            disabled={routePoints.length === 0}
+            className="rounded-2xl bg-stone-900 px-4 py-4 font-black text-stone-300 disabled:text-stone-600"
           >
-            {isSaving ? 'Saving...' : 'Save Course'}
+            Clear Route
           </button>
         </div>
 

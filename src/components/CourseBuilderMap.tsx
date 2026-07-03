@@ -1,4 +1,5 @@
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMapEvents } from 'react-leaflet';
 import type { LatLngTuple } from '../types/area';
 import type { CourseCheckpoint } from '../types/course';
 
@@ -7,6 +8,8 @@ type CourseBuilderMapProps = {
   routePoints: LatLngTuple[];
   checkpoints: CourseCheckpoint[];
   onAddRoutePoint: (position: LatLngTuple) => void;
+  onMoveRoutePoint: (index: number, position: LatLngTuple) => void;
+  onDeleteRoutePoint: (index: number) => void;
 };
 
 function MapClickLayer({ onAddRoutePoint }: { onAddRoutePoint: (position: LatLngTuple) => void }) {
@@ -23,10 +26,23 @@ export default function CourseBuilderMap({
   center,
   routePoints,
   checkpoints,
-  onAddRoutePoint
+  onAddRoutePoint,
+  onMoveRoutePoint,
+  onDeleteRoutePoint
 }: CourseBuilderMapProps) {
-  const startPoint = routePoints[0];
-  const finishPoint = routePoints[routePoints.length - 1];
+  function createPointIcon(index: number) {
+    const label =
+      index === 0 ? 'S' : index === routePoints.length - 1 ? 'F' : String(index + 1);
+    const color =
+      index === 0 ? '#22c55e' : index === routePoints.length - 1 ? '#f97316' : '#14b8a6';
+
+    return L.divIcon({
+      className: '',
+      html: `<div style="height:34px;width:34px;border-radius:9999px;border:3px solid #111816;background:${color};display:grid;place-items:center;color:white;font-weight:900;box-shadow:0 10px 24px rgba(0,0,0,.35);">${label}</div>`,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17]
+    });
+  }
 
   return (
     <MapContainer center={center} zoom={15} scrollWheelZoom className="h-full min-h-[500px] w-full">
@@ -41,22 +57,27 @@ export default function CourseBuilderMap({
       )}
 
       {routePoints.map((point, index) => (
-        <CircleMarker
-          key={`${point[0]}-${point[1]}-${index}`}
-          center={point}
-          radius={index === 0 || index === routePoints.length - 1 ? 10 : 7}
-          pathOptions={{
-            color: '#111816',
-            fillColor: index === 0 ? '#22c55e' : index === routePoints.length - 1 ? '#f97316' : '#14b8a6',
-            fillOpacity: 1,
-            weight: 3
+        <Marker
+          key={`route-point-${index}-${point[0]}-${point[1]}`}
+          position={point}
+          draggable
+          icon={createPointIcon(index)}
+          eventHandlers={{
+            click: () => onDeleteRoutePoint(index),
+            dragend: (event) => {
+              const marker = event.target as L.Marker;
+              const nextPosition = marker.getLatLng();
+              onMoveRoutePoint(index, [nextPosition.lat, nextPosition.lng]);
+            }
           }}
         >
           <Popup>
             {index === 0 ? 'START' : index === routePoints.length - 1 ? 'FINISH' : 'CHECKPOINT'}{' '}
             point {index + 1}
+            <br />
+            Drag to move. Click marker to delete.
           </Popup>
-        </CircleMarker>
+        </Marker>
       ))}
 
       {checkpoints.map((checkpoint) => (
@@ -78,8 +99,6 @@ export default function CourseBuilderMap({
           </Popup>
         </CircleMarker>
       ))}
-
-      {startPoint && finishPoint && startPoint !== finishPoint && null}
     </MapContainer>
   );
 }

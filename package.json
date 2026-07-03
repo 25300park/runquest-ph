@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "push:confirm": "node scripts/git-push-confirm.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",
