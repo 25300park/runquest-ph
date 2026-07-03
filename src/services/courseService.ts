@@ -156,6 +156,36 @@ export async function getCourses(): Promise<CourseWithPoints[]> {
   return courses;
 }
 
+export async function getCourseById(courseId: string): Promise<CourseWithPoints | null> {
+  const client = requireSupabaseClient();
+  console.log('ROUTE ID:', courseId);
+
+  const { data: course, error: courseError } = await client
+    .from('courses')
+    .select('*')
+    .eq('id', courseId)
+    .single();
+
+  console.log('COURSE:', course);
+
+  if (courseError) {
+    console.log('SUPABASE ERROR:', courseError);
+    throw courseError;
+  }
+
+  if (!course) {
+    return null;
+  }
+
+  const points = await getCoursePoints(course.id);
+  console.log('POINTS:', points);
+
+  return {
+    ...course,
+    course_points: points
+  };
+}
+
 export async function saveRouteAsCourse(input: CreateCourseInput, routePoints: LatLngTuple[]) {
   const courseId = await createCourse(input);
   await saveCoursePoints(courseId, routePointsToCoursePointInputs(routePoints));
