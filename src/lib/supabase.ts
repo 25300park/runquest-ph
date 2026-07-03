@@ -6,23 +6,16 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undef
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-function maskValue(value: string | undefined) {
-  if (!value) {
-    return 'MISSING';
-  }
+console.log('SUPABASE URL:', supabaseUrl);
+console.log('SUPABASE KEY:', supabaseAnonKey);
 
-  return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : 'PRESENT';
-}
-
-console.log('VITE_SUPABASE_URL', supabaseUrl ?? 'MISSING');
-console.log('VITE_SUPABASE_ANON_KEY', maskValue(supabaseAnonKey));
-
-export const supabase = isSupabaseConfigured
-  ? createClient<Database>(supabaseUrl!, supabaseAnonKey!)
-  : null;
+export const supabase = createClient<Database>(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 export function requireSupabaseClient() {
-  if (!supabase) {
+  if (!isSupabaseConfigured) {
     throw new Error(
       'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your local .env file.'
     );
