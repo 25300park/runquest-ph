@@ -1,4 +1,33 @@
 import { requireSupabaseClient } from '../lib/supabase';
+import type { Database } from '../types/database';
+
+export type GuildRow = Database['public']['Tables']['guilds']['Row'];
+export type GuildMemberRow = Database['public']['Tables']['guild_members']['Row'];
+
+const defaultMaxGuildMembers = Number(import.meta.env.VITE_MAX_GUILD_MEMBERS ?? 50);
+
+export async function listGuilds() {
+  const client = requireSupabaseClient();
+  const { data, error } = await client
+    .from('guilds')
+    .select('*')
+    .order('total_xp', { ascending: false })
+    .limit(100);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function listGuildMembers(guildId: string) {
+  const client = requireSupabaseClient();
+  const { data, error } = await client
+    .from('guild_members')
+    .select('*')
+    .eq('guild_id', guildId);
+
+  if (error) throw error;
+  return data ?? [];
+}
 
 export async function createGuild(input: {
   name: string;
@@ -36,6 +65,23 @@ export async function joinGuild(input: {
   role?: 'leader' | 'officer' | 'member';
 }) {
   const client = requireSupabaseClient();
+  const members = await listGuildMembers(input.guildId);
+  const maxMembers = Number.isFinite(defaultMaxGuildMembers) ? defaultMaxGuildMembers : 50;
+
+  if (members.length >= maxMembers) {
+    throw new Error('This guild is full.');
+  }
+
+  const alreadyJoined = members.find(
+    (member) =>
+      (input.userId && member.user_id === input.userId) ||
+      (input.characterId && member.character_id === input.characterId)
+  );
+
+  if (alreadyJoined) {
+    return alreadyJoined;
+  }
+
   const { data, error } = await client
     .from('guild_members')
     .insert({
@@ -59,8 +105,8 @@ export async function getGuildLeaderboard() {
   const { data, error } = await client
     .from('guilds')
     .select('*')
-    .order('shared_xp', { ascending: false })
-    .limit(50);
+    .order('total_xp', { ascending: false })
+    .limit(100);
 
   if (error) {
     throw error;
@@ -122,20 +168,67 @@ export async function contributeToGuild(input: {
       if (guildError) {
         throw guildError;
       }
+
+      const rankScore = guild.total_xp + input.xp * 2 + guild.total_distance + input.distanceKm;
+      const { data: score } = await client
+        .from('guild_scores')
+        .select('*')
+        .eq('guild_id', guild.id)
+        .maybeSingle();
+
+      if (score) {
+        const { error: scoreError } = await client
+          .from('guild_scores')
+          .update({
+            total_xp: score.total_xp + input.xp,
+            total_distance: score.total_distance + input.distanceKm,
+            rank_score: score.rank_score + input.xp * 2 + input.distanceKm,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', score.id);
+
+        if (scoreError) throw scoreError;
+      } else {
+        const { error: scoreError } = await client.from('guild_scores').insert({
+          guild_id: guild.id,
+          total_xp: input.xp,
+          total_distance: input.distanceKm,
+          rank_score: rankScore
+        });
+
+        if (scoreError) throw scoreError;
+      }
     })
   );
 }
 
 export function subscribeToGuilds(onChange: () => void) {
   const client = requireSupabaseClient();
+  let debounceTimer: number | undefined;
+  const debouncedChange = () => {
+    if (typeof window === 'undefined') {
+      onChange();
+      return;
+    }
+
+    window.clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(onChange, 500);
+  };
   const channel = client
     .channel('guild-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'guilds' }, onChange)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_members' }, onChange)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_challenges' }, onChange)
-    .subscribe();
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guilds' }, debouncedChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_members' }, debouncedChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_challenges' }, debouncedChange)
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('Guild realtime unavailable:', status);
+      }
+    });
 
   return () => {
+    if (typeof window !== 'undefined') {
+      window.clearTimeout(debounceTimer);
+    }
     client.removeChannel(channel);
   };
 }

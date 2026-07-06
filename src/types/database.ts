@@ -12,6 +12,7 @@ export type Database = {
           xp: number;
           role: 'admin' | 'user';
           status: 'active' | 'suspended' | 'banned';
+          subscription_type: 'free' | 'premium';
           created_at: string;
         };
         Insert: {
@@ -22,6 +23,7 @@ export type Database = {
           xp?: number;
           role?: 'admin' | 'user';
           status?: 'active' | 'suspended' | 'banned';
+          subscription_type?: 'free' | 'premium';
           created_at?: string;
         };
         Update: {
@@ -32,6 +34,7 @@ export type Database = {
           xp?: number;
           role?: 'admin' | 'user';
           status?: 'active' | 'suspended' | 'banned';
+          subscription_type?: 'free' | 'premium';
           created_at?: string;
         };
         Relationships: [];
@@ -425,7 +428,7 @@ export type Database = {
         };
         Relationships: [];
       };
-      guild_challenges: {
+        guild_challenges: {
         Row: {
           id: string;
           guild_id: string;
@@ -459,9 +462,39 @@ export type Database = {
           starts_at?: string;
           ends_at?: string | null;
         };
-        Relationships: [];
-      };
-      item_ownership: {
+          Relationships: [];
+        };
+        guild_scores: {
+          Row: {
+            id: string;
+            guild_id: string;
+            week_start: string;
+            total_xp: number;
+            total_distance: number;
+            rank_score: number;
+            updated_at: string;
+          };
+          Insert: {
+            id?: string;
+            guild_id: string;
+            week_start?: string;
+            total_xp?: number;
+            total_distance?: number;
+            rank_score?: number;
+            updated_at?: string;
+          };
+          Update: {
+            id?: string;
+            guild_id?: string;
+            week_start?: string;
+            total_xp?: number;
+            total_distance?: number;
+            rank_score?: number;
+            updated_at?: string;
+          };
+          Relationships: [];
+        };
+        item_ownership: {
         Row: {
           id: string;
           user_id: string | null;

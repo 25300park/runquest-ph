@@ -99,6 +99,7 @@ export default function QuestCompletedPage() {
         );
         await updateLeaderboardScore({
           characterId: reward.characterId,
+          userId: reward.userId,
           region: 'Global',
           totalDistance: reward.totalDistance,
           totalXp: reward.totalXp,
@@ -118,6 +119,7 @@ export default function QuestCompletedPage() {
           : null;
         const tokenReward = await awardRunTokens({
           characterId: reward.characterId,
+          userId: reward.userId,
           reward: {
             distanceKm: summary.distanceKm,
             streakBonus: summary.streakBonus ?? Math.min(20, reward.streakDays * 2),

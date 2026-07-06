@@ -100,11 +100,12 @@ export async function ensureStarterEquipment() {
   return items ?? [];
 }
 
-export async function createCharacter(input: { name: string; avatarBaseUrl: string }) {
+export async function createCharacter(input: { name: string; avatarBaseUrl: string; userId?: string | null }) {
   const client = requireSupabaseClient();
   const { data: character, error } = await client
     .from('characters')
     .insert({
+      user_id: input.userId ?? null,
       name: input.name,
       avatar_base_url: input.avatarBaseUrl
     })
@@ -163,14 +164,19 @@ async function getCharacterStats(characterId: string): Promise<CharacterStatsRow
 
 export async function getCharacterProfile(characterId?: string): Promise<CharacterProfile | null> {
   const client = requireSupabaseClient();
+  const { data: authData } = await client.auth.getUser();
+  const authUserId = authData.user?.id ?? null;
   const targetCharacterId = characterId ?? getStoredActiveCharacterId();
 
-  const characterQuery = client.from('characters').select('*').order('created_at', {
-    ascending: false
-  });
+  const characterQuery = client
+    .from('characters')
+    .select('*')
+    .order('created_at', { ascending: false });
   const { data: character, error } = targetCharacterId
     ? await client.from('characters').select('*').eq('id', targetCharacterId).maybeSingle()
-    : await characterQuery.limit(1).maybeSingle();
+    : authUserId
+      ? await characterQuery.eq('user_id', authUserId).limit(1).maybeSingle()
+      : await characterQuery.limit(1).maybeSingle();
 
   if (error) {
     throw error;
@@ -308,6 +314,7 @@ export async function applyRunReward(input: CharacterRunRewardInput) {
 
   return {
     characterId: profile.character.id,
+    userId: profile.character.user_id,
     xpEarned,
     previousLevel: profile.character.level,
     nextLevel,

@@ -23,7 +23,7 @@ export async function getLeaderboard(region: LeaderboardRegion = 'Global') {
     .select('*')
     .eq('region', region)
     .order('weekly_score', { ascending: false })
-    .limit(50);
+    .limit(100);
 
   if (error) {
     throw error;
@@ -34,6 +34,7 @@ export async function getLeaderboard(region: LeaderboardRegion = 'Global') {
 
 export async function updateLeaderboardScore(input: {
   characterId: string;
+  userId?: string | null;
   region?: LeaderboardRegion;
   totalDistance: number;
   totalXp: number;
@@ -61,6 +62,7 @@ export async function updateLeaderboardScore(input: {
 
   const payload = {
     character_id: input.characterId,
+    user_id: input.userId ?? null,
     region,
     total_distance: input.totalDistance,
     distance_total: input.totalDistance,
@@ -85,6 +87,16 @@ export async function updateLeaderboardScore(input: {
 
 export function subscribeToLeaderboard(region: LeaderboardRegion, onChange: () => void) {
   const client = requireSupabaseClient();
+  let debounceTimer: number | undefined;
+  const debouncedChange = () => {
+    if (typeof window === 'undefined') {
+      onChange();
+      return;
+    }
+
+    window.clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(onChange, 500);
+  };
   const channel = client
     .channel(`leaderboard-${region}`)
     .on(
@@ -95,11 +107,18 @@ export function subscribeToLeaderboard(region: LeaderboardRegion, onChange: () =
         table: 'leaderboard',
         filter: `region=eq.${region}`
       },
-      onChange
+      debouncedChange
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('Leaderboard realtime unavailable:', status);
+      }
+    });
 
   return () => {
+    if (typeof window !== 'undefined') {
+      window.clearTimeout(debounceTimer);
+    }
     client.removeChannel(channel);
   };
 }

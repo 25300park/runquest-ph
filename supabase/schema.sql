@@ -8,6 +8,7 @@ create table if not exists public.users (
   xp int not null default 0,
   role text not null default 'user' check (role in ('admin', 'user')),
   status text not null default 'active' check (status in ('active', 'suspended', 'banned')),
+  subscription_type text not null default 'free' check (subscription_type in ('free', 'premium')),
   created_at timestamp with time zone not null default now()
 );
 
@@ -98,6 +99,7 @@ create table if not exists public.guilds (
   name text not null unique,
   leader_id uuid references public.users(id) on delete set null,
   shared_xp int not null default 0,
+  total_xp int not null default 0,
   total_distance float8 not null default 0,
   created_at timestamp with time zone not null default now()
 );
@@ -110,6 +112,7 @@ create table if not exists public.guild_members (
   role text not null default 'member' check (role in ('leader', 'officer', 'member')),
   contributed_xp int not null default 0,
   contributed_distance float8 not null default 0,
+  contribution_score float8 not null default 0,
   joined_at timestamp with time zone not null default now()
 );
 
@@ -123,6 +126,16 @@ create table if not exists public.guild_challenges (
   progress_xp int not null default 0,
   starts_at timestamp with time zone not null default now(),
   ends_at timestamp with time zone
+);
+
+create table if not exists public.guild_scores (
+  id uuid primary key default gen_random_uuid(),
+  guild_id uuid not null references public.guilds(id) on delete cascade,
+  week_start date not null default date_trunc('week', now())::date,
+  total_xp int not null default 0,
+  total_distance float8 not null default 0,
+  rank_score float8 not null default 0,
+  updated_at timestamp with time zone not null default now()
 );
 
 create table if not exists public.item_ownership (
@@ -154,6 +167,7 @@ alter table public.equipment_items add column if not exists token_price int not 
 alter table public.equipment_items add column if not exists drop_rate float8 not null default 0.05;
 alter table public.users add column if not exists role text not null default 'user' check (role in ('admin', 'user'));
 alter table public.users add column if not exists status text not null default 'active' check (status in ('active', 'suspended', 'banned'));
+alter table public.users add column if not exists subscription_type text not null default 'free' check (subscription_type in ('free', 'premium'));
 insert into public.users (id, email, name, role, status)
 select
   id,
@@ -456,6 +470,7 @@ create index if not exists idx_leaderboard_character_id on public.leaderboard(ch
 create index if not exists idx_guild_members_guild_id on public.guild_members(guild_id);
 create index if not exists idx_guild_members_character_id on public.guild_members(character_id);
 create index if not exists idx_guild_challenges_guild_id on public.guild_challenges(guild_id);
+create index if not exists idx_guild_scores_week_rank on public.guild_scores(week_start, rank_score desc);
 create index if not exists idx_item_ownership_character_id on public.item_ownership(character_id);
 create index if not exists idx_item_ownership_item_id on public.item_ownership(item_id);
 create index if not exists idx_item_drops_character_id on public.item_drops(character_id);
@@ -497,6 +512,7 @@ alter table public.leaderboard enable row level security;
 alter table public.guilds enable row level security;
 alter table public.guild_members enable row level security;
 alter table public.guild_challenges enable row level security;
+alter table public.guild_scores enable row level security;
 alter table public.item_ownership enable row level security;
 alter table public.item_drops enable row level security;
 alter table public.items enable row level security;
@@ -706,6 +722,17 @@ using (true);
 drop policy if exists "Guild challenges are writable by everyone in prototype" on public.guild_challenges;
 create policy "Guild challenges are writable by everyone in prototype"
 on public.guild_challenges for all
+using (true)
+with check (true);
+
+drop policy if exists "Guild scores are readable by everyone" on public.guild_scores;
+create policy "Guild scores are readable by everyone"
+on public.guild_scores for select
+using (true);
+
+drop policy if exists "Guild scores are writable by everyone in prototype" on public.guild_scores;
+create policy "Guild scores are writable by everyone in prototype"
+on public.guild_scores for all
 using (true)
 with check (true);
 

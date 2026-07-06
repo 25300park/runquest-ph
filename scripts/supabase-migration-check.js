@@ -4,10 +4,14 @@ import { getOutput } from './pipeline-utils.js';
 const schemaPath = 'supabase/schema.sql';
 
 const requiredTables = {
-  users: ['id', 'email', 'name', 'level', 'xp', 'created_at'],
+  users: ['id', 'email', 'name', 'level', 'xp', 'subscription_type', 'created_at'],
   courses: ['id', 'name', 'area', 'difficulty', 'distance', 'created_by', 'created_at'],
   course_points: ['id', 'course_id', 'lat', 'lng', 'order_index', 'type'],
   activities: ['id', 'user_id', 'course_id', 'distance', 'duration', 'xp_earned', 'created_at'],
+  leaderboard: ['id', 'user_id', 'character_id', 'region', 'weekly_score'],
+  guilds: ['id', 'name', 'leader_id', 'shared_xp', 'total_xp', 'total_distance'],
+  guild_members: ['id', 'guild_id', 'user_id', 'character_id', 'role', 'contribution_score'],
+  guild_scores: ['id', 'guild_id', 'week_start', 'rank_score'],
   migration_history: ['id', 'change_type', 'executed_at', 'status']
 };
 
