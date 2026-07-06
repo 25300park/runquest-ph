@@ -27,10 +27,11 @@ export default function AdminCourses() {
   const [courses, setCourses] = useState<AdminCourse[]>([]);
   const [pointsByCourse, setPointsByCourse] = useState<Record<string, string>>({});
   const [status, setStatus] = useState('Loading courses...');
+  const [loading, setLoading] = useState(true);
 
   async function loadCourses() {
     try {
-      const nextCourses = await listAdminCourses();
+      const nextCourses = (await listAdminCourses()) ?? [];
       const pointPairs = await Promise.all(
         nextCourses.map(async (course) => {
           const points = await listAdminCoursePoints(course.id);
@@ -47,9 +48,13 @@ export default function AdminCourses() {
 
       setCourses(nextCourses);
       setPointsByCourse(Object.fromEntries(pointPairs));
-      setStatus('Course management connected to Supabase.');
+      setStatus(nextCourses.length === 0 ? 'No courses found.' : 'Course management connected to Supabase.');
     } catch (error) {
+      setCourses([]);
+      setPointsByCourse({});
       setStatus(error instanceof Error ? error.message : 'Could not load courses.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -66,6 +71,16 @@ export default function AdminCourses() {
       </div>
 
       <div className="grid gap-3">
+        {loading && (
+          <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-sm text-stone-400">
+            Loading courses...
+          </div>
+        )}
+        {!loading && courses.length === 0 && (
+          <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-sm text-stone-400">
+            No courses found.
+          </div>
+        )}
         {courses.map((course) => (
           <article key={course.id} className="rounded-lg border border-stone-800 bg-stone-950 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -73,7 +88,11 @@ export default function AdminCourses() {
                 <input
                   defaultValue={course.name}
                   onBlur={(event) =>
-                    void updateAdminCourseName(course.id, event.target.value).then(loadCourses)
+                    void updateAdminCourseName(course.id, event.target.value)
+                      .then(loadCourses)
+                      .catch((error) =>
+                        setStatus(error instanceof Error ? error.message : 'Could not update course.')
+                      )
                   }
                   className="w-full rounded-md border border-stone-700 bg-stone-900 px-3 py-2 font-black text-stone-100"
                 />
@@ -83,7 +102,13 @@ export default function AdminCourses() {
               </div>
               <button
                 type="button"
-                onClick={() => void deleteAdminCourse(course.id).then(loadCourses)}
+                onClick={() =>
+                  void deleteAdminCourse(course.id)
+                    .then(loadCourses)
+                    .catch((error) =>
+                      setStatus(error instanceof Error ? error.message : 'Could not delete course.')
+                    )
+                }
                 className="rounded-md border border-red-400/40 px-3 py-2 text-sm font-bold text-red-200"
               >
                 Delete Course
@@ -107,7 +132,10 @@ export default function AdminCourses() {
                 try {
                   void replaceAdminCoursePoints(course.id, parsePoints(pointsByCourse[course.id] ?? '[]'))
                     .then(loadCourses)
-                    .then(() => setStatus('Route points updated.'));
+                    .then(() => setStatus('Route points updated.'))
+                    .catch((error) =>
+                      setStatus(error instanceof Error ? error.message : 'Could not update route points.')
+                    );
                 } catch (error) {
                   setStatus(error instanceof Error ? error.message : 'Invalid route points JSON.');
                 }

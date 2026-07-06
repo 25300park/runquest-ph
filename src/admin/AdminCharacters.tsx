@@ -21,6 +21,7 @@ export default function AdminCharacters() {
   const [items, setItems] = useState<AdminItem[]>([]);
   const [equipmentByCharacter, setEquipmentByCharacter] = useState<Record<string, CharacterEquipment[]>>({});
   const [status, setStatus] = useState('Loading characters...');
+  const [loading, setLoading] = useState(true);
 
   async function loadData() {
     try {
@@ -28,15 +29,24 @@ export default function AdminCharacters() {
         listAdminCharacters(),
         listEconomyItems()
       ]);
-      setCharacters(nextCharacters);
-      setItems(nextItems);
+      const safeCharacters = nextCharacters ?? [];
+      setCharacters(safeCharacters);
+      setItems(nextItems ?? []);
       const equipmentPairs = await Promise.all(
-        nextCharacters.map(async (character) => [character.id, await listCharacterEquipment(character.id)] as const)
+        safeCharacters.map(async (character) => [
+          character.id,
+          (await listCharacterEquipment(character.id)) ?? []
+        ] as const)
       );
       setEquipmentByCharacter(Object.fromEntries(equipmentPairs));
-      setStatus('Character controls ready.');
+      setStatus(safeCharacters.length === 0 ? 'No characters found.' : 'Character controls ready.');
     } catch (error) {
+      setCharacters([]);
+      setItems([]);
+      setEquipmentByCharacter({});
       setStatus(error instanceof Error ? error.message : 'Could not load characters.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -53,6 +63,16 @@ export default function AdminCharacters() {
       </div>
 
       <div className="grid gap-3">
+        {loading && (
+          <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-sm text-stone-400">
+            Loading characters...
+          </div>
+        )}
+        {!loading && characters.length === 0 && (
+          <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-sm text-stone-400">
+            No characters found.
+          </div>
+        )}
         {characters.map((character) => (
           <article key={character.id} className="rounded-lg border border-stone-800 bg-stone-950 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -75,8 +95,12 @@ export default function AdminCharacters() {
                 onBlur={(event) =>
                   void updateCharacterProgress(character.id, {
                     level: Number(event.target.value),
-                    xp: character.xp
-                  }).then(loadData)
+                    xp: character.xp ?? 0
+                  })
+                    .then(loadData)
+                    .catch((error) =>
+                      setStatus(error instanceof Error ? error.message : 'Could not update character.')
+                    )
                 }
               />
               <input
@@ -87,16 +111,24 @@ export default function AdminCharacters() {
                 className="rounded-md border border-stone-700 bg-stone-900 px-3 py-2 text-sm"
                 onBlur={(event) =>
                   void updateCharacterProgress(character.id, {
-                    level: character.level,
+                    level: character.level ?? 1,
                     xp: Number(event.target.value)
-                  }).then(loadData)
+                  })
+                    .then(loadData)
+                    .catch((error) =>
+                      setStatus(error instanceof Error ? error.message : 'Could not update character.')
+                    )
                 }
               />
               <select
                 defaultValue=""
                 onChange={(event) => {
                   if (event.target.value) {
-                    void assignEquipment(character.id, event.target.value).then(loadData);
+                    void assignEquipment(character.id, event.target.value)
+                      .then(loadData)
+                      .catch((error) =>
+                        setStatus(error instanceof Error ? error.message : 'Could not assign equipment.')
+                      );
                   }
                 }}
                 className="rounded-md border border-stone-700 bg-stone-900 px-3 py-2 text-sm"
@@ -108,7 +140,13 @@ export default function AdminCharacters() {
               </select>
               <button
                 type="button"
-                onClick={() => void resetCharacterAvatar(character.id).then(loadData)}
+                onClick={() =>
+                  void resetCharacterAvatar(character.id)
+                    .then(loadData)
+                    .catch((error) =>
+                      setStatus(error instanceof Error ? error.message : 'Could not reset avatar.')
+                    )
+                }
                 className="rounded-md border border-stone-700 px-3 py-2 text-sm font-bold"
               >
                 Reset Avatar
@@ -117,14 +155,26 @@ export default function AdminCharacters() {
 
             <button
               type="button"
-              onClick={() => void banCharacter(character.id).then(loadData)}
+              onClick={() =>
+                void banCharacter(character.id)
+                  .then(loadData)
+                  .catch((error) =>
+                    setStatus(error instanceof Error ? error.message : 'Could not ban character.')
+                  )
+              }
               className="mt-3 rounded-md border border-red-400/40 px-3 py-2 text-sm font-bold text-red-200"
             >
               Ban Character
             </button>
             <button
               type="button"
-              onClick={() => void updateCharacterStatus(character.id, 'suspended').then(loadData)}
+              onClick={() =>
+                void updateCharacterStatus(character.id, 'suspended')
+                  .then(loadData)
+                  .catch((error) =>
+                    setStatus(error instanceof Error ? error.message : 'Could not suspend character.')
+                  )
+              }
               className="ml-2 mt-3 rounded-md border border-amber-300/40 px-3 py-2 text-sm font-bold text-amber-100"
             >
               Suspend Character
@@ -145,7 +195,15 @@ export default function AdminCharacters() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => void removeCharacterEquipment(equipment.id).then(loadData)}
+                          onClick={() =>
+                            void removeCharacterEquipment(equipment.id)
+                              .then(loadData)
+                              .catch((error) =>
+                                setStatus(
+                                  error instanceof Error ? error.message : 'Could not remove equipment.'
+                                )
+                              )
+                          }
                           className="rounded-md border border-stone-700 px-2 py-1 text-xs font-bold text-stone-300"
                         >
                           Remove

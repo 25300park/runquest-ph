@@ -6,7 +6,7 @@ create table if not exists public.users (
   name text,
   level int not null default 1,
   xp int not null default 0,
-  role text not null default 'user' check (role in ('admin', 'moderator', 'user')),
+  role text not null default 'user' check (role in ('admin', 'user')),
   status text not null default 'active' check (status in ('active', 'suspended', 'banned')),
   created_at timestamp with time zone not null default now()
 );
@@ -152,8 +152,57 @@ alter table public.guild_members add column if not exists contribution_score flo
 alter table public.equipment_items add column if not exists stamina_bonus float8 not null default 0;
 alter table public.equipment_items add column if not exists token_price int not null default 0;
 alter table public.equipment_items add column if not exists drop_rate float8 not null default 0.05;
-alter table public.users add column if not exists role text not null default 'user' check (role in ('admin', 'moderator', 'user'));
+alter table public.users add column if not exists role text not null default 'user' check (role in ('admin', 'user'));
 alter table public.users add column if not exists status text not null default 'active' check (status in ('active', 'suspended', 'banned'));
+insert into public.users (id, email, name, role, status)
+select
+  id,
+  email,
+  coalesce(raw_user_meta_data ->> 'name', 'RunQuest Admin'),
+  'admin',
+  'active'
+from auth.users
+where email = 'runner@runquest.ph'
+on conflict (id) do update
+set
+  email = excluded.email,
+  role = 'admin',
+  status = 'active';
+update public.users
+set role = 'admin', status = 'active'
+where email = 'runner@runquest.ph';
+
+create or replace function public.handle_new_auth_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.users (id, email, name, role, status)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data ->> 'name', new.email),
+    case when new.email = 'runner@runquest.ph' then 'admin' else 'user' end,
+    'active'
+  )
+  on conflict (id) do update
+  set
+    email = excluded.email,
+    name = coalesce(public.users.name, excluded.name),
+    role = case when excluded.email = 'runner@runquest.ph' then 'admin' else public.users.role end,
+    status = case when excluded.email = 'runner@runquest.ph' then 'active' else public.users.status end;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_auth_user();
+
 alter table public.courses add column if not exists status text not null default 'pending_review' check (status in ('draft', 'pending_review', 'approved', 'rejected', 'deleted'));
 alter table public.courses add column if not exists verified boolean not null default false;
 alter table public.characters add column if not exists status text not null default 'active' check (status in ('active', 'suspended', 'banned'));
@@ -466,6 +515,23 @@ drop policy if exists "Users are readable by everyone" on public.users;
 create policy "Users are readable by everyone"
 on public.users for select
 using (true);
+
+drop policy if exists "Authenticated users can create own user profile" on public.users;
+create policy "Authenticated users can create own user profile"
+on public.users for insert
+with check (auth.uid() = id and role = 'user');
+
+drop policy if exists "Users can update own basic profile" on public.users;
+create policy "Users can update own basic profile"
+on public.users for update
+using (auth.uid() = id)
+with check (auth.uid() = id and role = 'user');
+
+drop policy if exists "Users are manageable by admins" on public.users;
+create policy "Users are manageable by admins"
+on public.users for all
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "Courses are readable by everyone" on public.courses;
 create policy "Courses are readable by everyone"

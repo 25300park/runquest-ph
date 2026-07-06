@@ -1,25 +1,39 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { getCurrentAdminProfile } from './adminService';
-import type { AdminUser } from './adminService';
+
+const adminDebugBypass =
+  import.meta.env.DEV && import.meta.env.VITE_ADMIN_DEBUG_BYPASS === 'true';
 
 export function AdminGuard({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [denied, setDenied] = useState(false);
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
 
+    if (adminDebugBypass) {
+      setLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
     getCurrentAdminProfile()
       .then((currentProfile) => {
         if (!active) return;
-        setProfile(currentProfile);
-        setDenied(!currentProfile || currentProfile.role !== 'admin' || currentProfile.status !== 'active');
+        if (!currentProfile) {
+          setRedirectTo('/login');
+          return;
+        }
+
+        if (currentProfile.role !== 'admin' || currentProfile.status !== 'active') {
+          setRedirectTo('/login');
+        }
       })
       .catch(() => {
         if (!active) return;
-        setDenied(true);
+        setRedirectTo('/login');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -40,8 +54,8 @@ export function AdminGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  if (denied || !profile) {
-    return <Navigate to="/login" replace />;
+  if (redirectTo) {
+    return <Navigate to={redirectTo} replace />;
   }
 
   return children;

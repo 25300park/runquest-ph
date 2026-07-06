@@ -10,7 +10,7 @@ export type Database = {
           name: string | null;
           level: number;
           xp: number;
-          role: 'admin' | 'moderator' | 'user';
+          role: 'admin' | 'user';
           status: 'active' | 'suspended' | 'banned';
           created_at: string;
         };
@@ -20,7 +20,7 @@ export type Database = {
           name?: string | null;
           level?: number;
           xp?: number;
-          role?: 'admin' | 'moderator' | 'user';
+          role?: 'admin' | 'user';
           status?: 'active' | 'suspended' | 'banned';
           created_at?: string;
         };
@@ -30,7 +30,7 @@ export type Database = {
           name?: string | null;
           level?: number;
           xp?: number;
-          role?: 'admin' | 'moderator' | 'user';
+          role?: 'admin' | 'user';
           status?: 'active' | 'suspended' | 'banned';
           created_at?: string;
         };

@@ -7,7 +7,7 @@ import {
   type AdminUser
 } from './adminService';
 
-const roles: AdminRole[] = ['admin', 'moderator', 'user'];
+const roles: AdminRole[] = ['admin', 'user'];
 const statuses: AdminUser['status'][] = ['active', 'suspended', 'banned'];
 
 export default function AdminUsers() {

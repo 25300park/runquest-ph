@@ -1,7 +1,7 @@
 import { supabase, requireSupabaseClient } from '../lib/supabase';
 import type { Database, Json } from '../types/database';
 
-export type AdminRole = 'admin' | 'moderator' | 'user';
+export type AdminRole = 'admin' | 'user';
 export type AdminUser = Database['public']['Tables']['users']['Row'];
 export type AdminCharacter = Database['public']['Tables']['characters']['Row'];
 export type AdminCourse = Database['public']['Tables']['courses']['Row'];
@@ -34,20 +34,46 @@ export async function signOutAdmin() {
 
 export async function getCurrentAdminProfile() {
   const client = requireSupabaseClient();
-  const { data: sessionData, error: sessionError } = await client.auth.getSession();
+  const { data: userData, error: userError } = await client.auth.getUser();
 
-  if (sessionError) throw sessionError;
-  const userId = sessionData.session?.user.id;
-  if (!userId) return null;
+  if (userError) throw userError;
+  const authUser = userData.user;
+  if (!authUser) return null;
 
-  const { data, error } = await client
+  const { data: profileById, error: idError } = await client
     .from('users')
     .select('*')
-    .eq('id', userId)
+    .eq('id', authUser.id)
     .maybeSingle();
 
-  if (error) throw error;
-  return data;
+  if (idError) throw idError;
+  if (profileById) return profileById;
+
+  if (!authUser.email) return null;
+
+  const { data: profileByEmail, error: emailError } = await client
+    .from('users')
+    .select('*')
+    .eq('email', authUser.email)
+    .maybeSingle();
+
+  if (emailError) throw emailError;
+  if (profileByEmail) return profileByEmail;
+
+  const { data: createdProfile, error: createError } = await client
+    .from('users')
+    .insert({
+      id: authUser.id,
+      email: authUser.email,
+      name: authUser.user_metadata?.name ?? authUser.email,
+      role: 'user',
+      status: 'active'
+    })
+    .select('*')
+    .single();
+
+  if (createError) throw createError;
+  return createdProfile;
 }
 
 export async function logAdminAction(input: {
@@ -71,15 +97,7 @@ export async function logAdminAction(input: {
 
 export async function getAdminDashboardStats() {
   const client = requireSupabaseClient();
-  const [
-    users,
-    characters,
-    courses,
-    flagged,
-    wallets,
-    races,
-    guilds
-  ] = await Promise.all([
+  const results = await Promise.allSettled([
     client.from('users').select('id', { count: 'exact', head: true }),
     client.from('characters').select('id', { count: 'exact', head: true }),
     client.from('courses').select('id', { count: 'exact', head: true }),
@@ -88,17 +106,26 @@ export async function getAdminDashboardStats() {
     client.from('race_sessions').select('id', { count: 'exact', head: true }).eq('status', 'running'),
     client.from('guilds').select('id', { count: 'exact', head: true })
   ]);
+  const safeResult = <T,>(index: number): T | null =>
+    results[index].status === 'fulfilled' ? (results[index].value as T) : null;
+  const users = safeResult<{ count: number | null }>(0);
+  const characters = safeResult<{ count: number | null }>(1);
+  const courses = safeResult<{ count: number | null }>(2);
+  const flagged = safeResult<{ count: number | null }>(3);
+  const wallets = safeResult<{ data: Array<{ balance: number }> | null }>(4);
+  const races = safeResult<{ count: number | null }>(5);
+  const guilds = safeResult<{ count: number | null }>(6);
 
-  const walletBalance = (wallets.data ?? []).reduce((total, wallet) => total + wallet.balance, 0);
+  const walletBalance = (wallets?.data ?? []).reduce((total, wallet) => total + (wallet.balance ?? 0), 0);
 
   return {
-    users: users.count ?? 0,
-    characters: characters.count ?? 0,
-    courses: courses.count ?? 0,
-    flaggedReports: flagged.count ?? 0,
+    users: users?.count ?? 0,
+    characters: characters?.count ?? 0,
+    courses: courses?.count ?? 0,
+    flaggedReports: flagged?.count ?? 0,
     tokenSupply: walletBalance,
-    liveRaces: races.count ?? 0,
-    guilds: guilds.count ?? 0
+    liveRaces: races?.count ?? 0,
+    guilds: guilds?.count ?? 0
   };
 }
 
@@ -437,7 +464,7 @@ export async function listEconomySettings() {
     },
     {
       setting_key: 'token_reward_multiplier',
-      setting_value: 1,
+      setting_value: 0,
       description: 'Global RunToken reward multiplier'
     },
   ];
@@ -512,28 +539,37 @@ export async function listFlaggedSessions() {
 }
 
 export function subscribeToAdminRealtime(onChange: () => void) {
-  const client = requireSupabaseClient();
-  const tables = [
-    'users',
-    'characters',
-    'courses',
-    'anti_cheat_reports',
-    'flagged_sessions',
-    'run_token_wallets',
-    'system_settings',
-    'leaderboard',
-    'guilds',
-    'race_sessions'
-  ];
-  const channel = tables.reduce(
-    (current, table) =>
-      current.on('postgres_changes', { event: '*', schema: 'public', table }, onChange),
-    client.channel('runquest-admin-control')
-  );
+  try {
+    const client = requireSupabaseClient();
+    const tables = [
+      'users',
+      'characters',
+      'courses',
+      'anti_cheat_reports',
+      'flagged_sessions',
+      'run_token_wallets',
+      'system_settings',
+      'leaderboard',
+      'guilds',
+      'race_sessions'
+    ];
+    const channel = tables.reduce(
+      (current, table) =>
+        current.on('postgres_changes', { event: '*', schema: 'public', table }, onChange),
+      client.channel('runquest-admin-control')
+    );
 
-  channel.subscribe();
+    channel.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('Admin realtime unavailable:', status);
+      }
+    });
 
-  return () => {
-    client.removeChannel(channel);
-  };
+    return () => {
+      client.removeChannel(channel);
+    };
+  } catch (error) {
+    console.warn('Admin realtime disabled:', error);
+    return () => undefined;
+  }
 }

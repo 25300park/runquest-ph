@@ -14,6 +14,7 @@ export default function CheatMonitorPanel() {
   const [reports, setReports] = useState<AdminCheatReport[]>([]);
   const [flags, setFlags] = useState<FlaggedSession[]>([]);
   const [status, setStatus] = useState('Loading cheat monitor...');
+  const [loading, setLoading] = useState(true);
 
   async function loadCheatData() {
     try {
@@ -21,11 +22,21 @@ export default function CheatMonitorPanel() {
         listCheatReports(),
         listFlaggedSessions()
       ]);
-      setReports(nextReports);
-      setFlags(nextFlags);
-      setStatus('Realtime cheat monitor active.');
+      const safeReports = nextReports ?? [];
+      const safeFlags = nextFlags ?? [];
+      setReports(safeReports);
+      setFlags(safeFlags);
+      setStatus(
+        safeReports.length === 0 && safeFlags.length === 0
+          ? 'No flagged users.'
+          : 'Realtime cheat monitor active.'
+      );
     } catch (error) {
+      setReports([]);
+      setFlags([]);
       setStatus(error instanceof Error ? error.message : 'Could not load cheat monitor.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -45,6 +56,16 @@ export default function CheatMonitorPanel() {
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="space-y-3">
           <h3 className="text-sm font-black uppercase text-stone-500">Flagged users</h3>
+          {loading && (
+            <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-sm text-stone-400">
+              Loading flagged users...
+            </div>
+          )}
+          {!loading && reports.length === 0 && (
+            <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-sm text-stone-400">
+              No flagged users.
+            </div>
+          )}
           {reports.map((report) => (
             <article key={report.id} className="rounded-lg border border-stone-800 bg-stone-950 p-4">
               <div className="flex items-start justify-between gap-3">
@@ -64,7 +85,13 @@ export default function CheatMonitorPanel() {
               {report.user_id && (
                 <button
                   type="button"
-                  onClick={() => void updateUserStatus(report.user_id!, 'banned').then(loadCheatData)}
+                  onClick={() =>
+                    void updateUserStatus(report.user_id!, 'banned')
+                      .then(loadCheatData)
+                      .catch((error) =>
+                        setStatus(error instanceof Error ? error.message : 'Could not ban user.')
+                      )
+                  }
                   className="mt-3 rounded-md border border-red-400/40 px-3 py-2 text-sm font-bold text-red-200"
                 >
                   Auto-ban User
@@ -76,6 +103,16 @@ export default function CheatMonitorPanel() {
 
         <div className="space-y-3">
           <h3 className="text-sm font-black uppercase text-stone-500">GPS anomaly logs</h3>
+          {loading && (
+            <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-sm text-stone-400">
+              Loading GPS anomaly logs...
+            </div>
+          )}
+          {!loading && flags.length === 0 && (
+            <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-sm text-stone-400">
+              No GPS anomaly logs.
+            </div>
+          )}
           {flags.map((flag) => (
             <article key={flag.id} className="rounded-lg border border-stone-800 bg-stone-950 p-4">
               <div className="flex items-start justify-between gap-3">
