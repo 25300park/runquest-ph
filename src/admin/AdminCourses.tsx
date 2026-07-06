@@ -97,7 +97,7 @@ export default function AdminCourses() {
                   className="w-full rounded-md border border-stone-700 bg-stone-900 px-3 py-2 font-black text-stone-100"
                 />
                 <p className="mt-2 text-xs text-stone-500">
-                  {course.area} · {course.distance.toFixed(2)} km · {course.difficulty}
+                  {course.area} / {(course.distance ?? 0).toFixed(2)} km / {course.difficulty}
                 </p>
               </div>
               <button

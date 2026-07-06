@@ -121,18 +121,19 @@ export async function storeAntiCheatReport(input: {
 }) {
   const client = requireSupabaseClient();
   const reasonText = input.analysis.findings.map((finding) => finding.reason).join(', ') || null;
+  const reportPayload = {
+    session_id: input.sessionId ?? null,
+    user_id: input.userId ?? null,
+    character_id: input.characterId ?? null,
+    cheat_score: input.analysis.cheatScore,
+    risk_level: input.analysis.riskLevel,
+    flagged: input.analysis.flagged,
+    reason: reasonText,
+    xp_multiplier: input.analysis.xpMultiplier
+  };
   const { data: report, error } = await client
     .from('anti_cheat_reports')
-    .insert({
-      session_id: input.sessionId ?? null,
-      user_id: input.userId ?? null,
-      character_id: input.characterId ?? null,
-      cheat_score: input.analysis.cheatScore,
-      risk_level: input.analysis.riskLevel,
-      flagged: input.analysis.flagged,
-      reason: reasonText,
-      xp_multiplier: input.analysis.xpMultiplier
-    })
+    .insert(reportPayload)
     .select('*')
     .single();
 
@@ -150,7 +151,9 @@ export async function storeAntiCheatReport(input: {
       }))
     );
 
-    if (flaggedError) throw flaggedError;
+    if (flaggedError) {
+      console.warn('Anti-cheat flag detail storage skipped:', flaggedError);
+    }
 
     if (input.sessionId) {
       const { error: sessionError } = await client
@@ -158,11 +161,13 @@ export async function storeAntiCheatReport(input: {
         .update({ status: 'flagged' })
         .eq('id', input.sessionId);
 
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        console.warn('Anti-cheat session status update skipped:', sessionError);
+      }
     }
   }
 
-  return report;
+  return report ?? reportPayload;
 }
 
 export async function analyzeAndStoreGpsSession(input: {

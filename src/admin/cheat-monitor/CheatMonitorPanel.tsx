@@ -42,7 +42,10 @@ export default function CheatMonitorPanel() {
 
   useEffect(() => {
     void loadCheatData();
-    return subscribeToAdminRealtime(() => void loadCheatData());
+    const unsubscribe = subscribeToAdminRealtime(() => void loadCheatData());
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, []);
 
   return (
@@ -74,13 +77,14 @@ export default function CheatMonitorPanel() {
                   <p className="mt-1 text-xs text-stone-500">Session {report.session_id ?? 'none'}</p>
                 </div>
                 <span className="rounded-md bg-red-950 px-2 py-1 text-xs font-black text-red-200">
-                  score {report.cheat_score}
+                  score {report.cheat_score ?? 0}
                 </span>
               </div>
               <div className="mt-3 grid gap-2 rounded-md bg-stone-900 p-3 text-xs text-stone-300">
                 <p>flagged_reason: {report.reason ?? 'No reason stored'}</p>
+                <p>risk_level: {report.risk_level ?? 'low'}</p>
                 <p>session_history: {report.session_id ?? 'No session linked'}</p>
-                <p>xp_multiplier: {report.xp_multiplier}</p>
+                <p>xp_multiplier: {report.xp_multiplier ?? 1}</p>
               </div>
               {report.user_id && (
                 <button

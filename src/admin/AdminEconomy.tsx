@@ -10,18 +10,26 @@ import {
 
 const fallbackSettings: AdminEconomySetting[] = [
   {
-    id: '',
-    setting_key: 'xp_reward_rate',
+    id: 'fallback-xp-multiplier',
+    setting_key: 'xp_multiplier',
     setting_value: 1,
     description: 'Global XP reward multiplier',
     updated_by: null,
     updated_at: ''
   },
   {
-    id: '',
-    setting_key: 'token_reward_multiplier',
-    setting_value: 0,
-    description: 'Global RunToken reward multiplier',
+    id: 'fallback-token-rate',
+    setting_key: 'token_rate',
+    setting_value: 10,
+    description: 'RunToken reward rate per km',
+    updated_by: null,
+    updated_at: ''
+  },
+  {
+    id: 'fallback-reward-curve',
+    setting_key: 'reward_curve',
+    setting_value: 1,
+    description: 'Global reward curve tuning factor',
     updated_by: null,
     updated_at: ''
   }
@@ -45,7 +53,11 @@ export default function AdminEconomy() {
     } catch (error) {
       setItems([]);
       setSettings(fallbackSettings);
-      setStatus(error instanceof Error ? error.message : 'Could not load economy items.');
+      setStatus(
+        error instanceof Error
+          ? `${error.message} Using safe economy defaults.`
+          : 'Could not load economy items. Using safe economy defaults.'
+      );
     } finally {
       setLoading(false);
     }
@@ -78,9 +90,9 @@ export default function AdminEconomy() {
                 type="number"
                 step="0.01"
                 defaultValue={setting.setting_value}
-                disabled={!setting.id}
+                disabled={setting.id.startsWith('fallback-')}
                 onBlur={(event) =>
-                  setting.id
+                  !setting.id.startsWith('fallback-')
                     ? void updateEconomySetting(setting.id, Number(event.target.value))
                         .then(loadEconomy)
                         .catch((error) =>
@@ -90,6 +102,11 @@ export default function AdminEconomy() {
                 }
                 className="mt-3 w-full rounded-md border border-stone-700 bg-stone-900 px-3 py-2 text-sm text-stone-100 disabled:opacity-60"
               />
+              {setting.id.startsWith('fallback-') && (
+                <p className="mt-2 text-xs text-amber-200">
+                  Safe default active until Supabase settings load.
+                </p>
+              )}
             </article>
           ))}
         </div>
@@ -105,7 +122,7 @@ export default function AdminEconomy() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-black">{item.name}</p>
-                <p className="mt-1 text-xs text-stone-500">{item.type} · {item.rarity}</p>
+                <p className="mt-1 text-xs text-stone-500">{item.type} / {item.rarity}</p>
               </div>
               <span className="rounded-md bg-stone-900 px-2 py-1 text-xs font-black text-amber-200">
                 {item.token_price} RT
