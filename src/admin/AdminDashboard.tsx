@@ -18,62 +18,93 @@ const emptyStats: DashboardStats = {
 };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'characters' | 'courses' | 'economy' | 'cheat'>('characters');
+  const [activeTab, setActiveTab] =
+    useState<'characters' | 'courses' | 'economy' | 'cheat'>('characters');
+
   const [stats, setStats] = useState<DashboardStats>(emptyStats);
-  const [status, setStatus] = useState('Loading live control data...');
+  const [status, setStatus] = useState('Loading admin dashboard...');
 
   async function loadStats() {
     try {
-      setStats(await getAdminDashboardStats());
-      setStatus('Realtime monitoring active.');
+      const data = await getAdminDashboardStats();
+
+      if (!data) {
+        setStatus('No admin data returned from Supabase.');
+        return;
+      }
+
+      setStats(data);
+      setStatus('Realtime admin system active.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not load admin dashboard.');
+      console.error('Admin dashboard error:', error);
+      setStatus('Failed to load admin dashboard (check Supabase connection).');
     }
   }
 
   useEffect(() => {
-    void loadStats();
-    return subscribeToAdminRealtime(() => void loadStats());
+    loadStats();
+
+    const unsubscribe = subscribeToAdminRealtime(() => {
+      loadStats();
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, []);
 
   return (
-    <div className="space-y-4">
+    <div className="min-h-screen space-y-4 bg-black text-white p-4">
+
+      {/* HEADER */}
       <section className="rounded-lg border border-stone-800 bg-stone-950 p-4">
-        <p className="text-xs font-black uppercase text-amber-200">Live operations</p>
-        <h2 className="mt-1 text-2xl font-black">Admin Dashboard</h2>
-        <p className="mt-2 text-sm text-stone-400">{status}</p>
+        <p className="text-xs font-bold uppercase text-amber-300">
+          ADMIN CONTROL CENTER
+        </p>
+
+        <h1 className="text-2xl font-black">RunQuest Admin Dashboard</h1>
+
+        <p className="text-sm text-stone-400 mt-2">
+          {status}
+        </p>
       </section>
 
+      {/* STATS */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           ['Users', stats.users],
           ['Characters', stats.characters],
           ['Courses', stats.courses],
-          ['Flagged runs', stats.flaggedReports],
-          ['RunToken supply', stats.tokenSupply],
-          ['Live races', stats.liveRaces],
+          ['Flagged', stats.flaggedReports],
+          ['Tokens', stats.tokenSupply],
+          ['Live Races', stats.liveRaces],
           ['Guilds', stats.guilds]
         ].map(([label, value]) => (
-          <article key={label} className="rounded-lg border border-stone-800 bg-stone-950 p-4">
-            <p className="text-xs font-black uppercase text-stone-500">{label}</p>
-            <p className="mt-2 text-3xl font-black text-stone-50">{value}</p>
-          </article>
+          <div
+            key={label}
+            className="rounded-lg border border-stone-800 bg-stone-950 p-4"
+          >
+            <p className="text-xs text-stone-500 uppercase">{label}</p>
+            <p className="text-2xl font-black">{value}</p>
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-4 gap-2 rounded-lg border border-stone-800 bg-stone-950 p-2">
+      {/* TABS */}
+      <div className="grid grid-cols-4 gap-2">
         {[
           ['characters', 'Characters'],
           ['courses', 'Courses'],
           ['economy', 'Economy'],
-          ['cheat', 'Cheat Monitor']
+          ['cheat', 'Cheat']
         ].map(([key, label]) => (
           <button
             key={key}
-            type="button"
-            onClick={() => setActiveTab(key as typeof activeTab)}
-            className={`rounded-md px-2 py-3 text-xs font-black ${
-              activeTab === key ? 'bg-amber-300 text-stone-950' : 'text-stone-400'
+            onClick={() => setActiveTab(key as any)}
+            className={`p-3 text-xs font-bold rounded ${
+              activeTab === key
+                ? 'bg-amber-300 text-black'
+                : 'bg-stone-900 text-stone-400'
             }`}
           >
             {label}
@@ -81,10 +112,13 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {activeTab === 'characters' && <AdminCharacters />}
-      {activeTab === 'courses' && <AdminCourses />}
-      {activeTab === 'economy' && <AdminEconomy />}
-      {activeTab === 'cheat' && <AdminCheatMonitor />}
+      {/* CONTENT */}
+      <div className="border border-stone-800 rounded-lg p-4">
+        {activeTab === 'characters' && <AdminCharacters />}
+        {activeTab === 'courses' && <AdminCourses />}
+        {activeTab === 'economy' && <AdminEconomy />}
+        {activeTab === 'cheat' && <AdminCheatMonitor />}
+      </div>
     </div>
   );
 }
