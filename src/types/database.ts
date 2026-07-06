@@ -287,6 +287,204 @@ export type Database = {
           }
         ];
       };
+      leaderboard: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          character_id: string | null;
+          region: 'BGC' | 'Makati' | 'MOA' | 'Global';
+          total_distance: number;
+          total_xp: number;
+          level: number;
+          streak_bonus: number;
+          weekly_score: number;
+          week_start: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          region?: 'BGC' | 'Makati' | 'MOA' | 'Global';
+          total_distance?: number;
+          total_xp?: number;
+          level?: number;
+          streak_bonus?: number;
+          weekly_score?: number;
+          week_start?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          region?: 'BGC' | 'Makati' | 'MOA' | 'Global';
+          total_distance?: number;
+          total_xp?: number;
+          level?: number;
+          streak_bonus?: number;
+          weekly_score?: number;
+          week_start?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      guilds: {
+        Row: {
+          id: string;
+          name: string;
+          leader_id: string | null;
+          shared_xp: number;
+          total_distance: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          leader_id?: string | null;
+          shared_xp?: number;
+          total_distance?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          leader_id?: string | null;
+          shared_xp?: number;
+          total_distance?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      guild_members: {
+        Row: {
+          id: string;
+          guild_id: string;
+          user_id: string | null;
+          character_id: string | null;
+          role: 'leader' | 'officer' | 'member';
+          contributed_xp: number;
+          contributed_distance: number;
+          joined_at: string;
+        };
+        Insert: {
+          id?: string;
+          guild_id: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          role?: 'leader' | 'officer' | 'member';
+          contributed_xp?: number;
+          contributed_distance?: number;
+          joined_at?: string;
+        };
+        Update: {
+          id?: string;
+          guild_id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          role?: 'leader' | 'officer' | 'member';
+          contributed_xp?: number;
+          contributed_distance?: number;
+          joined_at?: string;
+        };
+        Relationships: [];
+      };
+      guild_challenges: {
+        Row: {
+          id: string;
+          guild_id: string;
+          name: string;
+          target_distance: number;
+          target_xp: number;
+          progress_distance: number;
+          progress_xp: number;
+          starts_at: string;
+          ends_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          guild_id: string;
+          name: string;
+          target_distance?: number;
+          target_xp?: number;
+          progress_distance?: number;
+          progress_xp?: number;
+          starts_at?: string;
+          ends_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          guild_id?: string;
+          name?: string;
+          target_distance?: number;
+          target_xp?: number;
+          progress_distance?: number;
+          progress_xp?: number;
+          starts_at?: string;
+          ends_at?: string | null;
+        };
+        Relationships: [];
+      };
+      item_ownership: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          character_id: string | null;
+          item_id: string;
+          serial_number: number;
+          upgrade_level: number;
+          trade_locked: boolean;
+          acquired_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          item_id: string;
+          serial_number?: number;
+          upgrade_level?: number;
+          trade_locked?: boolean;
+          acquired_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          item_id?: string;
+          serial_number?: number;
+          upgrade_level?: number;
+          trade_locked?: boolean;
+          acquired_at?: string;
+        };
+        Relationships: [];
+      };
+      item_drops: {
+        Row: {
+          id: string;
+          character_id: string | null;
+          item_id: string;
+          source: string;
+          rarity_roll: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          character_id?: string | null;
+          item_id: string;
+          source?: string;
+          rarity_roll?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          character_id?: string | null;
+          item_id?: string;
+          source?: string;
+          rarity_roll?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

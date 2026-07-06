@@ -14,6 +14,7 @@ import CourseDetailPage from '../pages/CourseDetailPage';
 import CourseViralHubPage from '../pages/CourseViralHubPage';
 import ExplorationMapPage from '../pages/ExplorationMapPage';
 import LandingPage from '../pages/LandingPage';
+import LeaderboardPage from '../pages/LeaderboardPage';
 import LoginPage from '../pages/LoginPage';
 import ProfilePage from '../pages/ProfilePage';
 import QuestCompletedPage from '../pages/QuestCompletedPage';
@@ -33,6 +34,7 @@ export const appRoutes = (
     <Route path="/map" element={<ExplorationMapPage />} />
     <Route path="/coach" element={<AiCoachPage />} />
     <Route path="/community" element={<CommunityPage />} />
+    <Route path="/leaderboard" element={<LeaderboardPage />} />
     <Route path="/course-builder" element={<CourseBuilder />} />
     <Route path="/course-builder/:courseId" element={<CourseBuilder />} />
     <Route path="/advanced-courses" element={<AdvancedCourseSystemPage />} />

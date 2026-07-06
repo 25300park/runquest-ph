@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getCharacterProfile, subscribeToCharacterUpdates } from '../services/characterService';
+import { subscribeToAvatarRealtime } from '../services/aiAvatarService';
+import { subscribeToEquipmentEconomy } from '../services/equipmentEconomyService';
 import type { CharacterProfile } from '../types/rpgCharacter';
 import { buildAvatarPrompt, describeOutfitLayer } from '../utils/avatarEngine';
 import { getLevelProgress, xpPerLevel } from '../utils/characterRpg';
@@ -12,7 +14,7 @@ export default function CharacterDashboardPage() {
   const [status, setStatus] = useState('Loading character...');
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
+    const unsubscribers: Array<() => void> = [];
 
     async function loadProfile() {
       try {
@@ -21,10 +23,13 @@ export default function CharacterDashboardPage() {
         setStatus(nextProfile ? '' : 'No character found.');
 
         if (nextProfile) {
-          unsubscribe = subscribeToCharacterUpdates(nextProfile.character.id, async () => {
+          const refresh = async () => {
             const refreshedProfile = await getCharacterProfile(nextProfile.character.id);
             setProfile(refreshedProfile);
-          });
+          };
+          unsubscribers.push(subscribeToCharacterUpdates(nextProfile.character.id, refresh));
+          unsubscribers.push(subscribeToAvatarRealtime(nextProfile.character.id, refresh));
+          unsubscribers.push(subscribeToEquipmentEconomy(nextProfile.character.id, refresh));
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unable to load character.';
@@ -35,7 +40,7 @@ export default function CharacterDashboardPage() {
     loadProfile();
 
     return () => {
-      unsubscribe?.();
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, []);
 

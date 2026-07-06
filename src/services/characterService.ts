@@ -295,10 +295,14 @@ export async function applyRunReward(input: CharacterRunRewardInput) {
   }
 
   return {
+    characterId: profile.character.id,
     xpEarned,
     previousLevel: profile.character.level,
     nextLevel,
-    leveledUp
+    leveledUp,
+    totalDistance: stats ? stats.total_distance + input.distanceKm : input.distanceKm,
+    totalXp: stats ? stats.total_xp + xpEarned : xpEarned,
+    streakDays: stats ? Math.max(1, stats.streak_days + 1) : 1
   };
 }
 

@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { mockCourses } from '../data/mockCourses';
 import { applyRunReward } from '../services/characterService';
+import { refreshCharacterAvatar } from '../services/aiAvatarService';
+import { maybeDropEquipment } from '../services/equipmentEconomyService';
+import { contributeToGuild } from '../services/guildService';
+import { updateLeaderboardScore } from '../features/leaderboard/leaderboardService';
+import { getCharacterProfile } from '../services/characterService';
 import type { CompletedActivitySummary } from '../types/activity';
 import {
   calculateActivityReward,
@@ -56,7 +61,7 @@ export default function QuestCompletedPage() {
       difficultyMultiplier: difficultyXpValues[summary.difficulty ?? course.difficulty] ?? 1,
       loopMultiplier: loopCount
     })
-      .then((reward) => {
+      .then(async (reward) => {
         if (!reward) {
           setCharacterRewardStatus('Create a character to store RPG XP in Supabase.');
           return;
@@ -67,6 +72,25 @@ export default function QuestCompletedPage() {
             ? `Character level up: ${reward.previousLevel} to ${reward.nextLevel}`
             : `Character gained ${reward.xpEarned} RPG XP`
         );
+        await updateLeaderboardScore({
+          characterId: reward.characterId,
+          region: 'Global',
+          totalDistance: reward.totalDistance,
+          totalXp: reward.totalXp,
+          level: reward.nextLevel,
+          streakDays: reward.streakDays
+        });
+        await contributeToGuild({
+          characterId: reward.characterId,
+          xp: reward.xpEarned,
+          distanceKm: summary.distanceKm
+        });
+        await maybeDropEquipment(reward.characterId);
+
+        const profile = await getCharacterProfile(reward.characterId);
+        if (profile) {
+          await refreshCharacterAvatar(profile, 'quest_completed');
+        }
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : 'Character XP update failed.';
