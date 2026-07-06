@@ -294,7 +294,9 @@ export type Database = {
           character_id: string | null;
           region: 'BGC' | 'Makati' | 'MOA' | 'Global';
           total_distance: number;
+          distance_total: number;
           total_xp: number;
+          xp_total: number;
           level: number;
           streak_bonus: number;
           weekly_score: number;
@@ -307,7 +309,9 @@ export type Database = {
           character_id?: string | null;
           region?: 'BGC' | 'Makati' | 'MOA' | 'Global';
           total_distance?: number;
+          distance_total?: number;
           total_xp?: number;
+          xp_total?: number;
           level?: number;
           streak_bonus?: number;
           weekly_score?: number;
@@ -320,7 +324,9 @@ export type Database = {
           character_id?: string | null;
           region?: 'BGC' | 'Makati' | 'MOA' | 'Global';
           total_distance?: number;
+          distance_total?: number;
           total_xp?: number;
+          xp_total?: number;
           level?: number;
           streak_bonus?: number;
           weekly_score?: number;
@@ -335,6 +341,7 @@ export type Database = {
           name: string;
           leader_id: string | null;
           shared_xp: number;
+          total_xp: number;
           total_distance: number;
           created_at: string;
         };
@@ -343,6 +350,7 @@ export type Database = {
           name: string;
           leader_id?: string | null;
           shared_xp?: number;
+          total_xp?: number;
           total_distance?: number;
           created_at?: string;
         };
@@ -351,6 +359,7 @@ export type Database = {
           name?: string;
           leader_id?: string | null;
           shared_xp?: number;
+          total_xp?: number;
           total_distance?: number;
           created_at?: string;
         };
@@ -365,6 +374,7 @@ export type Database = {
           role: 'leader' | 'officer' | 'member';
           contributed_xp: number;
           contributed_distance: number;
+          contribution_score: number;
           joined_at: string;
         };
         Insert: {
@@ -375,6 +385,7 @@ export type Database = {
           role?: 'leader' | 'officer' | 'member';
           contributed_xp?: number;
           contributed_distance?: number;
+          contribution_score?: number;
           joined_at?: string;
         };
         Update: {
@@ -385,6 +396,7 @@ export type Database = {
           role?: 'leader' | 'officer' | 'member';
           contributed_xp?: number;
           contributed_distance?: number;
+          contribution_score?: number;
           joined_at?: string;
         };
         Relationships: [];
@@ -482,6 +494,66 @@ export type Database = {
           source?: string;
           rarity_roll?: number;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      items: {
+        Row: {
+          id: string;
+          name: string;
+          type: 'shoe' | 'hat' | 'backpack' | 'accessory';
+          rarity: 'common' | 'rare' | 'epic' | 'legendary';
+          xp_bonus: number;
+          speed_bonus: number;
+          stamina_bonus: number;
+          image_url: string | null;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          type: 'shoe' | 'hat' | 'backpack' | 'accessory';
+          rarity?: 'common' | 'rare' | 'epic' | 'legendary';
+          xp_bonus?: number;
+          speed_bonus?: number;
+          stamina_bonus?: number;
+          image_url?: string | null;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          type?: 'shoe' | 'hat' | 'backpack' | 'accessory';
+          rarity?: 'common' | 'rare' | 'epic' | 'legendary';
+          xp_bonus?: number;
+          speed_bonus?: number;
+          stamina_bonus?: number;
+          image_url?: string | null;
+        };
+        Relationships: [];
+      };
+      character_items: {
+        Row: {
+          id: string;
+          character_id: string;
+          item_id: string;
+          equipped: boolean;
+          upgrade_level: number;
+          acquired_at: string;
+        };
+        Insert: {
+          id?: string;
+          character_id: string;
+          item_id: string;
+          equipped?: boolean;
+          upgrade_level?: number;
+          acquired_at?: string;
+        };
+        Update: {
+          id?: string;
+          character_id?: string;
+          item_id?: string;
+          equipped?: boolean;
+          upgrade_level?: number;
+          acquired_at?: string;
         };
         Relationships: [];
       };

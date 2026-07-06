@@ -19,6 +19,17 @@ export async function getEquipmentCatalog() {
   return data ?? [];
 }
 
+export async function getVirtualItemCatalog() {
+  const client = requireSupabaseClient();
+  const { data, error } = await client.from('items').select('*').order('rarity');
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}
+
 export function rollItemRarity(seedValue: number) {
   if (seedValue <= rarityDropWeights.common) return 'common';
   if (seedValue <= rarityDropWeights.rare) return 'rare';
@@ -125,6 +136,16 @@ export function subscribeToEquipmentEconomy(characterId: string, onChange: () =>
         event: '*',
         schema: 'public',
         table: 'character_equipment',
+        filter: `character_id=eq.${characterId}`
+      },
+      onChange
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'character_items',
         filter: `character_id=eq.${characterId}`
       },
       onChange

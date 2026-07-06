@@ -19,7 +19,7 @@ function deterministicAvatarUrl(input: GenerateAvatarInput) {
 export async function generateAvatarImage(input: GenerateAvatarInput) {
   const apiUrl = import.meta.env.VITE_AI_AVATAR_API_URL as string | undefined;
   const prompt = [
-    'consistent character identity, same face, same body structure, only outfit changes based on equipment, high consistency avatar',
+    'same character identity, consistent face, same body proportions, only outfit and equipment changes, high consistency RPG avatar',
     `character_id: ${input.characterId}`,
     `base_image: ${input.characterBaseImage ?? 'none'}`,
     `level: ${input.level}`,
@@ -112,6 +112,16 @@ export function subscribeToAvatarRealtime(characterId: string, onChange: () => v
         event: '*',
         schema: 'public',
         table: 'character_equipment',
+        filter: `character_id=eq.${characterId}`
+      },
+      onChange
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'character_stats',
         filter: `character_id=eq.${characterId}`
       },
       onChange

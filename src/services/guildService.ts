@@ -90,7 +90,9 @@ export async function contributeToGuild(input: {
         .from('guild_members')
         .update({
           contributed_xp: membership.contributed_xp + input.xp,
-          contributed_distance: membership.contributed_distance + input.distanceKm
+          contributed_distance: membership.contributed_distance + input.distanceKm,
+          contribution_score:
+            membership.contribution_score + input.xp * 2 + input.distanceKm
         })
         .eq('id', membership.id);
 
@@ -112,6 +114,7 @@ export async function contributeToGuild(input: {
         .from('guilds')
         .update({
           shared_xp: guild.shared_xp + input.xp,
+          total_xp: guild.total_xp + input.xp,
           total_distance: guild.total_distance + input.distanceKm
         })
         .eq('id', guild.id);

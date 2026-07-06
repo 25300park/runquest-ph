@@ -11,9 +11,9 @@ export function calculateLeaderboardScore(input: {
   level: number;
   streakDays: number;
 }) {
-  const levelBonus = input.level * 25;
+  const levelBonus = input.level * 10;
   const streakBonus = input.streakDays * 10;
-  return Number((input.distanceKm + input.xp + levelBonus + streakBonus).toFixed(2));
+  return Number((input.distanceKm * 1 + input.xp * 2 + levelBonus + streakBonus).toFixed(2));
 }
 
 export async function getLeaderboard(region: LeaderboardRegion = 'Global') {
@@ -63,7 +63,9 @@ export async function updateLeaderboardScore(input: {
     character_id: input.characterId,
     region,
     total_distance: input.totalDistance,
+    distance_total: input.totalDistance,
     total_xp: input.totalXp,
+    xp_total: input.totalXp,
     level: input.level,
     streak_bonus: input.streakDays * 10,
     weekly_score: weeklyScore,

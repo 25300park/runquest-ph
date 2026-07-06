@@ -140,6 +140,32 @@ create table if not exists public.item_drops (
   created_at timestamp with time zone not null default now()
 );
 
+alter table public.leaderboard add column if not exists distance_total float8 not null default 0;
+alter table public.leaderboard add column if not exists xp_total int not null default 0;
+alter table public.guilds add column if not exists total_xp int not null default 0;
+alter table public.guild_members add column if not exists contribution_score float8 not null default 0;
+alter table public.equipment_items add column if not exists stamina_bonus float8 not null default 0;
+
+create table if not exists public.items (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  type text not null check (type in ('shoe', 'hat', 'backpack', 'accessory')),
+  rarity text not null default 'common' check (rarity in ('common', 'rare', 'epic', 'legendary')),
+  xp_bonus float8 not null default 0,
+  speed_bonus float8 not null default 0,
+  stamina_bonus float8 not null default 0,
+  image_url text
+);
+
+create table if not exists public.character_items (
+  id uuid primary key default gen_random_uuid(),
+  character_id uuid not null references public.characters(id) on delete cascade,
+  item_id uuid not null references public.items(id) on delete cascade,
+  equipped boolean not null default false,
+  upgrade_level int not null default 0,
+  acquired_at timestamp with time zone not null default now()
+);
+
 create index if not exists idx_courses_area on public.courses(area);
 create index if not exists idx_course_points_course_id on public.course_points(course_id);
 create index if not exists idx_activities_user_id on public.activities(user_id);
@@ -156,6 +182,8 @@ create index if not exists idx_guild_challenges_guild_id on public.guild_challen
 create index if not exists idx_item_ownership_character_id on public.item_ownership(character_id);
 create index if not exists idx_item_ownership_item_id on public.item_ownership(item_id);
 create index if not exists idx_item_drops_character_id on public.item_drops(character_id);
+create index if not exists idx_character_items_character_id on public.character_items(character_id);
+create index if not exists idx_character_items_item_id on public.character_items(item_id);
 
 alter table public.users enable row level security;
 alter table public.courses enable row level security;
@@ -171,6 +199,8 @@ alter table public.guild_members enable row level security;
 alter table public.guild_challenges enable row level security;
 alter table public.item_ownership enable row level security;
 alter table public.item_drops enable row level security;
+alter table public.items enable row level security;
+alter table public.character_items enable row level security;
 
 drop policy if exists "Users are readable by everyone" on public.users;
 create policy "Users are readable by everyone"
@@ -328,4 +358,26 @@ using (true);
 drop policy if exists "Item drops are insertable by everyone in prototype" on public.item_drops;
 create policy "Item drops are insertable by everyone in prototype"
 on public.item_drops for insert
+with check (true);
+
+drop policy if exists "Items are readable by everyone" on public.items;
+create policy "Items are readable by everyone"
+on public.items for select
+using (true);
+
+drop policy if exists "Items are writable by everyone in prototype" on public.items;
+create policy "Items are writable by everyone in prototype"
+on public.items for all
+using (true)
+with check (true);
+
+drop policy if exists "Character items are readable by everyone" on public.character_items;
+create policy "Character items are readable by everyone"
+on public.character_items for select
+using (true);
+
+drop policy if exists "Character items are writable by everyone in prototype" on public.character_items;
+create policy "Character items are writable by everyone in prototype"
+on public.character_items for all
+using (true)
 with check (true);
