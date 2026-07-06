@@ -54,8 +54,16 @@ async function main() {
       const healthResponse = await assertOk(`${baseUrl}/api/health`, 'Health endpoint');
       const health = await healthResponse.json();
 
-      if (!health.supabase?.ok) {
-        throw new Error(`Supabase health failed: ${health.supabase?.message ?? 'unknown error'}`);
+      if (health.status !== 'ok' && health.ok !== true) {
+        throw new Error('Health endpoint returned failed status.');
+      }
+
+      if (health.supabase !== true) {
+        throw new Error(`Supabase health failed: ${health.checks?.supabase?.message ?? 'unknown error'}`);
+      }
+
+      if (health.admin !== true) {
+        throw new Error(`Admin route health failed: ${health.checks?.admin?.message ?? 'unknown error'}`);
       }
 
       await assertOk(`${baseUrl}/admin`, 'Admin route');

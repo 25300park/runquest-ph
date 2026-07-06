@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { signInAdmin } from './adminService';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState('');
@@ -14,7 +15,8 @@ export default function AdminLogin() {
 
     try {
       await signInAdmin(email, password);
-      navigate('/admin/dashboard', { replace: true });
+      const from = (location.state as { from?: string } | null)?.from ?? '/admin/dashboard';
+      navigate(from === '/admin/login' ? '/admin/dashboard' : from, { replace: true });
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Admin login failed.');
     }
