@@ -225,6 +225,13 @@ create table if not exists public.system_settings (
   updated_at timestamp with time zone not null default now()
 );
 
+insert into public.system_settings (setting_key, setting_value, description)
+values
+  ('xp_multiplier', 1, 'Global XP reward multiplier'),
+  ('token_rate', 10, 'RunToken reward rate per km'),
+  ('reward_curve', 1, 'Global reward curve tuning factor')
+on conflict (setting_key) do nothing;
+
 create table if not exists public.items (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -361,11 +368,14 @@ create table if not exists public.anti_cheat_reports (
   user_id uuid references public.users(id) on delete set null,
   character_id uuid references public.characters(id) on delete set null,
   cheat_score float8 not null default 0,
+  risk_level text not null default 'low' check (risk_level in ('low', 'medium', 'high')),
   flagged boolean not null default false,
   reason text,
   xp_multiplier float8 not null default 1,
   created_at timestamp with time zone not null default now()
 );
+
+alter table public.anti_cheat_reports add column if not exists risk_level text not null default 'low' check (risk_level in ('low', 'medium', 'high'));
 
 create table if not exists public.flagged_sessions (
   id uuid primary key default gen_random_uuid(),

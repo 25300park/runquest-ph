@@ -17,6 +17,7 @@ export type AntiCheatFinding = {
 
 export type AntiCheatAnalysis = {
   cheatScore: number;
+  riskLevel: 'low' | 'medium' | 'high';
   flagged: boolean;
   xpMultiplier: number;
   findings: AntiCheatFinding[];
@@ -36,6 +37,12 @@ function scoreToMultiplier(score: number) {
   if (score >= 55) return 0.25;
   if (score >= 30) return 0.5;
   return 1;
+}
+
+function scoreToRiskLevel(score: number): AntiCheatAnalysis['riskLevel'] {
+  if (score >= 70) return 'high';
+  if (score >= 30) return 'medium';
+  return 'low';
 }
 
 export function validateGpsPoint(previous: GpsPoint | null, next: GpsPoint): AntiCheatFinding[] {
@@ -99,6 +106,7 @@ export function analyzeMovement(points: GpsPoint[]): AntiCheatAnalysis {
 
   return {
     cheatScore,
+    riskLevel: scoreToRiskLevel(cheatScore),
     flagged: cheatScore >= 30,
     xpMultiplier: scoreToMultiplier(cheatScore),
     findings
@@ -120,6 +128,7 @@ export async function storeAntiCheatReport(input: {
       user_id: input.userId ?? null,
       character_id: input.characterId ?? null,
       cheat_score: input.analysis.cheatScore,
+      risk_level: input.analysis.riskLevel,
       flagged: input.analysis.flagged,
       reason: reasonText,
       xp_multiplier: input.analysis.xpMultiplier
@@ -179,4 +188,17 @@ export async function analyzeAndStoreGpsSession(input: {
   });
 
   return { analysis, report };
+}
+
+export async function analyzeAndStoreGpsSessionSafely(input: {
+  sessionId: string;
+  userId?: string | null;
+  characterId?: string | null;
+}) {
+  try {
+    return await analyzeAndStoreGpsSession(input);
+  } catch (error) {
+    console.warn('Anti-cheat analysis skipped:', error);
+    return null;
+  }
 }

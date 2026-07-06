@@ -918,6 +918,7 @@ export type Database = {
           user_id: string | null;
           character_id: string | null;
           cheat_score: number;
+          risk_level: 'low' | 'medium' | 'high';
           flagged: boolean;
           reason: string | null;
           xp_multiplier: number;
@@ -929,6 +930,7 @@ export type Database = {
           user_id?: string | null;
           character_id?: string | null;
           cheat_score?: number;
+          risk_level?: 'low' | 'medium' | 'high';
           flagged?: boolean;
           reason?: string | null;
           xp_multiplier?: number;
@@ -940,6 +942,7 @@ export type Database = {
           user_id?: string | null;
           character_id?: string | null;
           cheat_score?: number;
+          risk_level?: 'low' | 'medium' | 'high';
           flagged?: boolean;
           reason?: string | null;
           xp_multiplier?: number;

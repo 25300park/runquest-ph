@@ -4,6 +4,7 @@ import AdminCharacters from './AdminCharacters';
 import AdminCourses from './AdminCourses';
 import AdminEconomy from './AdminEconomy';
 import AdminCheatMonitor from './AdminCheatMonitor';
+import { getEnvironmentHealth } from '../utils/environment';
 
 type DashboardStats = Awaited<ReturnType<typeof getAdminDashboardStats>>;
 type AdminTab = 'characters' | 'courses' | 'economy' | 'cheat';
@@ -52,6 +53,7 @@ function AdminDashboardContent() {
   const [status, setStatus] = useState('Loading admin dashboard...');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const environmentHealth = getEnvironmentHealth();
 
   async function loadStats() {
     try {
@@ -115,6 +117,13 @@ function AdminDashboardContent() {
         <p className="text-sm text-stone-400 mt-2">
           {status}
         </p>
+        <div className="mt-3 rounded-md bg-stone-900 p-3 text-xs text-stone-300">
+          <p>Environment: {environmentHealth.mode}</p>
+          <p>Supabase: {environmentHealth.supabaseConfigured ? 'configured' : 'missing env'}</p>
+          {!environmentHealth.ready && (
+            <p className="mt-1 text-red-200">{environmentHealth.messages.join(' ')}</p>
+          )}
+        </div>
       </section>
 
       {/* STATS */}

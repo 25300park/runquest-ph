@@ -5,11 +5,15 @@ export type TokenRewardInput = {
   distanceKm: number;
   streakBonus?: number;
   difficultyMultiplier?: number;
+  tokenRate?: number;
+  rewardCurve?: number;
   cheatPenalty?: number;
 };
 
 export function calculateRunTokens(input: TokenRewardInput) {
-  const baseTokens = input.distanceKm * 10;
+  const tokenRate = input.tokenRate ?? 10;
+  const rewardCurve = input.rewardCurve ?? 1;
+  const baseTokens = input.distanceKm * tokenRate * rewardCurve;
   const streakBonus = input.streakBonus ?? 0;
   const difficultyBonus = input.difficultyMultiplier ?? 1;
   const cheatPenalty = input.cheatPenalty ?? 0;

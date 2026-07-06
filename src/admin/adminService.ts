@@ -458,14 +458,19 @@ export async function listEconomySettings() {
   const client = requireSupabaseClient();
   const defaults: Array<Database['public']['Tables']['system_settings']['Insert']> = [
     {
-      setting_key: 'xp_reward_rate',
+      setting_key: 'xp_multiplier',
       setting_value: 1,
       description: 'Global XP reward multiplier'
     },
     {
-      setting_key: 'token_reward_multiplier',
-      setting_value: 0,
-      description: 'Global RunToken reward multiplier'
+      setting_key: 'token_rate',
+      setting_value: 10,
+      description: 'RunToken reward rate per km'
+    },
+    {
+      setting_key: 'reward_curve',
+      setting_value: 1,
+      description: 'Global reward curve tuning factor'
     },
   ];
   const { data: existing, error: existingError } = await client
@@ -541,6 +546,16 @@ export async function listFlaggedSessions() {
 export function subscribeToAdminRealtime(onChange: () => void) {
   try {
     const client = requireSupabaseClient();
+    let debounceTimer: number | undefined;
+    const debouncedChange = () => {
+      if (typeof window === 'undefined') {
+        onChange();
+        return;
+      }
+
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(onChange, 500);
+    };
     const tables = [
       'users',
       'characters',
@@ -555,7 +570,7 @@ export function subscribeToAdminRealtime(onChange: () => void) {
     ];
     const channel = tables.reduce(
       (current, table) =>
-        current.on('postgres_changes', { event: '*', schema: 'public', table }, onChange),
+        current.on('postgres_changes', { event: '*', schema: 'public', table }, debouncedChange),
       client.channel('runquest-admin-control')
     );
 
@@ -566,6 +581,9 @@ export function subscribeToAdminRealtime(onChange: () => void) {
     });
 
     return () => {
+      if (typeof window !== 'undefined') {
+        window.clearTimeout(debounceTimer);
+      }
       client.removeChannel(channel);
     };
   } catch (error) {

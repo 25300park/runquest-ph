@@ -7,7 +7,7 @@ import { contributeToGuild } from '../services/guildService';
 import { updateLeaderboardScore } from '../features/leaderboard/leaderboardService';
 import { getCharacterProfile } from '../services/characterService';
 import { getRealtimeCoaching, saveCoachMessage } from '../services/aiCoachService';
-import { analyzeAndStoreGpsSession } from '../services/antiCheatService';
+import { analyzeAndStoreGpsSessionSafely } from '../services/antiCheatService';
 import { awardRunTokens } from '../features/economy/tokenEconomyService';
 import type { CompletedActivitySummary } from '../types/activity';
 import type { Course, Difficulty } from '../types/course';
@@ -111,7 +111,7 @@ export default function QuestCompletedPage() {
           distanceKm: summary.distanceKm
         });
         const antiCheatResult = summary.gpsSessionId
-          ? await analyzeAndStoreGpsSession({
+          ? await analyzeAndStoreGpsSessionSafely({
               sessionId: summary.gpsSessionId,
               characterId: reward.characterId
             })
