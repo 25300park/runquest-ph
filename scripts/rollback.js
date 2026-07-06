@@ -1,71 +1,70 @@
-import { confirm, getOutput, runChecked } from './pipeline-utils.js';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
+import { getOutput, runChecked } from './pipeline-utils.js';
 
 function getTags() {
-  return getOutput('git', ['tag', '--sort=-creatordate'])
+  return getOutput('git', ['tag', '--list', 'v[0-9]*', '--sort=-v:refname'])
     .split(/\r?\n/)
-    .filter((tag) => /^v\d+\.\d+\.\d+$/.test(tag));
+    .filter(Boolean);
 }
 
-async function askForTag(tags) {
+async function ask(question) {
+  const rl = readline.createInterface({ input, output });
+  const answer = await rl.question(question);
+  rl.close();
+
+  return answer.trim();
+}
+
+async function selectTag(tags) {
   console.log('Available release tags:');
-  tags.slice(0, 20).forEach((tag, index) => {
+  tags.forEach((tag, index) => {
     console.log(`${index + 1}. ${tag}`);
   });
 
-  const rl = readline.createInterface({ input, output });
-  const answer = await rl.question('\nRollback to which tag? Enter number or tag name: ');
-  rl.close();
+  const answer = await ask('\nSelect rollback version by number or tag name: ');
+  const index = Number(answer) - 1;
+  const selectedTag = Number.isInteger(index) && tags[index] ? tags[index] : answer;
 
-  const index = Number(answer.trim()) - 1;
-  const selected = Number.isInteger(index) && tags[index] ? tags[index] : answer.trim();
-
-  if (!tags.includes(selected)) {
-    throw new Error(`Unknown release tag: ${selected}`);
+  if (!tags.includes(selectedTag)) {
+    throw new Error(`Unknown rollback tag: ${selectedTag}`);
   }
 
-  return selected;
+  return selectedTag;
 }
 
 async function main() {
-  console.log('RunQuest PH rollback assistant');
+  console.log('RunQuest PH production rollback');
 
   const tags = getTags();
   if (tags.length === 0) {
-    throw new Error('No semantic release tags found.');
+    throw new Error('No release tags found. Rollback requires tags like v1.0.0.');
   }
 
-  const selectedTag = await askForTag(tags);
-  const branchName = `rollback-${selectedTag.replace(/^v/, 'v').replace(/\./g, '-')}`;
-  const shouldCreateBranch = await confirm(
-    `Create local rollback branch "${branchName}" from ${selectedTag}? (y/n) `
-  );
+  const selectedTag = await selectTag(tags);
 
-  if (!shouldCreateBranch) {
-    console.log('Rollback aborted safely. No Git state was changed.');
+  console.log(`
+WARNING: This rollback is destructive.
+
+It will execute:
+  git reset --hard ${selectedTag}
+  git push --force origin main
+
+This rewrites the remote main branch and will trigger a Vercel deployment from the selected tag.
+`);
+
+  const confirmation = await ask(`Type ROLLBACK ${selectedTag} to continue: `);
+
+  if (confirmation !== `ROLLBACK ${selectedTag}`) {
+    console.log('Rollback cancelled. No Git state was changed.');
     return;
   }
 
-  runChecked('git', ['switch', '-c', branchName, selectedTag], { stdio: 'inherit' });
+  runChecked('git', ['reset', '--hard', selectedTag], { stdio: 'inherit' });
+  runChecked('git', ['push', '--force', 'origin', 'main'], { stdio: 'inherit' });
 
-  console.log(`
-Rollback branch created: ${branchName}
-
-Next production rollback steps:
-1. Review the app locally:
-   npm.cmd run build
-
-2. Push the rollback branch if it is the correct target:
-   git push origin ${branchName}
-
-3. In Vercel, redeploy the deployment associated with ${selectedTag}, or promote this rollback branch.
-
-4. Supabase rollback is manual by design:
-   - Review supabase/schema.sql at ${selectedTag}
-   - Apply only the required reverse migration in the Supabase SQL editor
-   - Never run destructive DB rollback SQL without a backup
-`);
+  console.log(`Rollback completed to ${selectedTag}.`);
+  console.log('Vercel deployment triggered via GitHub');
 }
 
 main().catch((error) => {

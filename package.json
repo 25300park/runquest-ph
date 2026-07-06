@@ -12,6 +12,7 @@
     "predeploy": "node scripts/pre-deploy-check.js",
     "migration:check": "node scripts/supabase-migration-check.js",
     "release:version": "node scripts/release-version.js",
+    "devops": "node scripts/devops-cli.js",
     "safe-push": "node scripts/safe-push.js",
     "push:supabase-map": "node scripts/supabase-map-safe-push.js",
     "rollback": "node scripts/rollback.js"
