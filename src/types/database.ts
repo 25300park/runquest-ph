@@ -168,7 +168,7 @@ export type Database = {
           level: number;
           xp: number;
           avatar_base_url: string | null;
-          status: 'active' | 'banned';
+          status: 'active' | 'suspended' | 'banned';
           created_at: string;
         };
         Insert: {
@@ -178,7 +178,7 @@ export type Database = {
           level?: number;
           xp?: number;
           avatar_base_url?: string | null;
-          status?: 'active' | 'banned';
+          status?: 'active' | 'suspended' | 'banned';
           created_at?: string;
         };
         Update: {
@@ -188,7 +188,7 @@ export type Database = {
           level?: number;
           xp?: number;
           avatar_base_url?: string | null;
-          status?: 'active' | 'banned';
+          status?: 'active' | 'suspended' | 'banned';
           created_at?: string;
         };
         Relationships: [
@@ -1097,6 +1097,33 @@ export type Database = {
           target_id?: string | null;
           metadata?: Json;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      admin_economy_settings: {
+        Row: {
+          id: string;
+          setting_key: string;
+          setting_value: number;
+          description: string | null;
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          setting_key: string;
+          setting_value?: number;
+          description?: string | null;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          setting_key?: string;
+          setting_value?: number;
+          description?: string | null;
+          updated_by?: string | null;
+          updated_at?: string;
         };
         Relationships: [];
       };

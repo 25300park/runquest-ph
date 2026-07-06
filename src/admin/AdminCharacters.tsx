@@ -2,17 +2,24 @@ import { useEffect, useState } from 'react';
 import {
   assignEquipment,
   banCharacter,
+  listCharacterEquipment,
   listAdminCharacters,
   listEconomyItems,
+  removeCharacterEquipment,
   resetCharacterAvatar,
+  updateCharacterStatus,
   updateCharacterProgress,
   type AdminCharacter,
   type AdminItem
 } from './adminService';
+import type { Database } from '../types/database';
+
+type CharacterEquipment = Database['public']['Tables']['character_equipment']['Row'];
 
 export default function AdminCharacters() {
   const [characters, setCharacters] = useState<AdminCharacter[]>([]);
   const [items, setItems] = useState<AdminItem[]>([]);
+  const [equipmentByCharacter, setEquipmentByCharacter] = useState<Record<string, CharacterEquipment[]>>({});
   const [status, setStatus] = useState('Loading characters...');
 
   async function loadData() {
@@ -23,6 +30,10 @@ export default function AdminCharacters() {
       ]);
       setCharacters(nextCharacters);
       setItems(nextItems);
+      const equipmentPairs = await Promise.all(
+        nextCharacters.map(async (character) => [character.id, await listCharacterEquipment(character.id)] as const)
+      );
+      setEquipmentByCharacter(Object.fromEntries(equipmentPairs));
       setStatus('Character controls ready.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not load characters.');
@@ -111,6 +122,40 @@ export default function AdminCharacters() {
             >
               Ban Character
             </button>
+            <button
+              type="button"
+              onClick={() => void updateCharacterStatus(character.id, 'suspended').then(loadData)}
+              className="ml-2 mt-3 rounded-md border border-amber-300/40 px-3 py-2 text-sm font-bold text-amber-100"
+            >
+              Suspend Character
+            </button>
+
+            <div className="mt-4 rounded-md bg-stone-900 p-3">
+              <p className="text-xs font-black uppercase text-stone-500">Equipped / assigned items</p>
+              <div className="mt-2 grid gap-2">
+                {(equipmentByCharacter[character.id] ?? []).length === 0 ? (
+                  <p className="text-sm text-stone-500">No equipment assigned.</p>
+                ) : (
+                  (equipmentByCharacter[character.id] ?? []).map((equipment) => {
+                    const item = items.find((candidate) => candidate.id === equipment.item_id);
+                    return (
+                      <div key={equipment.id} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-stone-300">
+                          {item?.name ?? equipment.item_id} {equipment.equipped ? '(equipped)' : ''}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => void removeCharacterEquipment(equipment.id).then(loadData)}
+                          className="rounded-md border border-stone-700 px-2 py-1 text-xs font-bold text-stone-300"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </article>
         ))}
       </div>

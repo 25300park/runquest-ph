@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react';
 import {
+  listEconomySettings,
   listEconomyItems,
+  updateEconomySetting,
   updateEconomyItem,
+  type AdminEconomySetting,
   type AdminItem
 } from './adminService';
 
 export default function AdminEconomy() {
   const [items, setItems] = useState<AdminItem[]>([]);
+  const [settings, setSettings] = useState<AdminEconomySetting[]>([]);
   const [status, setStatus] = useState('Loading economy controls...');
 
-  async function loadItems() {
+  async function loadEconomy() {
     try {
-      setItems(await listEconomyItems());
+      const [nextItems, nextSettings] = await Promise.all([
+        listEconomyItems(),
+        listEconomySettings()
+      ]);
+      setItems(nextItems);
+      setSettings(nextSettings);
       setStatus('Economy controls ready.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not load economy items.');
@@ -19,7 +28,7 @@ export default function AdminEconomy() {
   }
 
   useEffect(() => {
-    void loadItems();
+    void loadEconomy();
   }, []);
 
   return (
@@ -31,6 +40,24 @@ export default function AdminEconomy() {
       </div>
 
       <div className="grid gap-3">
+        <div className="grid gap-3 md:grid-cols-2">
+          {settings.map((setting) => (
+            <article key={setting.id} className="rounded-lg border border-stone-800 bg-stone-950 p-4">
+              <p className="text-xs font-black uppercase text-stone-500">{setting.setting_key}</p>
+              <p className="mt-1 text-sm text-stone-400">{setting.description}</p>
+              <input
+                type="number"
+                step="0.01"
+                defaultValue={setting.setting_value}
+                onBlur={(event) =>
+                  void updateEconomySetting(setting.id, Number(event.target.value)).then(loadEconomy)
+                }
+                className="mt-3 w-full rounded-md border border-stone-700 bg-stone-900 px-3 py-2 text-sm text-stone-100"
+              />
+            </article>
+          ))}
+        </div>
+
         {items.map((item) => (
           <article key={item.id} className="rounded-lg border border-stone-800 bg-stone-950 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -54,7 +81,7 @@ export default function AdminEconomy() {
                       dropRate: item.drop_rate,
                       xpBonus: item.xp_bonus,
                       speedBonus: item.speed_bonus
-                    }).then(loadItems)
+                    }).then(loadEconomy)
                   }
                   className="mt-1 w-full rounded-md border border-stone-700 bg-stone-900 px-3 py-2 text-sm text-stone-100"
                 />
@@ -71,7 +98,7 @@ export default function AdminEconomy() {
                       dropRate: Number(event.target.value),
                       xpBonus: item.xp_bonus,
                       speedBonus: item.speed_bonus
-                    }).then(loadItems)
+                    }).then(loadEconomy)
                   }
                   className="mt-1 w-full rounded-md border border-stone-700 bg-stone-900 px-3 py-2 text-sm text-stone-100"
                 />
@@ -88,7 +115,7 @@ export default function AdminEconomy() {
                       dropRate: item.drop_rate,
                       xpBonus: Number(event.target.value),
                       speedBonus: item.speed_bonus
-                    }).then(loadItems)
+                    }).then(loadEconomy)
                   }
                   className="mt-1 w-full rounded-md border border-stone-700 bg-stone-900 px-3 py-2 text-sm text-stone-100"
                 />
@@ -105,7 +132,7 @@ export default function AdminEconomy() {
                       dropRate: item.drop_rate,
                       xpBonus: item.xp_bonus,
                       speedBonus: Number(event.target.value)
-                    }).then(loadItems)
+                    }).then(loadEconomy)
                   }
                   className="mt-1 w-full rounded-md border border-stone-700 bg-stone-900 px-3 py-2 text-sm text-stone-100"
                 />

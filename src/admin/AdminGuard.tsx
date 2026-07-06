@@ -41,7 +41,7 @@ export function AdminGuard({ children }: { children: ReactNode }) {
   }
 
   if (denied || !profile) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return children;

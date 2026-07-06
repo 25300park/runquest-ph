@@ -49,7 +49,7 @@ create table if not exists public.characters (
   level int not null default 1,
   xp int not null default 0,
   avatar_base_url text,
-  status text not null default 'active' check (status in ('active', 'banned')),
+  status text not null default 'active' check (status in ('active', 'suspended', 'banned')),
   created_at timestamp with time zone not null default now()
 );
 
@@ -156,7 +156,16 @@ alter table public.users add column if not exists role text not null default 'us
 alter table public.users add column if not exists status text not null default 'active' check (status in ('active', 'suspended', 'banned'));
 alter table public.courses add column if not exists status text not null default 'pending_review' check (status in ('draft', 'pending_review', 'approved', 'rejected', 'deleted'));
 alter table public.courses add column if not exists verified boolean not null default false;
-alter table public.characters add column if not exists status text not null default 'active' check (status in ('active', 'banned'));
+alter table public.characters add column if not exists status text not null default 'active' check (status in ('active', 'suspended', 'banned'));
+
+create table if not exists public.admin_economy_settings (
+  id uuid primary key default gen_random_uuid(),
+  setting_key text not null unique,
+  setting_value float8 not null default 1,
+  description text,
+  updated_by uuid references public.users(id) on delete set null,
+  updated_at timestamp with time zone not null default now()
+);
 
 create table if not exists public.items (
   id uuid primary key default gen_random_uuid(),
@@ -389,6 +398,7 @@ create index if not exists idx_users_role on public.users(role);
 create index if not exists idx_courses_status on public.courses(status);
 create index if not exists idx_characters_status on public.characters(status);
 create index if not exists idx_admin_audit_logs_admin_user_id on public.admin_audit_logs(admin_user_id);
+create index if not exists idx_admin_economy_settings_key on public.admin_economy_settings(setting_key);
 
 alter table public.users enable row level security;
 alter table public.courses enable row level security;
@@ -423,6 +433,7 @@ alter table public.ai_coach_messages enable row level security;
 alter table public.run_token_wallets enable row level security;
 alter table public.run_token_transactions enable row level security;
 alter table public.admin_audit_logs enable row level security;
+alter table public.admin_economy_settings enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -532,6 +543,11 @@ create policy "Character equipment is updateable by everyone in prototype"
 on public.character_equipment for update
 using (true)
 with check (true);
+
+drop policy if exists "Character equipment is deleteable by admins" on public.character_equipment;
+create policy "Character equipment is deleteable by admins"
+on public.character_equipment for delete
+using (public.is_admin());
 
 drop policy if exists "Leaderboard is readable by everyone" on public.leaderboard;
 create policy "Leaderboard is readable by everyone"
@@ -654,3 +670,5 @@ drop policy if exists "Run token transactions are open in prototype" on public.r
 create policy "Run token transactions are open in prototype" on public.run_token_transactions for all using (true) with check (true);
 drop policy if exists "Admin audit logs are admin only" on public.admin_audit_logs;
 create policy "Admin audit logs are admin only" on public.admin_audit_logs for all using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "Admin economy settings are admin only" on public.admin_economy_settings;
+create policy "Admin economy settings are admin only" on public.admin_economy_settings for all using (public.is_admin()) with check (public.is_admin());

@@ -7,6 +7,12 @@ export type AdminCharacter = Database['public']['Tables']['characters']['Row'];
 export type AdminCourse = Database['public']['Tables']['courses']['Row'];
 export type AdminItem = Database['public']['Tables']['equipment_items']['Row'];
 export type AdminCheatReport = Database['public']['Tables']['anti_cheat_reports']['Row'];
+export type AdminEconomySetting = Database['public']['Tables']['admin_economy_settings']['Row'];
+
+async function getAdminUserId() {
+  const profile = await getCurrentAdminProfile();
+  return profile?.id ?? null;
+}
 
 export async function signInAdmin(email: string, password: string) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -116,6 +122,13 @@ export async function updateUserRole(userId: string, role: AdminRole) {
     .single();
 
   if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'update_user_role',
+    targetTable: 'users',
+    targetId: userId,
+    metadata: { role }
+  });
   return data;
 }
 
@@ -132,6 +145,13 @@ export async function updateUserStatus(
     .single();
 
   if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'update_user_status',
+    targetTable: 'users',
+    targetId: userId,
+    metadata: { status }
+  });
   return data;
 }
 
@@ -156,6 +176,13 @@ export async function updateCharacterProgress(characterId: string, input: { leve
     .single();
 
   if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'update_character_progress',
+    targetTable: 'characters',
+    targetId: characterId,
+    metadata: input
+  });
   return data;
 }
 
@@ -169,20 +196,40 @@ export async function resetCharacterAvatar(characterId: string) {
     .single();
 
   if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'reset_character_avatar',
+    targetTable: 'characters',
+    targetId: characterId
+  });
   return data;
 }
 
-export async function banCharacter(characterId: string) {
+export async function updateCharacterStatus(
+  characterId: string,
+  status: AdminCharacter['status']
+) {
   const client = requireSupabaseClient();
   const { data, error } = await client
     .from('characters')
-    .update({ status: 'banned' })
+    .update({ status })
     .eq('id', characterId)
     .select('*')
     .single();
 
   if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'update_character_status',
+    targetTable: 'characters',
+    targetId: characterId,
+    metadata: { status }
+  });
   return data;
+}
+
+export function banCharacter(characterId: string) {
+  return updateCharacterStatus(characterId, 'banned');
 }
 
 export async function assignEquipment(characterId: string, itemId: string) {
@@ -194,7 +241,38 @@ export async function assignEquipment(characterId: string, itemId: string) {
     .single();
 
   if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'assign_equipment',
+    targetTable: 'character_equipment',
+    targetId: data.id,
+    metadata: { characterId, itemId }
+  });
   return data;
+}
+
+export async function listCharacterEquipment(characterId: string) {
+  const client = requireSupabaseClient();
+  const { data, error } = await client
+    .from('character_equipment')
+    .select('*')
+    .eq('character_id', characterId);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function removeCharacterEquipment(equipmentId: string) {
+  const client = requireSupabaseClient();
+  const { error } = await client.from('character_equipment').delete().eq('id', equipmentId);
+
+  if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'remove_equipment',
+    targetTable: 'character_equipment',
+    targetId: equipmentId
+  });
 }
 
 export async function listAdminCourses() {
@@ -221,6 +299,13 @@ export async function updateCourseModeration(
     .single();
 
   if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'moderate_course',
+    targetTable: 'courses',
+    targetId: courseId,
+    metadata: input
+  });
   return data;
 }
 
@@ -257,6 +342,85 @@ export async function updateEconomyItem(
     .single();
 
   if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'update_economy_item',
+    targetTable: 'equipment_items',
+    targetId: itemId,
+    metadata: input
+  });
+  return data;
+}
+
+export async function listEconomySettings() {
+  const client = requireSupabaseClient();
+  const defaults: Array<Database['public']['Tables']['admin_economy_settings']['Insert']> = [
+    {
+      setting_key: 'xp_reward_rate',
+      setting_value: 1,
+      description: 'Global XP reward multiplier'
+    },
+    {
+      setting_key: 'token_reward_multiplier',
+      setting_value: 1,
+      description: 'Global RunToken reward multiplier'
+    },
+    {
+      setting_key: 'global_drop_rate',
+      setting_value: 0.05,
+      description: 'Baseline equipment drop rate'
+    },
+    {
+      setting_key: 'legendary_rarity_weight',
+      setting_value: 0.01,
+      description: 'Legendary item rarity balance'
+    }
+  ];
+  const { data: existing, error: existingError } = await client
+    .from('admin_economy_settings')
+    .select('*');
+
+  if (existingError) throw existingError;
+
+  const existingKeys = new Set((existing ?? []).map((setting) => setting.setting_key));
+  const missing = defaults.filter((setting) => !existingKeys.has(setting.setting_key));
+
+  if (missing.length > 0) {
+    const { error } = await client.from('admin_economy_settings').insert(missing);
+    if (error) throw error;
+  }
+
+  const { data, error } = await client
+    .from('admin_economy_settings')
+    .select('*')
+    .order('setting_key', { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function updateEconomySetting(settingId: string, value: number) {
+  const client = requireSupabaseClient();
+  const adminUserId = await getAdminUserId();
+  const { data, error } = await client
+    .from('admin_economy_settings')
+    .update({
+      setting_value: value,
+      updated_by: adminUserId,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', settingId)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  await logAdminAction({
+    adminUserId,
+    action: 'update_economy_setting',
+    targetTable: 'admin_economy_settings',
+    targetId: settingId,
+    metadata: { setting_key: data.setting_key, setting_value: value }
+  });
   return data;
 }
 
@@ -291,6 +455,7 @@ export function subscribeToAdminRealtime(onChange: () => void) {
     'anti_cheat_reports',
     'flagged_sessions',
     'run_token_wallets',
+    'admin_economy_settings',
     'leaderboard',
     'guilds',
     'race_sessions'
