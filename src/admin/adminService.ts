@@ -7,7 +7,8 @@ export type AdminCharacter = Database['public']['Tables']['characters']['Row'];
 export type AdminCourse = Database['public']['Tables']['courses']['Row'];
 export type AdminItem = Database['public']['Tables']['equipment_items']['Row'];
 export type AdminCheatReport = Database['public']['Tables']['anti_cheat_reports']['Row'];
-export type AdminEconomySetting = Database['public']['Tables']['admin_economy_settings']['Row'];
+export type AdminEconomySetting = Database['public']['Tables']['system_settings']['Row'];
+export type AdminCoursePoint = Database['public']['Tables']['course_points']['Row'];
 
 async function getAdminUserId() {
   const profile = await getCurrentAdminProfile();
@@ -286,6 +287,80 @@ export async function listAdminCourses() {
   return data ?? [];
 }
 
+export async function listAdminCoursePoints(courseId: string) {
+  const client = requireSupabaseClient();
+  const { data, error } = await client
+    .from('course_points')
+    .select('*')
+    .eq('course_id', courseId)
+    .order('order_index', { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function updateAdminCourseName(courseId: string, name: string) {
+  const client = requireSupabaseClient();
+  const { data, error } = await client
+    .from('courses')
+    .update({ name })
+    .eq('id', courseId)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'update_course_name',
+    targetTable: 'courses',
+    targetId: courseId,
+    metadata: { name }
+  });
+  return data;
+}
+
+export async function replaceAdminCoursePoints(courseId: string, points: Array<{ lat: number; lng: number }>) {
+  const client = requireSupabaseClient();
+  const { error: deleteError } = await client.from('course_points').delete().eq('course_id', courseId);
+
+  if (deleteError) throw deleteError;
+
+  if (points.length > 0) {
+    const { error: insertError } = await client.from('course_points').insert(
+      points.map((point, index) => ({
+        course_id: courseId,
+        lat: point.lat,
+        lng: point.lng,
+        order_index: index,
+        type: index === 0 ? 'start' : index === points.length - 1 ? 'finish' : 'checkpoint'
+      }))
+    );
+
+    if (insertError) throw insertError;
+  }
+
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'replace_course_points',
+    targetTable: 'course_points',
+    targetId: courseId,
+    metadata: { point_count: points.length }
+  });
+}
+
+export async function deleteAdminCourse(courseId: string) {
+  const client = requireSupabaseClient();
+  const { error } = await client.from('courses').delete().eq('id', courseId);
+
+  if (error) throw error;
+  await logAdminAction({
+    adminUserId: await getAdminUserId(),
+    action: 'delete_course',
+    targetTable: 'courses',
+    targetId: courseId
+  });
+}
+
 export async function updateCourseModeration(
   courseId: string,
   input: { status: AdminCourse['status']; verified?: boolean }
@@ -354,7 +429,7 @@ export async function updateEconomyItem(
 
 export async function listEconomySettings() {
   const client = requireSupabaseClient();
-  const defaults: Array<Database['public']['Tables']['admin_economy_settings']['Insert']> = [
+  const defaults: Array<Database['public']['Tables']['system_settings']['Insert']> = [
     {
       setting_key: 'xp_reward_rate',
       setting_value: 1,
@@ -365,19 +440,9 @@ export async function listEconomySettings() {
       setting_value: 1,
       description: 'Global RunToken reward multiplier'
     },
-    {
-      setting_key: 'global_drop_rate',
-      setting_value: 0.05,
-      description: 'Baseline equipment drop rate'
-    },
-    {
-      setting_key: 'legendary_rarity_weight',
-      setting_value: 0.01,
-      description: 'Legendary item rarity balance'
-    }
   ];
   const { data: existing, error: existingError } = await client
-    .from('admin_economy_settings')
+    .from('system_settings')
     .select('*');
 
   if (existingError) throw existingError;
@@ -386,12 +451,12 @@ export async function listEconomySettings() {
   const missing = defaults.filter((setting) => !existingKeys.has(setting.setting_key));
 
   if (missing.length > 0) {
-    const { error } = await client.from('admin_economy_settings').insert(missing);
+    const { error } = await client.from('system_settings').insert(missing);
     if (error) throw error;
   }
 
   const { data, error } = await client
-    .from('admin_economy_settings')
+    .from('system_settings')
     .select('*')
     .order('setting_key', { ascending: true });
 
@@ -403,7 +468,7 @@ export async function updateEconomySetting(settingId: string, value: number) {
   const client = requireSupabaseClient();
   const adminUserId = await getAdminUserId();
   const { data, error } = await client
-    .from('admin_economy_settings')
+    .from('system_settings')
     .update({
       setting_value: value,
       updated_by: adminUserId,
@@ -417,7 +482,7 @@ export async function updateEconomySetting(settingId: string, value: number) {
   await logAdminAction({
     adminUserId,
     action: 'update_economy_setting',
-    targetTable: 'admin_economy_settings',
+    targetTable: 'system_settings',
     targetId: settingId,
     metadata: { setting_key: data.setting_key, setting_value: value }
   });
@@ -455,7 +520,7 @@ export function subscribeToAdminRealtime(onChange: () => void) {
     'anti_cheat_reports',
     'flagged_sessions',
     'run_token_wallets',
-    'admin_economy_settings',
+    'system_settings',
     'leaderboard',
     'guilds',
     'race_sessions'

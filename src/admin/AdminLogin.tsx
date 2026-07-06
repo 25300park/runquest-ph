@@ -14,7 +14,7 @@ export default function AdminLogin() {
 
     try {
       await signInAdmin(email, password);
-      navigate('/admin', { replace: true });
+      navigate('/admin/dashboard', { replace: true });
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Admin login failed.');
     }

@@ -1,10 +1,13 @@
+import { useEffect, useState } from 'react';
 import { mockAreas } from '../data/mockAreas';
 import { mockCharacters } from '../data/mockCharacters';
 import { getGameProgress } from '../utils/gameProgress';
 import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../utils/xp';
 import { Link } from 'react-router-dom';
+import { getCurrentAdminProfile } from '../admin/adminService';
 
 export default function ProfilePage() {
+  const [isAdmin, setIsAdmin] = useState(false);
   const progress = getGameProgress();
   const selectedCharacter =
     mockCharacters.find((character) => character.id === progress.selectedCharacterId) ??
@@ -22,6 +25,12 @@ export default function ProfilePage() {
       : Math.round(
           ((progress.totalXp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100
         );
+
+  useEffect(() => {
+    getCurrentAdminProfile()
+      .then((profile) => setIsAdmin(Boolean(profile && profile.role === 'admin')))
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   return (
     <section className="min-h-full space-y-5 bg-[#111816] px-4 py-6 text-stone-50">
@@ -89,6 +98,15 @@ export default function ProfilePage() {
       >
         Open Reward Wallet
       </Link>
+
+      {isAdmin && (
+        <Link
+          to="/admin/dashboard"
+          className="block rounded-2xl border border-teal-200 bg-teal-400 px-4 py-4 text-center font-black text-stone-950"
+        >
+          Admin Panel
+        </Link>
+      )}
 
       <div>
         <h2 className="font-black text-stone-50">Area exploration</h2>

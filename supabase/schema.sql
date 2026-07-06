@@ -167,6 +167,15 @@ create table if not exists public.admin_economy_settings (
   updated_at timestamp with time zone not null default now()
 );
 
+create table if not exists public.system_settings (
+  id uuid primary key default gen_random_uuid(),
+  setting_key text not null unique,
+  setting_value float8 not null default 1,
+  description text,
+  updated_by uuid references public.users(id) on delete set null,
+  updated_at timestamp with time zone not null default now()
+);
+
 create table if not exists public.items (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -399,6 +408,7 @@ create index if not exists idx_courses_status on public.courses(status);
 create index if not exists idx_characters_status on public.characters(status);
 create index if not exists idx_admin_audit_logs_admin_user_id on public.admin_audit_logs(admin_user_id);
 create index if not exists idx_admin_economy_settings_key on public.admin_economy_settings(setting_key);
+create index if not exists idx_system_settings_key on public.system_settings(setting_key);
 
 alter table public.users enable row level security;
 alter table public.courses enable row level security;
@@ -434,6 +444,7 @@ alter table public.run_token_wallets enable row level security;
 alter table public.run_token_transactions enable row level security;
 alter table public.admin_audit_logs enable row level security;
 alter table public.admin_economy_settings enable row level security;
+alter table public.system_settings enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -466,6 +477,12 @@ create policy "Courses are insertable by everyone in prototype"
 on public.courses for insert
 with check (true);
 
+drop policy if exists "Courses are manageable by admins" on public.courses;
+create policy "Courses are manageable by admins"
+on public.courses for all
+using (public.is_admin())
+with check (public.is_admin());
+
 drop policy if exists "Course points are readable by everyone" on public.course_points;
 create policy "Course points are readable by everyone"
 on public.course_points for select
@@ -475,6 +492,12 @@ drop policy if exists "Course points are insertable by everyone in prototype" on
 create policy "Course points are insertable by everyone in prototype"
 on public.course_points for insert
 with check (true);
+
+drop policy if exists "Course points are manageable by admins" on public.course_points;
+create policy "Course points are manageable by admins"
+on public.course_points for all
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "Activities are readable by everyone in prototype" on public.activities;
 create policy "Activities are readable by everyone in prototype"
@@ -672,3 +695,5 @@ drop policy if exists "Admin audit logs are admin only" on public.admin_audit_lo
 create policy "Admin audit logs are admin only" on public.admin_audit_logs for all using (public.is_admin()) with check (public.is_admin());
 drop policy if exists "Admin economy settings are admin only" on public.admin_economy_settings;
 create policy "Admin economy settings are admin only" on public.admin_economy_settings for all using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "System settings are admin only" on public.system_settings;
+create policy "System settings are admin only" on public.system_settings for all using (public.is_admin()) with check (public.is_admin());

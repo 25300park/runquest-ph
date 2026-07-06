@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import { getAdminDashboardStats, subscribeToAdminRealtime } from './adminService';
+import AdminCharacters from './AdminCharacters';
+import AdminCourses from './AdminCourses';
+import AdminEconomy from './AdminEconomy';
+import AdminCheatMonitor from './AdminCheatMonitor';
 
 type DashboardStats = Awaited<ReturnType<typeof getAdminDashboardStats>>;
 
@@ -14,6 +18,7 @@ const emptyStats: DashboardStats = {
 };
 
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<'characters' | 'courses' | 'economy' | 'cheat'>('characters');
   const [stats, setStats] = useState<DashboardStats>(emptyStats);
   const [status, setStatus] = useState('Loading live control data...');
 
@@ -55,6 +60,31 @@ export default function AdminDashboard() {
           </article>
         ))}
       </div>
+
+      <div className="grid grid-cols-4 gap-2 rounded-lg border border-stone-800 bg-stone-950 p-2">
+        {[
+          ['characters', 'Characters'],
+          ['courses', 'Courses'],
+          ['economy', 'Economy'],
+          ['cheat', 'Cheat Monitor']
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setActiveTab(key as typeof activeTab)}
+            className={`rounded-md px-2 py-3 text-xs font-black ${
+              activeTab === key ? 'bg-amber-300 text-stone-950' : 'text-stone-400'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'characters' && <AdminCharacters />}
+      {activeTab === 'courses' && <AdminCourses />}
+      {activeTab === 'economy' && <AdminEconomy />}
+      {activeTab === 'cheat' && <AdminCheatMonitor />}
     </div>
   );
 }

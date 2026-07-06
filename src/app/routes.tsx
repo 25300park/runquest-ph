@@ -23,11 +23,6 @@ import BgcTestModePage from '../pages/BgcTestModePage';
 import AdminLayout from '../admin/AdminLayout';
 import AdminLogin from '../admin/AdminLogin';
 import AdminDashboard from '../admin/AdminDashboard';
-import AdminUsers from '../admin/AdminUsers';
-import AdminCharacters from '../admin/AdminCharacters';
-import AdminCourses from '../admin/AdminCourses';
-import AdminEconomy from '../admin/AdminEconomy';
-import AdminCheatMonitor from '../admin/AdminCheatMonitor';
 import { AdminGuard } from '../admin/AdminGuard';
 
 export const appRoutes = (
@@ -64,13 +59,9 @@ export const appRoutes = (
       }
     >
       <Route index element={<AdminDashboard />} />
-      <Route path="users" element={<AdminUsers />} />
-      <Route path="characters" element={<AdminCharacters />} />
-      <Route path="courses" element={<AdminCourses />} />
+      <Route path="dashboard" element={<AdminDashboard />} />
       <Route path="course-builder" element={<AdminCourseBuilderPage />} />
       <Route path="course-builder/:courseId" element={<AdminCourseBuilderPage />} />
-      <Route path="economy" element={<AdminEconomy />} />
-      <Route path="cheat-monitor" element={<AdminCheatMonitor />} />
     </Route>
   </Routes>
 );
