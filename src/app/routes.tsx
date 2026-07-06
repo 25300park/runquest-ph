@@ -30,6 +30,7 @@ export const appRoutes = (
     <Route path="/coach" element={<AiCoachPage />} />
     <Route path="/community" element={<CommunityPage />} />
     <Route path="/course-builder" element={<CourseBuilder />} />
+    <Route path="/course-builder/:courseId" element={<CourseBuilder />} />
     <Route path="/advanced-courses" element={<AdvancedCourseSystemPage />} />
     <Route path="/test-mode/bgc" element={<BgcTestModePage />} />
     <Route path="/course-viral" element={<CourseViralHubPage />} />

@@ -13,6 +13,14 @@ export type CreateCourseInput = {
   createdBy?: string | null;
 };
 
+export type UpdateCourseInput = {
+  id: string;
+  name: string;
+  area: CourseArea;
+  difficulty: CourseDifficulty;
+  distance: number;
+};
+
 export type CoursePointInput = {
   lat: number;
   lng: number;
@@ -107,6 +115,20 @@ export async function saveCoursePoints(courseId: string, points: CoursePointInpu
   }
 }
 
+export async function replaceCoursePoints(courseId: string, points: CoursePointInput[]) {
+  const client = requireSupabaseClient();
+  const { error: deleteError } = await client
+    .from('course_points')
+    .delete()
+    .eq('course_id', courseId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  await saveCoursePoints(courseId, points);
+}
+
 export async function getCoursesByArea(area: CourseArea) {
   const client = requireSupabaseClient();
   const { data, error } = await client
@@ -184,6 +206,27 @@ export async function getCourseById(courseId: string): Promise<CourseWithPoints 
     ...course,
     course_points: points
   };
+}
+
+export async function updateCourse(input: UpdateCourseInput, routePoints: LatLngTuple[]) {
+  const client = requireSupabaseClient();
+  const { error } = await client
+    .from('courses')
+    .update({
+      name: input.name,
+      area: input.area,
+      difficulty: input.difficulty,
+      distance: input.distance
+    })
+    .eq('id', input.id);
+
+  if (error) {
+    throw error;
+  }
+
+  await replaceCoursePoints(input.id, routePointsToCoursePointInputs(routePoints));
+
+  return input.id;
 }
 
 export async function saveRouteAsCourse(input: CreateCourseInput, routePoints: LatLngTuple[]) {

@@ -1,12 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import CourseBuilderMap from '../components/CourseBuilderMap';
 import GPXUploader, { type GeneratedCourseMetadata } from '../components/GPXUploader';
 import { mockAreas } from '../data/mockAreas';
-import { mockCourses } from '../data/mockCourses';
 import type { LatLngTuple } from '../types/area';
 import type { CheckpointType, CourseCheckpoint, Difficulty } from '../types/course';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { saveRouteAsCourse, type CourseArea } from '../services/courseService';
+import {
+  getCourseById,
+  saveRouteAsCourse,
+  updateCourse,
+  type CourseArea
+} from '../services/courseService';
 import {
   testFetchCourses,
   testInsertCourse,
@@ -58,6 +63,7 @@ function buildCheckpoints(routePoints: LatLngTuple[]): CourseCheckpoint[] {
 }
 
 export default function CourseBuilder() {
+  const { courseId } = useParams();
   const [courseName, setCourseName] = useState('Creator Route');
   const [areaId, setAreaId] = useState(mockAreas[0].id);
   const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
@@ -71,12 +77,64 @@ export default function CourseBuilder() {
   const [testStatus, setTestStatus] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingSupabase, setIsTestingSupabase] = useState(false);
+  const [isLoadingCourse, setIsLoadingCourse] = useState(Boolean(courseId));
   const selectedArea = mockAreas.find((area) => area.id === areaId) ?? mockAreas[0];
   const checkpoints = useMemo(
     () => (gpxCheckpoints.length > 0 ? gpxCheckpoints : buildCheckpoints(routePoints)),
     [gpxCheckpoints, routePoints]
   );
   const routeDistanceKm = useMemo(() => calculateRouteDistanceKm(routePoints), [routePoints]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadEditableCourse() {
+      if (!courseId) {
+        return;
+      }
+
+      try {
+        setIsLoadingCourse(true);
+        setSaveStatus('Loading course for editing...');
+        const editableCourse = await getCourseById(courseId);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!editableCourse) {
+          setSaveStatus('Course not found.');
+          return;
+        }
+
+        const matchingArea = mockAreas.find((area) => toDatabaseArea(area.name) === editableCourse.area);
+        setCourseName(editableCourse.name);
+        setAreaId(matchingArea?.id ?? mockAreas[0].id);
+        setDifficulty(editableCourse.difficulty);
+        setRoutePoints(
+          editableCourse.course_points.map((point) => [point.lat, point.lng] as LatLngTuple)
+        );
+        setGpxCheckpoints([]);
+        setGeneratedMetadata(null);
+        setGeneratedXpReward(Math.round(editableCourse.distance * 100));
+        setPaceEstimate(estimatePaceLabel(editableCourse.distance));
+        setSaveStatus(`Editing Supabase course: ${editableCourse.id}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown course load error.';
+        setSaveStatus(`Could not load course for editing. ${message}`);
+      } finally {
+        if (isMounted) {
+          setIsLoadingCourse(false);
+        }
+      }
+    }
+
+    loadEditableCourse();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [courseId]);
 
   function addRoutePoint(position: LatLngTuple) {
     setRoutePoints((currentPoints) => [...currentPoints, position]);
@@ -137,16 +195,30 @@ export default function CourseBuilder() {
     const fallbackId = `saved-course-${Date.now()}`;
 
     try {
-      databaseId = await saveRouteAsCourse(
-        {
-          name: courseName.trim() || 'Creator Route',
-          area: databaseArea,
-          difficulty,
-          distance
-        },
-        routePoints
-      );
-      setSaveStatus(`Saved to Supabase: ${databaseId}`);
+      if (courseId) {
+        databaseId = await updateCourse(
+          {
+            id: courseId,
+            name: courseName.trim() || 'Creator Route',
+            area: databaseArea,
+            difficulty,
+            distance
+          },
+          routePoints
+        );
+        setSaveStatus(`Updated Supabase course: ${databaseId}`);
+      } else {
+        databaseId = await saveRouteAsCourse(
+          {
+            name: courseName.trim() || 'Creator Route',
+            area: databaseArea,
+            difficulty,
+            distance
+          },
+          routePoints
+        );
+        setSaveStatus(`Saved to Supabase: ${databaseId}`);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown Supabase save error.';
       setSaveStatus(
@@ -202,8 +274,12 @@ export default function CourseBuilder() {
     <section className="min-h-full bg-[#111816] text-stone-50">
       <div className="space-y-4 px-4 py-4">
         <div className="rounded-2xl border border-amber-200/30 bg-stone-900 p-4">
-          <p className="text-xs font-black uppercase text-amber-200">Course Creator</p>
-          <h1 className="mt-1 text-3xl font-black">Build a RunQuest route</h1>
+          <p className="text-xs font-black uppercase text-amber-200">
+            {courseId ? 'Course Edit Mode' : 'Course Creator'}
+          </p>
+          <h1 className="mt-1 text-3xl font-black">
+            {courseId ? 'Edit RunQuest route' : 'Build a RunQuest route'}
+          </h1>
           <p className="mt-2 text-sm leading-6 text-stone-400">
             Click the map to add route points, or import a GPX file to render a saved route.
           </p>
@@ -215,6 +291,7 @@ export default function CourseBuilder() {
             <input
               value={courseName}
               onChange={(event) => setCourseName(event.target.value)}
+              disabled={isLoadingCourse}
               className="mt-2 w-full rounded-xl border border-stone-700 bg-stone-950 px-3 py-3 text-stone-50 outline-none focus:ring-4 focus:ring-teal-500/20"
             />
           </label>
@@ -345,8 +422,8 @@ export default function CourseBuilder() {
             <p className="font-black">{routeDistanceKm.toFixed(2)} km</p>
           </div>
           <div className="rounded-xl bg-stone-900 p-3">
-            <p className="text-xs text-stone-500">Mock courses</p>
-            <p className="font-black">{mockCourses.length}</p>
+            <p className="text-xs text-stone-500">Mode</p>
+            <p className="font-black">{courseId ? 'Edit' : 'Create'}</p>
           </div>
         </div>
 
@@ -387,10 +464,10 @@ export default function CourseBuilder() {
             <button
               type="button"
               onClick={saveCourse}
-              disabled={routePoints.length < 2 || isSaving}
+              disabled={routePoints.length < 2 || isSaving || isLoadingCourse}
               className="rounded-2xl border border-amber-200 bg-amber-300 px-3 py-4 font-black text-stone-950 disabled:border-stone-700 disabled:bg-stone-800 disabled:text-stone-500"
             >
-              {isSaving ? 'Saving...' : 'Save'}
+              {isSaving ? 'Saving...' : courseId ? 'Update' : 'Save'}
             </button>
           </div>
         </div>
@@ -421,7 +498,7 @@ export default function CourseBuilder() {
         )}
 
         <div>
-          <h2 className="font-black">Saved mock courses</h2>
+          <h2 className="font-black">Saved creator courses</h2>
           <div className="mt-3 grid gap-3">
             {savedCourses.length === 0 ? (
               <div className="rounded-2xl border border-stone-700 bg-stone-900 p-4 text-center text-sm text-stone-400">

@@ -97,6 +97,7 @@ function toMapCourse(course: CourseWithPoints): Course | null {
 export default function ExplorationMapPage() {
   const [selectedAreaId, setSelectedAreaId] = useState(mockAreas[0].id);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [loopCount, setLoopCount] = useState(1);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [courseLoadError, setCourseLoadError] = useState<string | null>(null);
@@ -160,11 +161,14 @@ export default function ExplorationMapPage() {
   const selectedArea = mockAreas.find((area) => area.id === selectedAreaId) ?? mockAreas[0];
   const areaCourses = courses.filter((course) => course.areaId === selectedAreaId);
   const previewUserPosition = selectedCourse?.routeCoordinates[1] ?? selectedCourse?.startPoint;
+  const selectedBaseDistanceKm = selectedCourse?.distanceKm ?? 0;
+  const selectedTotalDistanceKm = Number((selectedBaseDistanceKm * loopCount).toFixed(2));
 
   function selectArea(areaId: string) {
     setSelectedAreaId(areaId);
     const firstCourse = courses.find((course) => course.areaId === areaId);
     setSelectedCourseId(firstCourse?.id ?? null);
+    setLoopCount(1);
   }
 
   function selectCourse(courseId: string) {
@@ -172,6 +176,7 @@ export default function ExplorationMapPage() {
     if (course) {
       setSelectedAreaId(course.areaId);
       setSelectedCourseId(course.id);
+      setLoopCount(1);
     }
   }
 
@@ -255,10 +260,31 @@ export default function ExplorationMapPage() {
             </span>
           </div>
           <p className="mt-3 text-sm leading-6 text-stone-300">{selectedCourse.description}</p>
+          <div className="mt-4 rounded-2xl border border-stone-700 bg-stone-950 p-3">
+            <p className="text-xs font-black uppercase text-amber-200">Loop multiplier</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[1, 2, 3].map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => setLoopCount(count)}
+                  className={`rounded-xl border px-3 py-2 font-black ${
+                    loopCount === count
+                      ? 'border-amber-200 bg-amber-300 text-stone-950'
+                      : 'border-stone-700 bg-stone-900 text-stone-300'
+                  }`}
+                >
+                  {count}x
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl bg-stone-950 p-3">
               <p className="text-xs text-stone-500">Distance</p>
-              <p className="font-black">{selectedCourse.distanceKm} km</p>
+              <p className="font-black">
+                {selectedBaseDistanceKm} km → {selectedTotalDistanceKm} km
+              </p>
             </div>
             <div className="rounded-xl bg-stone-950 p-3">
               <p className="text-xs text-stone-500">Reward</p>

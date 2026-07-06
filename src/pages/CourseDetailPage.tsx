@@ -160,6 +160,48 @@ export default function CourseDetailPage() {
     totalDistanceKm,
     xpReward
   ]);
+  const baseActivityCourse = useMemo<Course | null>(() => {
+    if (!course || routeCoordinates.length < 2) {
+      return null;
+    }
+
+    const baseCheckpoints: CourseCheckpoint[] = course.course_points.map((point, index) => ({
+      id: point.id,
+      name:
+        point.type === 'start'
+          ? 'Start Gate'
+          : point.type === 'finish'
+            ? 'Finish Gate'
+            : `Checkpoint ${index}`,
+      type:
+        point.type === 'start' ? 'START' : point.type === 'finish' ? 'FINISH' : 'CHECKPOINT',
+      position: [point.lat, point.lng],
+      distanceFromStartKm:
+        routeCoordinates.length > 1
+          ? Number(((baseDistanceKm / (routeCoordinates.length - 1)) * index).toFixed(2))
+          : 0
+    }));
+
+    return {
+      id: course.id,
+      areaId: areaIdByArea[course.area],
+      areaName: areaNameByArea[course.area],
+      name: course.name,
+      description: `A community-created ${course.area} route loaded from Supabase.`,
+      courseType: 'city',
+      distanceKm: baseDistanceKm,
+      estimatedTimeMin: estimateTimeMinutes(baseDistanceKm),
+      difficulty: course.difficulty,
+      xpReward: Math.round(baseDistanceKm * 100),
+      explorationReward: Math.max(3, Math.round(baseDistanceKm * 5)),
+      startPoint: routeCoordinates[0],
+      finishPoint: routeCoordinates[routeCoordinates.length - 1],
+      routeCoordinates,
+      checkpoints: baseCheckpoints,
+      pois: [],
+      safetyNotes: 'Review the route before running and stay aware of local traffic conditions.'
+    };
+  }, [baseDistanceKm, course, routeCoordinates]);
 
   function startCourse() {
     if (!activityCourse) {
@@ -167,7 +209,14 @@ export default function CourseDetailPage() {
       return;
     }
 
-    navigate('/run', { state: activityCourse });
+    navigate('/run', {
+      state: {
+        course: activityCourse,
+        baseCourse: baseActivityCourse ?? activityCourse,
+        loopCount,
+        totalDistance: totalDistanceKm
+      }
+    });
   }
 
   if (isLoading) {
@@ -278,6 +327,13 @@ export default function CourseDetailPage() {
       >
         Start Course
       </button>
+
+      <Link
+        to={`/course-builder/${course.id}`}
+        className="block rounded-xl border border-quest-teal px-4 py-3 text-center font-bold text-quest-teal"
+      >
+        Edit Course
+      </Link>
 
       <p className="text-center text-xs text-slate-500">Explore reward: +{explorationReward}%</p>
     </section>

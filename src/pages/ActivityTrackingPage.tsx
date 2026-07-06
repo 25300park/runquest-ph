@@ -10,6 +10,61 @@ import { calculateHaversineDistanceKm, calculateRouteProgress } from '../utils/r
 const distancePerSecondKm = 0.02;
 const maxReasonableGpsJumpKm = 0.25;
 
+type RunNavigationState = {
+  course: Course;
+  baseCourse?: Course;
+  loopCount?: number;
+  totalDistance?: number;
+};
+
+function isRunNavigationState(state: unknown): state is RunNavigationState {
+  return Boolean(state && typeof state === 'object' && 'course' in state);
+}
+
+function createLoopedRoute(routeCoordinates: LatLngTuple[], loopCount: number) {
+  return Array.from({ length: loopCount }).flatMap((_, loopIndex) =>
+    loopIndex === 0 ? routeCoordinates : routeCoordinates.slice(1)
+  );
+}
+
+function createLoopedCourse(baseCourse: Course, loopCount: number): Course {
+  const routeCoordinates = createLoopedRoute(baseCourse.routeCoordinates, loopCount);
+  const distanceKm = Number((baseCourse.distanceKm * loopCount).toFixed(2));
+
+  return {
+    ...baseCourse,
+    distanceKm,
+    estimatedTimeMin: Math.max(5, Math.round(distanceKm * 9)),
+    xpReward: Math.round(distanceKm * 100),
+    explorationReward: Math.max(3, Math.round(distanceKm * 5)),
+    startPoint: routeCoordinates[0],
+    finishPoint: routeCoordinates[routeCoordinates.length - 1],
+    routeCoordinates,
+    checkpoints: Array.from({ length: loopCount }).flatMap((_, loopIndex) =>
+      baseCourse.checkpoints.map((checkpoint, checkpointIndex) => ({
+        ...checkpoint,
+        id: `${checkpoint.id}-run-loop-${loopIndex + 1}`,
+        name: `${checkpoint.name} / Loop ${loopIndex + 1}`,
+        type:
+          loopIndex === 0 && checkpoint.type === 'START'
+            ? 'START'
+            : loopIndex === loopCount - 1 && checkpoint.type === 'FINISH'
+              ? 'FINISH'
+              : 'CHECKPOINT',
+        distanceFromStartKm:
+          baseCourse.checkpoints.length > 1
+            ? Number(
+                (
+                  (distanceKm / (baseCourse.checkpoints.length * loopCount - 1)) *
+                  (loopIndex * baseCourse.checkpoints.length + checkpointIndex)
+                ).toFixed(2)
+              )
+            : 0
+      }))
+    )
+  };
+}
+
 function formatElapsedTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -32,7 +87,20 @@ function formatPace(distanceKm: number, elapsedSeconds: number) {
 export default function ActivityTrackingPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const course = location.state as Course | null;
+  const navigationState = location.state;
+  const initialCourse = isRunNavigationState(navigationState)
+    ? navigationState.course
+    : (navigationState as Course | null);
+  const baseCourse = isRunNavigationState(navigationState)
+    ? (navigationState.baseCourse ?? navigationState.course)
+    : initialCourse;
+  const [loopCount, setLoopCount] = useState(
+    isRunNavigationState(navigationState) ? (navigationState.loopCount ?? 1) : 1
+  );
+  const course = useMemo(
+    () => (baseCourse ? createLoopedCourse(baseCourse, loopCount) : null),
+    [baseCourse, loopCount]
+  );
   const [activityState, setActivityState] = useState<ActivityState>('idle');
   const [trackingMode, setTrackingMode] = useState<TrackingMode>('gps');
   const [distanceKm, setDistanceKm] = useState(0);
@@ -71,6 +139,14 @@ export default function ActivityTrackingPage() {
       navigate('/map', { replace: true });
     }
   }, [course, navigate]);
+
+  useEffect(() => {
+    if (course && activityState === 'idle') {
+      setCurrentPosition(course.startPoint);
+      setDistanceKm(0);
+      previousGpsPositionRef.current = null;
+    }
+  }, [activityState, course]);
 
   useEffect(() => {
     if (activityState !== 'running') {
@@ -227,6 +303,35 @@ export default function ActivityTrackingPage() {
           <span className="rounded-full bg-teal-950 px-3 py-2 text-xs font-black uppercase text-quest-teal">
             {activityState}
           </span>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-stone-700 bg-stone-900 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase text-amber-200">Loop multiplier</p>
+            <p className="mt-1 text-sm text-stone-400">
+              {baseCourse?.distanceKm.toFixed(2)} km → {course.distanceKm.toFixed(2)} km (
+              {loopCount}x)
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {[1, 2, 3].map((count) => (
+            <button
+              key={count}
+              type="button"
+              onClick={() => setLoopCount(count)}
+              disabled={activityState !== 'idle'}
+              className={`rounded-xl border px-4 py-3 font-black ${
+                loopCount === count
+                  ? 'border-amber-200 bg-amber-300 text-stone-950'
+                  : 'border-stone-700 bg-stone-950 text-stone-300'
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              {count}x
+            </button>
+          ))}
         </div>
       </div>
 
