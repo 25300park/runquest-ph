@@ -20,6 +20,9 @@ export type CompletedActivitySummary = {
   areaName?: string;
   difficulty?: string;
   loopCount?: number;
+  gpsSessionId?: string;
+  cheatPenalty?: number;
+  streakBonus?: number;
   distanceKm: number;
   durationSeconds: number;
 };

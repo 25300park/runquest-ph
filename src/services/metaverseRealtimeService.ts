@@ -9,7 +9,14 @@ const realtimeTables = [
   'map_zones',
   'zone_activity',
   'marketplace_items',
-  'transactions'
+  'transactions',
+  'gps_sessions',
+  'gps_points',
+  'anti_cheat_reports',
+  'flagged_sessions',
+  'ai_coach_messages',
+  'run_token_wallets',
+  'run_token_transactions'
 ];
 
 export function subscribeToMetaverseRealtime(onChange: (table: string) => void) {

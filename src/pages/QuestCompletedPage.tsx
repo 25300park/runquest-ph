@@ -1,13 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { mockCourses } from '../data/mockCourses';
 import { applyRunReward } from '../services/characterService';
 import { refreshCharacterAvatar } from '../services/aiAvatarService';
 import { maybeDropEquipment } from '../services/equipmentEconomyService';
 import { contributeToGuild } from '../services/guildService';
 import { updateLeaderboardScore } from '../features/leaderboard/leaderboardService';
 import { getCharacterProfile } from '../services/characterService';
+import { getRealtimeCoaching, saveCoachMessage } from '../services/aiCoachService';
+import { analyzeAndStoreGpsSession } from '../services/antiCheatService';
+import { awardRunTokens } from '../features/economy/tokenEconomyService';
 import type { CompletedActivitySummary } from '../types/activity';
+import type { Course, Difficulty } from '../types/course';
 import {
   calculateActivityReward,
   completeActivityProgress,
@@ -27,7 +30,29 @@ export default function QuestCompletedPage() {
   const { courseId } = useParams();
   const location = useLocation();
   const summary = location.state as CompletedActivitySummary | null;
-  const course = mockCourses.find((item) => item.id === courseId) ?? mockCourses[0];
+  const course = useMemo<Course>(() => {
+    const difficulty = (summary?.difficulty ?? 'Easy') as Difficulty;
+
+    return {
+      id: summary?.courseId ?? courseId ?? 'unknown-course',
+      areaId: summary?.areaName?.toLowerCase() ?? 'global',
+      areaName: summary?.areaName ?? 'Global',
+      name: summary?.courseName ?? 'Completed Route',
+      description: 'Supabase run summary',
+      courseType: 'running',
+      distanceKm: summary?.distanceKm ?? 0,
+      estimatedTimeMin: Math.max(1, Math.ceil((summary?.durationSeconds ?? 60) / 60)),
+      difficulty,
+      xpReward: Math.round((summary?.distanceKm ?? 0) * 100),
+      explorationReward: Math.max(1, Math.round((summary?.distanceKm ?? 0) * 2)),
+      startPoint: [14.5503, 121.0507],
+      finishPoint: [14.5503, 121.0507],
+      routeCoordinates: [],
+      checkpoints: [],
+      pois: [],
+      safetyNotes: ''
+    };
+  }, [courseId, summary]);
   const courseName = summary?.courseName ?? course.name;
   const areaName = summary?.areaName ?? course.areaName;
   const distanceKm = summary?.distanceKm ?? course.distanceKm;
@@ -85,18 +110,53 @@ export default function QuestCompletedPage() {
           xp: reward.xpEarned,
           distanceKm: summary.distanceKm
         });
+        const antiCheatResult = summary.gpsSessionId
+          ? await analyzeAndStoreGpsSession({
+              sessionId: summary.gpsSessionId,
+              characterId: reward.characterId
+            })
+          : null;
+        const tokenReward = await awardRunTokens({
+          characterId: reward.characterId,
+          reward: {
+            distanceKm: summary.distanceKm,
+            streakBonus: summary.streakBonus ?? Math.min(20, reward.streakDays * 2),
+            difficultyMultiplier: difficultyXpValues[summary.difficulty ?? course.difficulty] ?? 1,
+            cheatPenalty:
+              summary.cheatPenalty ??
+              (antiCheatResult ? Math.round(antiCheatResult.analysis.cheatScore / 2) : 0)
+          },
+          metadata: {
+            course_id: summary.courseId,
+            gps_session_id: summary.gpsSessionId ?? null
+          }
+        });
+        const coachMessage = await getRealtimeCoaching({
+          distanceKm: summary.distanceKm,
+          paceSecondsPerKm:
+            summary.distanceKm > 0 ? Math.round(summary.durationSeconds / summary.distanceKm) : 0,
+          elapsedSeconds: summary.durationSeconds
+        });
+        await saveCoachMessage({
+          characterId: reward.characterId,
+          sessionId: summary.gpsSessionId ?? null,
+          message: coachMessage
+        });
         await maybeDropEquipment(reward.characterId);
 
         const profile = await getCharacterProfile(reward.characterId);
         if (profile) {
           await refreshCharacterAvatar(profile, 'quest_completed');
         }
+        setCharacterRewardStatus((currentStatus) =>
+          `${currentStatus} · +${tokenReward.amount} RunTokens · Coach: ${coachMessage.message}`
+        );
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : 'Character XP update failed.';
         setCharacterRewardStatus(message);
       });
-  }, [course, summary]);
+  }, [course, loopCount, summary]);
 
   const xpEarned = progressUpdate.reward.totalXp;
 

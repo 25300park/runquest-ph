@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { MapContainer, Marker, Polyline, TileLayer } from 'react-leaflet';
-import type { ActivityState, CompletedActivitySummary, TrackingMode } from '../types/activity';
+import type { ActivityState, CompletedActivitySummary } from '../types/activity';
 import type { LatLngTuple } from '../types/area';
 import type { Course } from '../types/course';
 import { calculateActivityReward, getGameProgress } from '../utils/gameProgress';
-import { calculateHaversineDistanceKm, calculateRouteProgress } from '../utils/route';
-
-const distancePerSecondKm = 0.02;
-const maxReasonableGpsJumpKm = 0.25;
+import { calculateRouteProgress } from '../utils/route';
+import {
+  completeGpsSession,
+  isBrowserGpsAvailable,
+  startGpsSession,
+  watchBrowserGpsSession
+} from '../features/gps/gpsSyncService';
 
 type RunNavigationState = {
   course: Course;
@@ -37,8 +40,8 @@ function createLoopedCourse(baseCourse: Course, loopCount: number): Course {
     estimatedTimeMin: Math.max(5, Math.round(distanceKm * 9)),
     xpReward: Math.round(distanceKm * 100),
     explorationReward: Math.max(3, Math.round(distanceKm * 5)),
-    startPoint: routeCoordinates[0],
-    finishPoint: routeCoordinates[routeCoordinates.length - 1],
+    startPoint: routeCoordinates[0] ?? baseCourse.startPoint,
+    finishPoint: routeCoordinates[routeCoordinates.length - 1] ?? baseCourse.finishPoint,
     routeCoordinates,
     checkpoints: Array.from({ length: loopCount }).flatMap((_, loopIndex) =>
       baseCourse.checkpoints.map((checkpoint, checkpointIndex) => ({
@@ -102,14 +105,14 @@ export default function ActivityTrackingPage() {
     [baseCourse, loopCount]
   );
   const [activityState, setActivityState] = useState<ActivityState>('idle');
-  const [trackingMode, setTrackingMode] = useState<TrackingMode>('gps');
+  const [gpsSessionId, setGpsSessionId] = useState<string | null>(null);
   const [distanceKm, setDistanceKm] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentPosition, setCurrentPosition] = useState<LatLngTuple>(
     course?.startPoint ?? [14.5503, 121.0507]
   );
-  const previousGpsPositionRef = useRef<LatLngTuple | null>(null);
   const [gpsStatus, setGpsStatus] = useState('GPS ready');
+  const isStartingRef = useRef(false);
   const progressSnapshot = getGameProgress();
   const rewardPreview = course
     ? calculateActivityReward(course, distanceKm, progressSnapshot.completedActivities)
@@ -119,14 +122,7 @@ export default function ActivityTrackingPage() {
   const routeMatch = calculateRouteProgress(currentPosition, routeCoordinates);
   const distanceProgress = course ? Math.min(distanceKm / course.distanceKm, 1) : 0;
   const routeProgress = Math.max(routeMatch.progressPercent / 100, distanceProgress);
-  const mockCompletedPointCount = Math.max(
-    1,
-    Math.ceil(distanceProgress * routeCoordinates.length)
-  );
-  const completedSegment =
-    trackingMode === 'gps'
-      ? routeMatch.completedSegment
-      : routeCoordinates.slice(0, mockCompletedPointCount);
+  const completedSegment = routeMatch.completedSegment;
   const nextCheckpoint = useMemo(
     () =>
       course?.checkpoints.find((checkpoint) => checkpoint.distanceFromStartKm > distanceKm) ??
@@ -144,7 +140,7 @@ export default function ActivityTrackingPage() {
     if (course && activityState === 'idle') {
       setCurrentPosition(course.startPoint);
       setDistanceKm(0);
-      previousGpsPositionRef.current = null;
+      setGpsSessionId(null);
     }
   }, [activityState, course]);
 
@@ -161,77 +157,55 @@ export default function ActivityTrackingPage() {
   }, [activityState]);
 
   useEffect(() => {
-    if (!course || activityState !== 'running' || trackingMode !== 'mock') {
-      return undefined;
-    }
-
-    const timer = window.setInterval(() => {
-      setDistanceKm((current) => Math.min(current + distancePerSecondKm, course.distanceKm));
-      setCurrentPosition((current) => {
-        const nextProgress = Math.min((distanceKm + distancePerSecondKm) / course.distanceKm, 1);
-        const nextIndex = Math.min(
-          course.routeCoordinates.length - 1,
-          Math.floor(nextProgress * (course.routeCoordinates.length - 1))
-        );
-
-        return course.routeCoordinates[nextIndex] ?? current;
-      });
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [activityState, course, distanceKm, trackingMode]);
-
-  useEffect(() => {
-    if (!course || activityState !== 'running' || trackingMode !== 'gps') {
-      return undefined;
-    }
-
-    if (!navigator.geolocation) {
-      setTrackingMode('mock');
-      setGpsStatus('GPS unavailable. Mock tracking enabled.');
+    if (!course || activityState !== 'running' || !gpsSessionId) {
       return undefined;
     }
 
     setGpsStatus('Waiting for GPS lock...');
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const nextPosition: LatLngTuple = [position.coords.latitude, position.coords.longitude];
-        setCurrentPosition(nextPosition);
-        setGpsStatus(`GPS active ±${Math.round(position.coords.accuracy)}m`);
-        const previousPosition = previousGpsPositionRef.current;
-
-        if (previousPosition) {
-          const nextDistance = calculateHaversineDistanceKm(previousPosition, nextPosition);
-          if (nextDistance > 0 && nextDistance < maxReasonableGpsJumpKm) {
-            setDistanceKm((current) => Math.min(current + nextDistance, course.distanceKm));
-          }
-        }
-
-        previousGpsPositionRef.current = nextPosition;
+    return watchBrowserGpsSession({
+      sessionId: gpsSessionId,
+      onPoint: (point, session) => {
+        setCurrentPosition([point.lat, point.lng]);
+        setDistanceKm(Math.min(session.total_distance, course.distanceKm));
+        setGpsStatus(`GPS active +/-${Math.round(point.accuracy ?? 0)}m`);
       },
-      () => {
-        setTrackingMode('mock');
-        setGpsStatus('GPS permission unavailable. Mock tracking enabled.');
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 3000,
-        timeout: 8000
+      onError: (error) => {
+        const message = error instanceof Error ? error.message : 'GPS tracking failed.';
+        setGpsStatus(message);
+        setActivityState('paused');
       }
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [activityState, course, trackingMode]);
+    });
+  }, [activityState, course, gpsSessionId]);
 
   useEffect(() => {
     if (course && distanceKm >= course.distanceKm && activityState === 'running') {
-      completeActivity();
+      void completeActivity();
     }
   });
 
-  function startActivity() {
+  async function startActivity() {
+    if (isStartingRef.current) {
+      return;
+    }
+
+    if (!isBrowserGpsAvailable()) {
+      setGpsStatus('GPS is required for verified real-world runs.');
+      return;
+    }
+
+    isStartingRef.current = true;
     setGpsStatus('Starting tracker...');
-    setActivityState('running');
+
+    try {
+      const session = await startGpsSession({ provider: 'browser_geolocation' });
+      setGpsSessionId(session.id);
+      setActivityState('running');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not start GPS session.';
+      setGpsStatus(message);
+    } finally {
+      isStartingRef.current = false;
+    }
   }
 
   function pauseActivity() {
@@ -242,10 +216,14 @@ export default function ActivityTrackingPage() {
     setActivityState('running');
   }
 
-  function completeActivity() {
+  async function completeActivity() {
     if (!course) {
       navigate('/map', { replace: true });
       return;
+    }
+
+    if (gpsSessionId) {
+      await completeGpsSession(gpsSessionId);
     }
 
     const summary: CompletedActivitySummary = {
@@ -255,6 +233,7 @@ export default function ActivityTrackingPage() {
       areaName: course.areaName,
       difficulty: course.difficulty,
       loopCount,
+      gpsSessionId: gpsSessionId ?? undefined,
       distanceKm,
       durationSeconds: elapsedSeconds
     };
@@ -271,7 +250,7 @@ export default function ActivityTrackingPage() {
     activityState === 'idle' ? (
       <button
         type="button"
-        onClick={startActivity}
+        onClick={() => void startActivity()}
         className="rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 font-black text-stone-950"
       >
         Start
@@ -300,7 +279,7 @@ export default function ActivityTrackingPage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-black uppercase text-quest-teal">
-              {trackingMode === 'gps' ? 'Real GPS activity' : 'Mock fallback activity'}
+              Verified real GPS activity
             </p>
             <h1 className="mt-1 text-2xl font-black">{course.name}</h1>
           </div>
@@ -315,7 +294,7 @@ export default function ActivityTrackingPage() {
           <div>
             <p className="text-xs font-black uppercase text-amber-200">Loop multiplier</p>
             <p className="mt-1 text-sm text-stone-400">
-              {baseCourse?.distanceKm.toFixed(2)} km → {course.distanceKm.toFixed(2)} km (
+              {baseCourse?.distanceKm.toFixed(2)} km to {course.distanceKm.toFixed(2)} km (
               {loopCount}x)
             </p>
           </div>
@@ -393,7 +372,7 @@ export default function ActivityTrackingPage() {
         {primaryAction}
         <button
           type="button"
-          onClick={completeActivity}
+          onClick={() => void completeActivity()}
           disabled={activityState === 'idle'}
           className="rounded-2xl bg-quest-teal px-4 py-4 font-black text-white disabled:cursor-not-allowed disabled:bg-stone-800 disabled:text-stone-500"
         >

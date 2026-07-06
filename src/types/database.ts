@@ -809,6 +809,243 @@ export type Database = {
         };
         Relationships: [];
       };
+      gps_sessions: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          character_id: string | null;
+          race_id: string | null;
+          provider: 'browser_geolocation' | 'apple_healthkit' | 'google_fit';
+          status: 'active' | 'completed' | 'flagged';
+          total_distance: number;
+          average_pace: number;
+          elevation_gain: number;
+          started_at: string;
+          ended_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          race_id?: string | null;
+          provider?: 'browser_geolocation' | 'apple_healthkit' | 'google_fit';
+          status?: 'active' | 'completed' | 'flagged';
+          total_distance?: number;
+          average_pace?: number;
+          elevation_gain?: number;
+          started_at?: string;
+          ended_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          race_id?: string | null;
+          provider?: 'browser_geolocation' | 'apple_healthkit' | 'google_fit';
+          status?: 'active' | 'completed' | 'flagged';
+          total_distance?: number;
+          average_pace?: number;
+          elevation_gain?: number;
+          started_at?: string;
+          ended_at?: string | null;
+        };
+        Relationships: [];
+      };
+      gps_points: {
+        Row: {
+          id: string;
+          session_id: string;
+          lat: number;
+          lng: number;
+          speed_kmh: number;
+          pace: number;
+          elevation: number | null;
+          accuracy: number | null;
+          recorded_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          lat: number;
+          lng: number;
+          speed_kmh?: number;
+          pace?: number;
+          elevation?: number | null;
+          accuracy?: number | null;
+          recorded_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          lat?: number;
+          lng?: number;
+          speed_kmh?: number;
+          pace?: number;
+          elevation?: number | null;
+          accuracy?: number | null;
+          recorded_at?: string;
+        };
+        Relationships: [];
+      };
+      anti_cheat_reports: {
+        Row: {
+          id: string;
+          session_id: string | null;
+          user_id: string | null;
+          character_id: string | null;
+          cheat_score: number;
+          flagged: boolean;
+          reason: string | null;
+          xp_multiplier: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id?: string | null;
+          user_id?: string | null;
+          character_id?: string | null;
+          cheat_score?: number;
+          flagged?: boolean;
+          reason?: string | null;
+          xp_multiplier?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string | null;
+          user_id?: string | null;
+          character_id?: string | null;
+          cheat_score?: number;
+          flagged?: boolean;
+          reason?: string | null;
+          xp_multiplier?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      flagged_sessions: {
+        Row: {
+          id: string;
+          session_id: string | null;
+          user_id: string | null;
+          character_id: string | null;
+          flag_type: string;
+          severity: number;
+          details: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id?: string | null;
+          user_id?: string | null;
+          character_id?: string | null;
+          flag_type: string;
+          severity?: number;
+          details?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string | null;
+          user_id?: string | null;
+          character_id?: string | null;
+          flag_type?: string;
+          severity?: number;
+          details?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      ai_coach_messages: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          character_id: string | null;
+          session_id: string | null;
+          message: string;
+          message_type: string;
+          pace_target: number | null;
+          fatigue_level: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          session_id?: string | null;
+          message: string;
+          message_type?: string;
+          pace_target?: number | null;
+          fatigue_level?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          session_id?: string | null;
+          message?: string;
+          message_type?: string;
+          pace_target?: number | null;
+          fatigue_level?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      run_token_wallets: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          character_id: string | null;
+          balance: number;
+          lifetime_earned: number;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          balance?: number;
+          lifetime_earned?: number;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          balance?: number;
+          lifetime_earned?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      run_token_transactions: {
+        Row: {
+          id: string;
+          wallet_id: string;
+          amount: number;
+          reason: string;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          wallet_id: string;
+          amount: number;
+          reason: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          wallet_id?: string;
+          amount?: number;
+          reason?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

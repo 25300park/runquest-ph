@@ -250,6 +250,85 @@ create table if not exists public.transactions (
   timestamp timestamp with time zone not null default now()
 );
 
+create table if not exists public.gps_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete set null,
+  character_id uuid references public.characters(id) on delete set null,
+  race_id uuid references public.race_sessions(id) on delete set null,
+  provider text not null default 'browser_geolocation' check (provider in ('browser_geolocation', 'apple_healthkit', 'google_fit')),
+  status text not null default 'active' check (status in ('active', 'completed', 'flagged')),
+  total_distance float8 not null default 0,
+  average_pace float8 not null default 0,
+  elevation_gain float8 not null default 0,
+  started_at timestamp with time zone not null default now(),
+  ended_at timestamp with time zone
+);
+
+create table if not exists public.gps_points (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.gps_sessions(id) on delete cascade,
+  lat float8 not null,
+  lng float8 not null,
+  speed_kmh float8 not null default 0,
+  pace float8 not null default 0,
+  elevation float8,
+  accuracy float8,
+  recorded_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.anti_cheat_reports (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid references public.gps_sessions(id) on delete set null,
+  user_id uuid references public.users(id) on delete set null,
+  character_id uuid references public.characters(id) on delete set null,
+  cheat_score float8 not null default 0,
+  flagged boolean not null default false,
+  reason text,
+  xp_multiplier float8 not null default 1,
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.flagged_sessions (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid references public.gps_sessions(id) on delete cascade,
+  user_id uuid references public.users(id) on delete set null,
+  character_id uuid references public.characters(id) on delete set null,
+  flag_type text not null,
+  severity float8 not null default 0,
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.ai_coach_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete set null,
+  character_id uuid references public.characters(id) on delete set null,
+  session_id uuid references public.gps_sessions(id) on delete set null,
+  message text not null,
+  message_type text not null default 'motivation',
+  pace_target float8,
+  fatigue_level float8 not null default 0,
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.run_token_wallets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  character_id uuid references public.characters(id) on delete cascade,
+  balance int not null default 0,
+  lifetime_earned int not null default 0,
+  updated_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.run_token_transactions (
+  id uuid primary key default gen_random_uuid(),
+  wallet_id uuid not null references public.run_token_wallets(id) on delete cascade,
+  amount int not null,
+  reason text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now()
+);
+
 create index if not exists idx_courses_area on public.courses(area);
 create index if not exists idx_course_points_course_id on public.course_points(course_id);
 create index if not exists idx_activities_user_id on public.activities(user_id);
@@ -276,6 +355,14 @@ create index if not exists idx_seasonal_guilds_season_id on public.seasonal_guil
 create index if not exists idx_guild_wars_season_id on public.guild_wars(season_id);
 create index if not exists idx_marketplace_items_status on public.marketplace_items(status);
 create index if not exists idx_transactions_item_id on public.transactions(item_id);
+create index if not exists idx_gps_sessions_character_id on public.gps_sessions(character_id);
+create index if not exists idx_gps_sessions_race_id on public.gps_sessions(race_id);
+create index if not exists idx_gps_points_session_id on public.gps_points(session_id);
+create index if not exists idx_anti_cheat_reports_session_id on public.anti_cheat_reports(session_id);
+create index if not exists idx_flagged_sessions_session_id on public.flagged_sessions(session_id);
+create index if not exists idx_ai_coach_messages_character_id on public.ai_coach_messages(character_id);
+create index if not exists idx_run_token_wallets_character_id on public.run_token_wallets(character_id);
+create index if not exists idx_run_token_transactions_wallet_id on public.run_token_transactions(wallet_id);
 
 alter table public.users enable row level security;
 alter table public.courses enable row level security;
@@ -302,6 +389,13 @@ alter table public.seasonal_guilds enable row level security;
 alter table public.guild_wars enable row level security;
 alter table public.marketplace_items enable row level security;
 alter table public.transactions enable row level security;
+alter table public.gps_sessions enable row level security;
+alter table public.gps_points enable row level security;
+alter table public.anti_cheat_reports enable row level security;
+alter table public.flagged_sessions enable row level security;
+alter table public.ai_coach_messages enable row level security;
+alter table public.run_token_wallets enable row level security;
+alter table public.run_token_transactions enable row level security;
 
 drop policy if exists "Users are readable by everyone" on public.users;
 create policy "Users are readable by everyone"
@@ -501,3 +595,17 @@ drop policy if exists "Marketplace items are open in prototype" on public.market
 create policy "Marketplace items are open in prototype" on public.marketplace_items for all using (true) with check (true);
 drop policy if exists "Transactions are open in prototype" on public.transactions;
 create policy "Transactions are open in prototype" on public.transactions for all using (true) with check (true);
+drop policy if exists "GPS sessions are open in prototype" on public.gps_sessions;
+create policy "GPS sessions are open in prototype" on public.gps_sessions for all using (true) with check (true);
+drop policy if exists "GPS points are open in prototype" on public.gps_points;
+create policy "GPS points are open in prototype" on public.gps_points for all using (true) with check (true);
+drop policy if exists "Anti cheat reports are open in prototype" on public.anti_cheat_reports;
+create policy "Anti cheat reports are open in prototype" on public.anti_cheat_reports for all using (true) with check (true);
+drop policy if exists "Flagged sessions are open in prototype" on public.flagged_sessions;
+create policy "Flagged sessions are open in prototype" on public.flagged_sessions for all using (true) with check (true);
+drop policy if exists "AI coach messages are open in prototype" on public.ai_coach_messages;
+create policy "AI coach messages are open in prototype" on public.ai_coach_messages for all using (true) with check (true);
+drop policy if exists "Run token wallets are open in prototype" on public.run_token_wallets;
+create policy "Run token wallets are open in prototype" on public.run_token_wallets for all using (true) with check (true);
+drop policy if exists "Run token transactions are open in prototype" on public.run_token_transactions;
+create policy "Run token transactions are open in prototype" on public.run_token_transactions for all using (true) with check (true);
