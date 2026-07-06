@@ -21,10 +21,21 @@ function estimateTimeMinutes(distanceKm: number) {
   return Math.max(5, Math.round(distanceKm * 9));
 }
 
+function createLoopedRoute(routeCoordinates: LatLngTuple[], loopCount: number) {
+  if (loopCount <= 1) {
+    return routeCoordinates;
+  }
+
+  return Array.from({ length: loopCount }).flatMap((_, loopIndex) =>
+    loopIndex === 0 ? routeCoordinates : routeCoordinates.slice(1)
+  );
+}
+
 export default function CourseDetailPage() {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState<CourseWithPoints | null>(null);
+  const [loopCount, setLoopCount] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -76,30 +87,50 @@ export default function CourseDetailPage() {
     [course]
   );
   const startPoint = routeCoordinates[0];
-  const distanceKm = course ? Number(course.distance.toFixed(2)) : 0;
-  const xpReward = Math.round(distanceKm * 100);
-  const explorationReward = Math.max(3, Math.round(distanceKm * 5));
+  const baseDistanceKm = course ? Number(course.distance.toFixed(2)) : 0;
+  const totalDistanceKm = Number((baseDistanceKm * loopCount).toFixed(2));
+  const loopedRouteCoordinates = useMemo(
+    () => createLoopedRoute(routeCoordinates, loopCount),
+    [loopCount, routeCoordinates]
+  );
+  const xpReward = Math.round(totalDistanceKm * 100);
+  const explorationReward = Math.max(3, Math.round(totalDistanceKm * 5));
   const activityCourse = useMemo<Course | null>(() => {
-    if (!course || routeCoordinates.length < 2) {
+    if (!course || loopedRouteCoordinates.length < 2) {
       return null;
     }
 
-    const checkpoints: CourseCheckpoint[] = course.course_points.map((point, index) => ({
-      id: point.id,
-      name:
-        point.type === 'start'
-          ? 'Start Gate'
-          : point.type === 'finish'
-            ? 'Finish Gate'
-            : `Checkpoint ${index}`,
-      type:
-        point.type === 'start' ? 'START' : point.type === 'finish' ? 'FINISH' : 'CHECKPOINT',
-      position: [point.lat, point.lng],
-      distanceFromStartKm:
-        routeCoordinates.length > 1
-          ? Number(((distanceKm / (routeCoordinates.length - 1)) * index).toFixed(2))
-          : 0
-    }));
+    const checkpoints: CourseCheckpoint[] = Array.from({ length: loopCount }).flatMap(
+      (_, loopIndex) =>
+        course.course_points.map((point, pointIndex) => {
+          const routePointIndex = loopIndex * (routeCoordinates.length - 1) + pointIndex;
+          return {
+            id: `${point.id}-loop-${loopIndex + 1}`,
+            name:
+              point.type === 'start'
+                ? `Start Gate ${loopIndex + 1}`
+                : point.type === 'finish'
+                  ? `Finish Gate ${loopIndex + 1}`
+                  : `Checkpoint ${pointIndex} / Loop ${loopIndex + 1}`,
+            type:
+              loopIndex === 0 && point.type === 'start'
+                ? 'START'
+                : loopIndex === loopCount - 1 && point.type === 'finish'
+                  ? 'FINISH'
+                  : 'CHECKPOINT',
+            position: [point.lat, point.lng] as LatLngTuple,
+            distanceFromStartKm:
+              loopedRouteCoordinates.length > 1
+                ? Number(
+                    (
+                      (totalDistanceKm / (loopedRouteCoordinates.length - 1)) *
+                      routePointIndex
+                    ).toFixed(2)
+                  )
+                : 0
+          } satisfies CourseCheckpoint;
+        })
+    );
 
     return {
       id: course.id,
@@ -108,19 +139,27 @@ export default function CourseDetailPage() {
       name: course.name,
       description: `A community-created ${course.area} route loaded from Supabase.`,
       courseType: 'city',
-      distanceKm,
-      estimatedTimeMin: estimateTimeMinutes(distanceKm),
+      distanceKm: totalDistanceKm,
+      estimatedTimeMin: estimateTimeMinutes(totalDistanceKm),
       difficulty: course.difficulty,
       xpReward,
       explorationReward,
-      startPoint: routeCoordinates[0],
-      finishPoint: routeCoordinates[routeCoordinates.length - 1],
-      routeCoordinates,
+      startPoint: loopedRouteCoordinates[0],
+      finishPoint: loopedRouteCoordinates[loopedRouteCoordinates.length - 1],
+      routeCoordinates: loopedRouteCoordinates,
       checkpoints,
       pois: [],
       safetyNotes: 'Review the route before running and stay aware of local traffic conditions.'
     };
-  }, [course, distanceKm, explorationReward, routeCoordinates, xpReward]);
+  }, [
+    course,
+    explorationReward,
+    loopCount,
+    loopedRouteCoordinates,
+    routeCoordinates.length,
+    totalDistanceKm,
+    xpReward
+  ]);
 
   function startCourse() {
     if (!activityCourse) {
@@ -177,21 +216,43 @@ export default function CourseDetailPage() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <Polyline positions={routeCoordinates} color="#14b8a6" />
-          {course.course_points.map((point, index) => (
-            <Marker key={point.id} position={[point.lat, point.lng]}>
+          <Polyline positions={loopedRouteCoordinates} color="#14b8a6" />
+          {activityCourse?.checkpoints.map((checkpoint, index) => (
+            <Marker key={checkpoint.id} position={checkpoint.position}>
               <Popup>
-                {point.type.toUpperCase()} {index + 1}
+                {checkpoint.type} {index + 1}
               </Popup>
             </Marker>
           ))}
         </MapContainer>
       </div>
 
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <p className="text-xs font-black uppercase text-slate-500">Loop multiplier</p>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {[1, 2, 3].map((count) => (
+            <button
+              key={count}
+              type="button"
+              onClick={() => setLoopCount(count)}
+              className={`rounded-xl border px-4 py-3 font-black ${
+                loopCount === count
+                  ? 'border-quest-teal bg-quest-teal text-white'
+                  : 'border-slate-200 bg-slate-50 text-slate-700'
+              }`}
+            >
+              {count}x
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="rounded-xl bg-slate-100 p-3">
           <p className="text-xs text-slate-500">Distance</p>
-          <p className="font-bold">{distanceKm} km</p>
+          <p className="font-bold">
+            {baseDistanceKm} km → {totalDistanceKm} km ({loopCount}x)
+          </p>
         </div>
         <div className="rounded-xl bg-slate-100 p-3">
           <p className="text-xs text-slate-500">Reward</p>
@@ -199,7 +260,7 @@ export default function CourseDetailPage() {
         </div>
         <div className="rounded-xl bg-slate-100 p-3">
           <p className="text-xs text-slate-500">Time</p>
-          <p className="font-bold">{estimateTimeMinutes(distanceKm)} min</p>
+          <p className="font-bold">{estimateTimeMinutes(totalDistanceKm)} min</p>
         </div>
       </div>
 
