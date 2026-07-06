@@ -5,6 +5,8 @@ import AiCoachPage from '../pages/AiCoachPage';
 import AdminCourseBuilderPage from '../pages/AdminCourseBuilderPage';
 import AdminCourseListPage from '../pages/AdminCourseListPage';
 import AreaSelectPage from '../pages/AreaSelectPage';
+import CharacterCreation from '../pages/CharacterCreation';
+import CharacterDashboardPage from '../pages/CharacterDashboardPage';
 import CharacterSelectPage from '../pages/CharacterSelectPage';
 import CommunityPage from '../pages/CommunityPage';
 import CourseBuilder from '../pages/CourseBuilder';
@@ -25,6 +27,8 @@ export const appRoutes = (
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/character" element={<CharacterSelectPage />} />
+    <Route path="/character/create" element={<CharacterCreation />} />
+    <Route path="/character-dashboard" element={<CharacterDashboardPage />} />
     <Route path="/areas" element={<AreaSelectPage />} />
     <Route path="/map" element={<ExplorationMapPage />} />
     <Route path="/coach" element={<AiCoachPage />} />

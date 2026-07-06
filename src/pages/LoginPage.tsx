@@ -7,7 +7,7 @@ export default function LoginPage() {
         <p className="text-sm font-black uppercase text-amber-200">Adventurer login</p>
         <h1 className="mt-3 text-4xl font-black leading-tight">Return to your map</h1>
         <p className="mt-3 text-sm leading-6 text-stone-300">
-          Mock login only. Enter an email and continue to character selection.
+          Mock login only. Enter an email and continue to your character dashboard.
         </p>
 
         <form className="mt-7 space-y-5">
@@ -20,7 +20,7 @@ export default function LoginPage() {
             />
           </label>
           <Link
-            to="/character"
+            to="/character-dashboard"
             className="block rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 text-center font-black text-stone-950 shadow-[0_8px_0_rgba(120,53,15,0.55)] transition active:translate-y-1 active:shadow-[0_4px_0_rgba(120,53,15,0.55)]"
           >
             Login

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { mockCourses } from '../data/mockCourses';
+import { applyRunReward } from '../services/characterService';
 import type { CompletedActivitySummary } from '../types/activity';
 import {
   calculateActivityReward,
@@ -8,6 +9,7 @@ import {
   getGameProgress,
   type ProgressUpdate
 } from '../utils/gameProgress';
+import { difficultyXpValues } from '../utils/characterRpg';
 
 function formatElapsedTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -21,9 +23,13 @@ export default function QuestCompletedPage() {
   const location = useLocation();
   const summary = location.state as CompletedActivitySummary | null;
   const course = mockCourses.find((item) => item.id === courseId) ?? mockCourses[0];
+  const courseName = summary?.courseName ?? course.name;
+  const areaName = summary?.areaName ?? course.areaName;
   const distanceKm = summary?.distanceKm ?? course.distanceKm;
   const durationSeconds = summary?.durationSeconds ?? course.estimatedTimeMin * 60;
+  const loopCount = summary?.loopCount ?? 1;
   const processedRef = useRef(false);
+  const [characterRewardStatus, setCharacterRewardStatus] = useState('');
   const [progressUpdate, setProgressUpdate] = useState<ProgressUpdate>(() => {
     const progress = getGameProgress();
     const reward = calculateActivityReward(course, distanceKm, progress.completedActivities);
@@ -45,6 +51,27 @@ export default function QuestCompletedPage() {
 
     processedRef.current = true;
     setProgressUpdate(completeActivityProgress(course, summary));
+    applyRunReward({
+      distanceKm: summary.distanceKm,
+      difficultyMultiplier: difficultyXpValues[summary.difficulty ?? course.difficulty] ?? 1,
+      loopMultiplier: loopCount
+    })
+      .then((reward) => {
+        if (!reward) {
+          setCharacterRewardStatus('Create a character to store RPG XP in Supabase.');
+          return;
+        }
+
+        setCharacterRewardStatus(
+          reward.leveledUp
+            ? `Character level up: ${reward.previousLevel} to ${reward.nextLevel}`
+            : `Character gained ${reward.xpEarned} RPG XP`
+        );
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : 'Character XP update failed.';
+        setCharacterRewardStatus(message);
+      });
   }, [course, summary]);
 
   const xpEarned = progressUpdate.reward.totalXp;
@@ -56,9 +83,9 @@ export default function QuestCompletedPage() {
       </div>
       <div>
         <p className="text-sm font-black uppercase text-amber-200">Quest completed</p>
-        <h1 className="mt-2 text-3xl font-black text-stone-50">You cleared {course.name}.</h1>
+        <h1 className="mt-2 text-3xl font-black text-stone-50">You cleared {courseName}.</h1>
         <p className="mt-3 text-stone-300">
-          You earned {xpEarned} XP and increased {course.areaName} exploration.
+          You earned {xpEarned} XP and increased {areaName} exploration.
         </p>
       </div>
       {progressUpdate.didLevelUp && (
@@ -67,6 +94,11 @@ export default function QuestCompletedPage() {
           <p className="mt-1 text-xl font-black">
             Level {progressUpdate.previousLevel} to {progressUpdate.currentLevel}
           </p>
+        </div>
+      )}
+      {characterRewardStatus && (
+        <div className="rounded-2xl border border-teal-200/30 bg-teal-950/30 px-4 py-3 text-sm font-bold text-teal-100">
+          {characterRewardStatus}
         </div>
       )}
       <div className="grid grid-cols-2 gap-3 text-left">

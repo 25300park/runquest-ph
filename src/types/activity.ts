@@ -16,6 +16,10 @@ export type ActivitySummary = {
 export type CompletedActivitySummary = {
   activityId: string;
   courseId: string;
+  courseName?: string;
+  areaName?: string;
+  difficulty?: string;
+  loopCount?: number;
   distanceKm: number;
   durationSeconds: number;
 };

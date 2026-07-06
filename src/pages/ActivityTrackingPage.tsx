@@ -251,6 +251,10 @@ export default function ActivityTrackingPage() {
     const summary: CompletedActivitySummary = {
       activityId: `activity-${course.id}-${Date.now()}`,
       courseId: course.id,
+      courseName: course.name,
+      areaName: course.areaName,
+      difficulty: course.difficulty,
+      loopCount,
       distanceKm,
       durationSeconds: elapsedSeconds
     };

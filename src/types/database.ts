@@ -148,6 +148,145 @@ export type Database = {
           }
         ];
       };
+      characters: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          name: string;
+          level: number;
+          xp: number;
+          avatar_base_url: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          name: string;
+          level?: number;
+          xp?: number;
+          avatar_base_url?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          name?: string;
+          level?: number;
+          xp?: number;
+          avatar_base_url?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'characters_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      character_stats: {
+        Row: {
+          id: string;
+          character_id: string;
+          total_distance: number;
+          total_runs: number;
+          total_xp: number;
+          streak_days: number;
+        };
+        Insert: {
+          id?: string;
+          character_id: string;
+          total_distance?: number;
+          total_runs?: number;
+          total_xp?: number;
+          streak_days?: number;
+        };
+        Update: {
+          id?: string;
+          character_id?: string;
+          total_distance?: number;
+          total_runs?: number;
+          total_xp?: number;
+          streak_days?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'character_stats_character_id_fkey';
+            columns: ['character_id'];
+            isOneToOne: false;
+            referencedRelation: 'characters';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      equipment_items: {
+        Row: {
+          id: string;
+          name: string;
+          type: 'shoes' | 'backpack' | 'hat' | 'accessory';
+          rarity: string;
+          speed_bonus: number;
+          xp_bonus: number;
+          image_url: string | null;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          type: 'shoes' | 'backpack' | 'hat' | 'accessory';
+          rarity?: string;
+          speed_bonus?: number;
+          xp_bonus?: number;
+          image_url?: string | null;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          type?: 'shoes' | 'backpack' | 'hat' | 'accessory';
+          rarity?: string;
+          speed_bonus?: number;
+          xp_bonus?: number;
+          image_url?: string | null;
+        };
+        Relationships: [];
+      };
+      character_equipment: {
+        Row: {
+          id: string;
+          character_id: string;
+          item_id: string;
+          equipped: boolean;
+        };
+        Insert: {
+          id?: string;
+          character_id: string;
+          item_id: string;
+          equipped?: boolean;
+        };
+        Update: {
+          id?: string;
+          character_id?: string;
+          item_id?: string;
+          equipped?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'character_equipment_character_id_fkey';
+            columns: ['character_id'];
+            isOneToOne: false;
+            referencedRelation: 'characters';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'character_equipment_item_id_fkey';
+            columns: ['item_id'];
+            isOneToOne: false;
+            referencedRelation: 'equipment_items';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
