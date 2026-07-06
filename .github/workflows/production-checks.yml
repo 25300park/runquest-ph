@@ -1,0 +1,36 @@
+name: RunQuest PH Production Checks
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  production-checks:
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+      PRODUCTION_URL: ${{ secrets.PRODUCTION_URL }}
+      AUTO_ROLLBACK: ${{ secrets.AUTO_ROLLBACK }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run pre-deploy checks
+        run: npm run predeploy
+
+      - name: Run production health check
+        if: ${{ env.PRODUCTION_URL != '' }}
+        run: npm run health:check

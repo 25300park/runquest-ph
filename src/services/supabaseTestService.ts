@@ -34,7 +34,7 @@ export async function testInsertCourse() {
     console.log('INSERT RESULT: success', result);
     return result;
   } catch (error) {
-    console.error('INSERT RESULT: failure', error);
+    console.warn('INSERT RESULT: failure', error);
     throw error;
   }
 }
@@ -53,7 +53,7 @@ export async function testFetchCourses() {
     console.log('FETCH RESULT: success', result);
     return result;
   } catch (error) {
-    console.error('FETCH RESULT: failure', error);
+    console.warn('FETCH RESULT: failure', error);
     throw error;
   }
 }
@@ -79,7 +79,7 @@ export async function testSaveGPXCourse(points: LatLngTuple[] = samplePoints) {
     console.log('GPX SAVE RESULT: success', result);
     return result;
   } catch (error) {
-    console.error('GPX SAVE RESULT: failure', error);
+    console.warn('GPX SAVE RESULT: failure', error);
     throw error;
   }
 }

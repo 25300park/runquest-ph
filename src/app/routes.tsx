@@ -11,6 +11,7 @@ import CommunityPage from '../pages/CommunityPage';
 import CourseBuilder from '../pages/CourseBuilder';
 import CourseDetailPage from '../pages/CourseDetailPage';
 import CourseViralHubPage from '../pages/CourseViralHubPage';
+import DeployStatusPage from '../pages/DeployStatusPage';
 import ExplorationMapPage from '../pages/ExplorationMapPage';
 import LandingPage from '../pages/LandingPage';
 import LeaderboardPage from '../pages/LeaderboardPage';
@@ -50,6 +51,14 @@ export const appRoutes = (
     <Route path="/profile" element={<ProfilePage />} />
     <Route path="/rewards" element={<RewardsPage />} />
     <Route path="/admin/login" element={<AdminLogin />} />
+    <Route
+      path="/deploy/status"
+      element={
+        <AdminGuard>
+          <DeployStatusPage />
+        </AdminGuard>
+      }
+    />
     <Route
       path="/admin"
       element={

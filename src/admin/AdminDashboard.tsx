@@ -30,7 +30,7 @@ class AdminErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
   }
 
   componentDidCatch(error: unknown) {
-    console.error('Admin system error:', error);
+    console.warn('Admin system error:', error);
   }
 
   render() {
@@ -62,7 +62,7 @@ function AdminDashboardContent() {
       setStatus('Realtime admin system active.');
       setError('');
     } catch (error) {
-      console.error('Admin dashboard error:', error);
+      console.warn('Admin dashboard error:', error);
       setStats(emptyStats);
       setError('Admin system error');
       setStatus('Failed to load admin dashboard (check Supabase connection).');

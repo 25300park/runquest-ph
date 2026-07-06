@@ -225,12 +225,27 @@ create table if not exists public.system_settings (
   updated_at timestamp with time zone not null default now()
 );
 
+create table if not exists public.migration_history (
+  id uuid primary key default gen_random_uuid(),
+  change_type text not null,
+  executed_at timestamp with time zone not null default now(),
+  status text not null default 'pending' check (status in ('pending', 'passed', 'failed', 'rolled_back')),
+  details jsonb not null default '{}'::jsonb
+);
+
 insert into public.system_settings (setting_key, setting_value, description)
 values
   ('xp_multiplier', 1, 'Global XP reward multiplier'),
   ('token_rate', 10, 'RunToken reward rate per km'),
   ('reward_curve', 1, 'Global reward curve tuning factor')
 on conflict (setting_key) do nothing;
+
+insert into public.migration_history (change_type, status, details)
+values (
+  'launch_schema_baseline',
+  'passed',
+  jsonb_build_object('source', 'supabase/schema.sql', 'notes', 'Production launch baseline')
+);
 
 create table if not exists public.items (
   id uuid primary key default gen_random_uuid(),
@@ -468,6 +483,7 @@ create index if not exists idx_characters_status on public.characters(status);
 create index if not exists idx_admin_audit_logs_admin_user_id on public.admin_audit_logs(admin_user_id);
 create index if not exists idx_admin_economy_settings_key on public.admin_economy_settings(setting_key);
 create index if not exists idx_system_settings_key on public.system_settings(setting_key);
+create index if not exists idx_migration_history_executed_at on public.migration_history(executed_at desc);
 
 alter table public.users enable row level security;
 alter table public.courses enable row level security;
@@ -504,6 +520,7 @@ alter table public.run_token_transactions enable row level security;
 alter table public.admin_audit_logs enable row level security;
 alter table public.admin_economy_settings enable row level security;
 alter table public.system_settings enable row level security;
+alter table public.migration_history enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -773,3 +790,5 @@ drop policy if exists "Admin economy settings are admin only" on public.admin_ec
 create policy "Admin economy settings are admin only" on public.admin_economy_settings for all using (public.is_admin()) with check (public.is_admin());
 drop policy if exists "System settings are admin only" on public.system_settings;
 create policy "System settings are admin only" on public.system_settings for all using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "Migration history is admin readable" on public.migration_history;
+create policy "Migration history is admin readable" on public.migration_history for select using (public.is_admin());
