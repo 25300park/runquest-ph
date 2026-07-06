@@ -10,6 +10,8 @@ export type Database = {
           name: string | null;
           level: number;
           xp: number;
+          role: 'admin' | 'moderator' | 'user';
+          status: 'active' | 'suspended' | 'banned';
           created_at: string;
         };
         Insert: {
@@ -18,6 +20,8 @@ export type Database = {
           name?: string | null;
           level?: number;
           xp?: number;
+          role?: 'admin' | 'moderator' | 'user';
+          status?: 'active' | 'suspended' | 'banned';
           created_at?: string;
         };
         Update: {
@@ -26,6 +30,8 @@ export type Database = {
           name?: string | null;
           level?: number;
           xp?: number;
+          role?: 'admin' | 'moderator' | 'user';
+          status?: 'active' | 'suspended' | 'banned';
           created_at?: string;
         };
         Relationships: [];
@@ -38,6 +44,8 @@ export type Database = {
           difficulty: 'Easy' | 'Normal' | 'Hard' | 'Challenge';
           distance: number;
           created_by: string | null;
+          status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'deleted';
+          verified: boolean;
           created_at: string;
         };
         Insert: {
@@ -47,6 +55,8 @@ export type Database = {
           difficulty: 'Easy' | 'Normal' | 'Hard' | 'Challenge';
           distance?: number;
           created_by?: string | null;
+          status?: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'deleted';
+          verified?: boolean;
           created_at?: string;
         };
         Update: {
@@ -56,6 +66,8 @@ export type Database = {
           difficulty?: 'Easy' | 'Normal' | 'Hard' | 'Challenge';
           distance?: number;
           created_by?: string | null;
+          status?: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'deleted';
+          verified?: boolean;
           created_at?: string;
         };
         Relationships: [
@@ -156,6 +168,7 @@ export type Database = {
           level: number;
           xp: number;
           avatar_base_url: string | null;
+          status: 'active' | 'banned';
           created_at: string;
         };
         Insert: {
@@ -165,6 +178,7 @@ export type Database = {
           level?: number;
           xp?: number;
           avatar_base_url?: string | null;
+          status?: 'active' | 'banned';
           created_at?: string;
         };
         Update: {
@@ -174,6 +188,7 @@ export type Database = {
           level?: number;
           xp?: number;
           avatar_base_url?: string | null;
+          status?: 'active' | 'banned';
           created_at?: string;
         };
         Relationships: [
@@ -229,6 +244,9 @@ export type Database = {
           rarity: string;
           speed_bonus: number;
           xp_bonus: number;
+          stamina_bonus: number;
+          token_price: number;
+          drop_rate: number;
           image_url: string | null;
         };
         Insert: {
@@ -238,6 +256,9 @@ export type Database = {
           rarity?: string;
           speed_bonus?: number;
           xp_bonus?: number;
+          stamina_bonus?: number;
+          token_price?: number;
+          drop_rate?: number;
           image_url?: string | null;
         };
         Update: {
@@ -247,6 +268,9 @@ export type Database = {
           rarity?: string;
           speed_bonus?: number;
           xp_bonus?: number;
+          stamina_bonus?: number;
+          token_price?: number;
+          drop_rate?: number;
           image_url?: string | null;
         };
         Relationships: [];
@@ -1041,6 +1065,36 @@ export type Database = {
           wallet_id?: string;
           amount?: number;
           reason?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      admin_audit_logs: {
+        Row: {
+          id: string;
+          admin_user_id: string | null;
+          action: string;
+          target_table: string;
+          target_id: string | null;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          admin_user_id?: string | null;
+          action: string;
+          target_table: string;
+          target_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          admin_user_id?: string | null;
+          action?: string;
+          target_table?: string;
+          target_id?: string | null;
           metadata?: Json;
           created_at?: string;
         };

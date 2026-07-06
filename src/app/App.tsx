@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BrowserRouter, Link, NavLink } from 'react-router-dom';
+import { BrowserRouter, Link, NavLink, useLocation } from 'react-router-dom';
 import { appRoutes } from './routes';
 
 const navItems = [
@@ -10,6 +10,13 @@ const navItems = [
 ];
 
 function AppShell({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+
+  if (isAdminRoute) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen bg-[#0f1412] text-slate-950">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-[#111816] shadow-soft">

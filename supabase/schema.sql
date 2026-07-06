@@ -6,6 +6,8 @@ create table if not exists public.users (
   name text,
   level int not null default 1,
   xp int not null default 0,
+  role text not null default 'user' check (role in ('admin', 'moderator', 'user')),
+  status text not null default 'active' check (status in ('active', 'suspended', 'banned')),
   created_at timestamp with time zone not null default now()
 );
 
@@ -16,6 +18,8 @@ create table if not exists public.courses (
   difficulty text not null check (difficulty in ('Easy', 'Normal', 'Hard', 'Challenge')),
   distance float8 not null default 0,
   created_by uuid references public.users(id) on delete set null,
+  status text not null default 'pending_review' check (status in ('draft', 'pending_review', 'approved', 'rejected', 'deleted')),
+  verified boolean not null default false,
   created_at timestamp with time zone not null default now()
 );
 
@@ -45,6 +49,7 @@ create table if not exists public.characters (
   level int not null default 1,
   xp int not null default 0,
   avatar_base_url text,
+  status text not null default 'active' check (status in ('active', 'banned')),
   created_at timestamp with time zone not null default now()
 );
 
@@ -145,6 +150,13 @@ alter table public.leaderboard add column if not exists xp_total int not null de
 alter table public.guilds add column if not exists total_xp int not null default 0;
 alter table public.guild_members add column if not exists contribution_score float8 not null default 0;
 alter table public.equipment_items add column if not exists stamina_bonus float8 not null default 0;
+alter table public.equipment_items add column if not exists token_price int not null default 0;
+alter table public.equipment_items add column if not exists drop_rate float8 not null default 0.05;
+alter table public.users add column if not exists role text not null default 'user' check (role in ('admin', 'moderator', 'user'));
+alter table public.users add column if not exists status text not null default 'active' check (status in ('active', 'suspended', 'banned'));
+alter table public.courses add column if not exists status text not null default 'pending_review' check (status in ('draft', 'pending_review', 'approved', 'rejected', 'deleted'));
+alter table public.courses add column if not exists verified boolean not null default false;
+alter table public.characters add column if not exists status text not null default 'active' check (status in ('active', 'banned'));
 
 create table if not exists public.items (
   id uuid primary key default gen_random_uuid(),
@@ -329,6 +341,16 @@ create table if not exists public.run_token_transactions (
   created_at timestamp with time zone not null default now()
 );
 
+create table if not exists public.admin_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  admin_user_id uuid references public.users(id) on delete set null,
+  action text not null,
+  target_table text not null,
+  target_id uuid,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now()
+);
+
 create index if not exists idx_courses_area on public.courses(area);
 create index if not exists idx_course_points_course_id on public.course_points(course_id);
 create index if not exists idx_activities_user_id on public.activities(user_id);
@@ -363,6 +385,10 @@ create index if not exists idx_flagged_sessions_session_id on public.flagged_ses
 create index if not exists idx_ai_coach_messages_character_id on public.ai_coach_messages(character_id);
 create index if not exists idx_run_token_wallets_character_id on public.run_token_wallets(character_id);
 create index if not exists idx_run_token_transactions_wallet_id on public.run_token_transactions(wallet_id);
+create index if not exists idx_users_role on public.users(role);
+create index if not exists idx_courses_status on public.courses(status);
+create index if not exists idx_characters_status on public.characters(status);
+create index if not exists idx_admin_audit_logs_admin_user_id on public.admin_audit_logs(admin_user_id);
 
 alter table public.users enable row level security;
 alter table public.courses enable row level security;
@@ -396,6 +422,23 @@ alter table public.flagged_sessions enable row level security;
 alter table public.ai_coach_messages enable row level security;
 alter table public.run_token_wallets enable row level security;
 alter table public.run_token_transactions enable row level security;
+alter table public.admin_audit_logs enable row level security;
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.users
+    where id = auth.uid()
+      and role = 'admin'
+      and status = 'active'
+  );
+$$;
 
 drop policy if exists "Users are readable by everyone" on public.users;
 create policy "Users are readable by everyone"
@@ -609,3 +652,5 @@ drop policy if exists "Run token wallets are open in prototype" on public.run_to
 create policy "Run token wallets are open in prototype" on public.run_token_wallets for all using (true) with check (true);
 drop policy if exists "Run token transactions are open in prototype" on public.run_token_transactions;
 create policy "Run token transactions are open in prototype" on public.run_token_transactions for all using (true) with check (true);
+drop policy if exists "Admin audit logs are admin only" on public.admin_audit_logs;
+create policy "Admin audit logs are admin only" on public.admin_audit_logs for all using (public.is_admin()) with check (public.is_admin());

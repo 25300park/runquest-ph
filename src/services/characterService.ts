@@ -20,6 +20,9 @@ const starterEquipment: Array<Omit<EquipmentItemRow, 'id'>> = [
     rarity: 'common',
     speed_bonus: 0.02,
     xp_bonus: 0.02,
+    stamina_bonus: 0,
+    token_price: 0,
+    drop_rate: 0.05,
     image_url: '/images/equipment/starter-striders.svg'
   },
   {
@@ -28,6 +31,9 @@ const starterEquipment: Array<Omit<EquipmentItemRow, 'id'>> = [
     rarity: 'common',
     speed_bonus: 0,
     xp_bonus: 0.03,
+    stamina_bonus: 0,
+    token_price: 0,
+    drop_rate: 0.05,
     image_url: '/images/equipment/quest-pack.svg'
   },
   {
@@ -36,6 +42,9 @@ const starterEquipment: Array<Omit<EquipmentItemRow, 'id'>> = [
     rarity: 'common',
     speed_bonus: 0,
     xp_bonus: 0.01,
+    stamina_bonus: 0,
+    token_price: 0,
+    drop_rate: 0.05,
     image_url: '/images/equipment/sun-cap.svg'
   },
   {
@@ -44,6 +53,9 @@ const starterEquipment: Array<Omit<EquipmentItemRow, 'id'>> = [
     rarity: 'common',
     speed_bonus: 0,
     xp_bonus: 0.02,
+    stamina_bonus: 0,
+    token_price: 0,
+    drop_rate: 0.05,
     image_url: '/images/equipment/glow-charm.svg'
   }
 ];
