@@ -4,7 +4,7 @@ import { getOutput } from './pipeline-utils.js';
 const schemaPath = 'supabase/schema.sql';
 
 const requiredTables = {
-  users: ['id', 'email', 'name', 'level', 'xp', 'subscription_type', 'created_at'],
+  users: ['id', 'email', 'name', 'level', 'xp', 'subscription_type', 'referral_code', 'created_at'],
   courses: ['id', 'name', 'area', 'difficulty', 'distance', 'created_by', 'created_at'],
   course_points: ['id', 'course_id', 'lat', 'lng', 'order_index', 'type'],
   activities: ['id', 'user_id', 'course_id', 'distance', 'duration', 'xp_earned', 'created_at'],
@@ -12,6 +12,10 @@ const requiredTables = {
   guilds: ['id', 'name', 'leader_id', 'shared_xp', 'total_xp', 'total_distance'],
   guild_members: ['id', 'guild_id', 'user_id', 'character_id', 'role', 'contribution_score'],
   guild_scores: ['id', 'guild_id', 'week_start', 'rank_score'],
+  referrals: ['id', 'referrer_user_id', 'referred_user_id', 'referral_code', 'status'],
+  push_subscriptions: ['id', 'user_id', 'endpoint', 'permission'],
+  events: ['id', 'season_id', 'name', 'event_type', 'xp_bonus_multiplier'],
+  season_scores: ['id', 'season_id', 'user_id', 'character_id', 'rank_score'],
   migration_history: ['id', 'change_type', 'executed_at', 'status']
 };
 

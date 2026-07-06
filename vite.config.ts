@@ -8,6 +8,29 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon.svg'],
+      workbox: {
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/tile\.openstreetmap\.org\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'runquest-osm-tiles',
+              expiration: {
+                maxEntries: 180,
+                maxAgeSeconds: 60 * 60 * 24 * 14
+              }
+            }
+          },
+          {
+            urlPattern: ({ request }) => request.destination === 'document',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'runquest-pages',
+              networkTimeoutSeconds: 3
+            }
+          }
+        ]
+      },
       manifest: {
         name: 'RunQuest PH',
         short_name: 'RunQuest',

@@ -1,0 +1,19 @@
+{
+  "name": "RunQuest PH",
+  "short_name": "RunQuest",
+  "description": "Explore your city, grow your character, and build your running habit.",
+  "theme_color": "#14b8a6",
+  "background_color": "#111816",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

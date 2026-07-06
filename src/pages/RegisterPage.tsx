@@ -7,6 +7,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -16,7 +17,7 @@ export default function RegisterPage() {
     setStatus('Creating your RunQuest account...');
 
     try {
-      await registerRunQuest({ email, password, name });
+      await registerRunQuest({ email, password, name, referralCode: referralCode.trim() || undefined });
       navigate('/character-dashboard', { replace: true });
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Registration failed.');
@@ -65,6 +66,15 @@ export default function RegisterPage() {
               type="password"
               minLength={6}
               required
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-black text-stone-200">Referral code</span>
+            <input
+              value={referralCode}
+              onChange={(event) => setReferralCode(event.target.value)}
+              className="mt-2 w-full rounded-2xl border border-stone-700 bg-stone-950 px-4 py-4 text-stone-50 outline-none ring-quest-teal/40 focus:ring-4"
+              placeholder="Optional invite code"
             />
           </label>
           {status && (

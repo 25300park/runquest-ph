@@ -9,6 +9,7 @@ import { getCharacterProfile } from '../services/characterService';
 import { getRealtimeCoaching, saveCoachMessage } from '../services/aiCoachService';
 import { analyzeAndStoreGpsSessionSafely } from '../services/antiCheatService';
 import { awardRunTokens } from '../features/economy/tokenEconomyService';
+import { updateSeasonScore } from '../services/seasonService';
 import type { CompletedActivitySummary } from '../types/activity';
 import type { Course, Difficulty } from '../types/course';
 import {
@@ -107,6 +108,12 @@ export default function QuestCompletedPage() {
           streakDays: reward.streakDays
         });
         await contributeToGuild({
+          characterId: reward.characterId,
+          xp: reward.xpEarned,
+          distanceKm: summary.distanceKm
+        });
+        await updateSeasonScore({
+          userId: reward.userId,
           characterId: reward.characterId,
           xp: reward.xpEarned,
           distanceKm: summary.distanceKm

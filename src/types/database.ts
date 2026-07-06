@@ -13,6 +13,8 @@ export type Database = {
           role: 'admin' | 'user';
           status: 'active' | 'suspended' | 'banned';
           subscription_type: 'free' | 'premium';
+          referral_code: string | null;
+          referred_by: string | null;
           created_at: string;
         };
         Insert: {
@@ -24,6 +26,8 @@ export type Database = {
           role?: 'admin' | 'user';
           status?: 'active' | 'suspended' | 'banned';
           subscription_type?: 'free' | 'premium';
+          referral_code?: string | null;
+          referred_by?: string | null;
           created_at?: string;
         };
         Update: {
@@ -35,6 +39,8 @@ export type Database = {
           role?: 'admin' | 'user';
           status?: 'active' | 'suspended' | 'banned';
           subscription_type?: 'free' | 'premium';
+          referral_code?: string | null;
+          referred_by?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -494,6 +500,36 @@ export type Database = {
           };
           Relationships: [];
         };
+        referrals: {
+          Row: {
+            id: string;
+            referrer_user_id: string;
+            referred_user_id: string;
+            referral_code: string;
+            reward_xp: number;
+            status: 'pending' | 'rewarded' | 'blocked';
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            referrer_user_id: string;
+            referred_user_id: string;
+            referral_code: string;
+            reward_xp?: number;
+            status?: 'pending' | 'rewarded' | 'blocked';
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            referrer_user_id?: string;
+            referred_user_id?: string;
+            referral_code?: string;
+            reward_xp?: number;
+            status?: 'pending' | 'rewarded' | 'blocked';
+            created_at?: string;
+          };
+          Relationships: [];
+        };
         item_ownership: {
         Row: {
           id: string;
@@ -722,7 +758,7 @@ export type Database = {
         };
         Relationships: [];
       };
-      seasons: {
+        seasons: {
         Row: {
           id: string;
           name: string;
@@ -744,9 +780,75 @@ export type Database = {
           ends_at?: string | null;
           active?: boolean;
         };
-        Relationships: [];
-      };
-      seasonal_guilds: {
+          Relationships: [];
+        };
+        events: {
+          Row: {
+            id: string;
+            season_id: string | null;
+            name: string;
+            event_type: 'weekly' | 'monthly' | 'guild' | 'special';
+            xp_bonus_multiplier: number;
+            starts_at: string;
+            ends_at: string | null;
+            active: boolean;
+          };
+          Insert: {
+            id?: string;
+            season_id?: string | null;
+            name: string;
+            event_type?: 'weekly' | 'monthly' | 'guild' | 'special';
+            xp_bonus_multiplier?: number;
+            starts_at?: string;
+            ends_at?: string | null;
+            active?: boolean;
+          };
+          Update: {
+            id?: string;
+            season_id?: string | null;
+            name?: string;
+            event_type?: 'weekly' | 'monthly' | 'guild' | 'special';
+            xp_bonus_multiplier?: number;
+            starts_at?: string;
+            ends_at?: string | null;
+            active?: boolean;
+          };
+          Relationships: [];
+        };
+        season_scores: {
+          Row: {
+            id: string;
+            season_id: string;
+            user_id: string | null;
+            character_id: string | null;
+            total_xp: number;
+            total_distance: number;
+            rank_score: number;
+            updated_at: string;
+          };
+          Insert: {
+            id?: string;
+            season_id: string;
+            user_id?: string | null;
+            character_id?: string | null;
+            total_xp?: number;
+            total_distance?: number;
+            rank_score?: number;
+            updated_at?: string;
+          };
+          Update: {
+            id?: string;
+            season_id?: string;
+            user_id?: string | null;
+            character_id?: string | null;
+            total_xp?: number;
+            total_distance?: number;
+            rank_score?: number;
+            updated_at?: string;
+          };
+          Relationships: [];
+        };
+        seasonal_guilds: {
         Row: {
           id: string;
           season_id: string;
@@ -1163,7 +1265,7 @@ export type Database = {
         };
         Relationships: [];
       };
-      system_settings: {
+        system_settings: {
         Row: {
           id: string;
           setting_key: string;
@@ -1188,9 +1290,42 @@ export type Database = {
           updated_by?: string | null;
           updated_at?: string;
         };
-        Relationships: [];
+          Relationships: [];
+        };
+        push_subscriptions: {
+          Row: {
+            id: string;
+            user_id: string | null;
+            endpoint: string;
+            p256dh: string | null;
+            auth: string | null;
+            permission: 'default' | 'granted' | 'denied';
+            created_at: string;
+            updated_at: string;
+          };
+          Insert: {
+            id?: string;
+            user_id?: string | null;
+            endpoint: string;
+            p256dh?: string | null;
+            auth?: string | null;
+            permission?: 'default' | 'granted' | 'denied';
+            created_at?: string;
+            updated_at?: string;
+          };
+          Update: {
+            id?: string;
+            user_id?: string | null;
+            endpoint?: string;
+            p256dh?: string | null;
+            auth?: string | null;
+            permission?: 'default' | 'granted' | 'denied';
+            created_at?: string;
+            updated_at?: string;
+          };
+          Relationships: [];
+        };
       };
-    };
     Views: Record<string, never>;
     Functions: Record<string, never>;
     Enums: Record<string, never>;

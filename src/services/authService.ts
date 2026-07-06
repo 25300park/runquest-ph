@@ -1,5 +1,6 @@
 import { requireSupabaseClient } from '../lib/supabase';
 import { createCharacter, getCharacterProfile } from './characterService';
+import { applyReferral, ensureReferralCode } from './referralService';
 import type { Database } from '../types/database';
 
 export type LiveUserProfile = Database['public']['Tables']['users']['Row'];
@@ -31,7 +32,16 @@ export async function ensureUserProfile(input?: {
     .maybeSingle();
 
   if (existingError) throw existingError;
-  if (existing) return existing;
+  if (existing) {
+    if (!existing.referral_code) {
+      await ensureReferralCode(existing.id, existing.email);
+      return {
+        ...existing,
+        referral_code: await ensureReferralCode(existing.id, existing.email)
+      };
+    }
+    return existing;
+  }
 
   const { data: created, error: createError } = await client
     .from('users')
@@ -41,7 +51,8 @@ export async function ensureUserProfile(input?: {
       name: displayName,
       role: 'user',
       status: 'active',
-      subscription_type: 'free'
+      subscription_type: 'free',
+      referral_code: `RQ-${authUser.id.slice(0, 8).toUpperCase()}`
     })
     .select('*')
     .single();
@@ -75,6 +86,7 @@ export async function registerRunQuest(input: {
   email: string;
   password: string;
   name: string;
+  referralCode?: string;
 }) {
   const client = requireSupabaseClient();
   const { error } = await client.auth.signUp({
@@ -90,6 +102,10 @@ export async function registerRunQuest(input: {
   if (error) throw error;
 
   const profile = await ensureUserProfile({ name: input.name });
+  await applyReferral({
+    referredUserId: profile.id,
+    referralCode: input.referralCode
+  });
   const character = await ensureDefaultCharacter(profile);
   return { profile, character };
 }

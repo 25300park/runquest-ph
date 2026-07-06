@@ -15,6 +15,7 @@ import DeployStatusPage from '../pages/DeployStatusPage';
 import ExplorationMapPage from '../pages/ExplorationMapPage';
 import LandingPage from '../pages/LandingPage';
 import LeaderboardPage from '../pages/LeaderboardPage';
+import LaunchPage from '../pages/LaunchPage';
 import LoginPage from '../pages/LoginPage';
 import ProfilePage from '../pages/ProfilePage';
 import QuestCompletedPage from '../pages/QuestCompletedPage';
@@ -39,6 +40,7 @@ export const appRoutes = (
     <Route path="/coach" element={<AiCoachPage />} />
     <Route path="/community" element={<CommunityPage />} />
     <Route path="/leaderboard" element={<LeaderboardPage />} />
+    <Route path="/launch" element={<LaunchPage />} />
     <Route path="/course-builder" element={<CourseBuilder />} />
     <Route path="/course-builder/:courseId" element={<CourseBuilder />} />
     <Route path="/advanced-courses" element={<AdvancedCourseSystemPage />} />

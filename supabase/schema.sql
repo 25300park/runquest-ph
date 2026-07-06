@@ -9,6 +9,8 @@ create table if not exists public.users (
   role text not null default 'user' check (role in ('admin', 'user')),
   status text not null default 'active' check (status in ('active', 'suspended', 'banned')),
   subscription_type text not null default 'free' check (subscription_type in ('free', 'premium')),
+  referral_code text unique,
+  referred_by uuid references public.users(id) on delete set null,
   created_at timestamp with time zone not null default now()
 );
 
@@ -138,6 +140,17 @@ create table if not exists public.guild_scores (
   updated_at timestamp with time zone not null default now()
 );
 
+create table if not exists public.referrals (
+  id uuid primary key default gen_random_uuid(),
+  referrer_user_id uuid not null references public.users(id) on delete cascade,
+  referred_user_id uuid not null references public.users(id) on delete cascade,
+  referral_code text not null,
+  reward_xp int not null default 100,
+  status text not null default 'pending' check (status in ('pending', 'rewarded', 'blocked')),
+  created_at timestamp with time zone not null default now(),
+  unique (referred_user_id)
+);
+
 create table if not exists public.item_ownership (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.users(id) on delete cascade,
@@ -168,6 +181,8 @@ alter table public.equipment_items add column if not exists drop_rate float8 not
 alter table public.users add column if not exists role text not null default 'user' check (role in ('admin', 'user'));
 alter table public.users add column if not exists status text not null default 'active' check (status in ('active', 'suspended', 'banned'));
 alter table public.users add column if not exists subscription_type text not null default 'free' check (subscription_type in ('free', 'premium'));
+alter table public.users add column if not exists referral_code text unique;
+alter table public.users add column if not exists referred_by uuid references public.users(id) on delete set null;
 insert into public.users (id, email, name, role, status)
 select
   id,
@@ -239,6 +254,17 @@ create table if not exists public.system_settings (
   updated_at timestamp with time zone not null default now()
 );
 
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text,
+  auth text,
+  permission text not null default 'default' check (permission in ('default', 'granted', 'denied')),
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
 create table if not exists public.migration_history (
   id uuid primary key default gen_random_uuid(),
   change_type text not null,
@@ -251,7 +277,8 @@ insert into public.system_settings (setting_key, setting_value, description)
 values
   ('xp_multiplier', 1, 'Global XP reward multiplier'),
   ('token_rate', 10, 'RunToken reward rate per km'),
-  ('reward_curve', 1, 'Global reward curve tuning factor')
+  ('reward_curve', 1, 'Global reward curve tuning factor'),
+  ('difficulty_balance', 1, 'AI economy difficulty balance factor')
 on conflict (setting_key) do nothing;
 
 insert into public.migration_history (change_type, status, details)
@@ -323,6 +350,28 @@ create table if not exists public.seasons (
   starts_at timestamp with time zone not null default now(),
   ends_at timestamp with time zone,
   active boolean not null default true
+);
+
+create table if not exists public.events (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid references public.seasons(id) on delete set null,
+  name text not null,
+  event_type text not null default 'weekly' check (event_type in ('weekly', 'monthly', 'guild', 'special')),
+  xp_bonus_multiplier float8 not null default 1,
+  starts_at timestamp with time zone not null default now(),
+  ends_at timestamp with time zone,
+  active boolean not null default true
+);
+
+create table if not exists public.season_scores (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid not null references public.seasons(id) on delete cascade,
+  user_id uuid references public.users(id) on delete cascade,
+  character_id uuid references public.characters(id) on delete cascade,
+  total_xp int not null default 0,
+  total_distance float8 not null default 0,
+  rank_score float8 not null default 0,
+  updated_at timestamp with time zone not null default now()
 );
 
 create table if not exists public.seasonal_guilds (
@@ -471,6 +520,8 @@ create index if not exists idx_guild_members_guild_id on public.guild_members(gu
 create index if not exists idx_guild_members_character_id on public.guild_members(character_id);
 create index if not exists idx_guild_challenges_guild_id on public.guild_challenges(guild_id);
 create index if not exists idx_guild_scores_week_rank on public.guild_scores(week_start, rank_score desc);
+create index if not exists idx_referrals_referrer on public.referrals(referrer_user_id);
+create index if not exists idx_referrals_referred on public.referrals(referred_user_id);
 create index if not exists idx_item_ownership_character_id on public.item_ownership(character_id);
 create index if not exists idx_item_ownership_item_id on public.item_ownership(item_id);
 create index if not exists idx_item_drops_character_id on public.item_drops(character_id);
@@ -481,6 +532,8 @@ create index if not exists idx_race_participants_race_id on public.race_particip
 create index if not exists idx_map_zones_region on public.map_zones(region);
 create index if not exists idx_zone_activity_zone_id on public.zone_activity(zone_id);
 create index if not exists idx_seasonal_guilds_season_id on public.seasonal_guilds(season_id);
+create index if not exists idx_events_active on public.events(active, starts_at);
+create index if not exists idx_season_scores_rank on public.season_scores(season_id, rank_score desc);
 create index if not exists idx_guild_wars_season_id on public.guild_wars(season_id);
 create index if not exists idx_marketplace_items_status on public.marketplace_items(status);
 create index if not exists idx_transactions_item_id on public.transactions(item_id);
@@ -492,6 +545,7 @@ create index if not exists idx_flagged_sessions_session_id on public.flagged_ses
 create index if not exists idx_ai_coach_messages_character_id on public.ai_coach_messages(character_id);
 create index if not exists idx_run_token_wallets_character_id on public.run_token_wallets(character_id);
 create index if not exists idx_run_token_transactions_wallet_id on public.run_token_transactions(wallet_id);
+create index if not exists idx_push_subscriptions_user_id on public.push_subscriptions(user_id);
 create index if not exists idx_users_role on public.users(role);
 create index if not exists idx_courses_status on public.courses(status);
 create index if not exists idx_characters_status on public.characters(status);
@@ -513,6 +567,7 @@ alter table public.guilds enable row level security;
 alter table public.guild_members enable row level security;
 alter table public.guild_challenges enable row level security;
 alter table public.guild_scores enable row level security;
+alter table public.referrals enable row level security;
 alter table public.item_ownership enable row level security;
 alter table public.item_drops enable row level security;
 alter table public.items enable row level security;
@@ -522,6 +577,8 @@ alter table public.race_participants enable row level security;
 alter table public.map_zones enable row level security;
 alter table public.zone_activity enable row level security;
 alter table public.seasons enable row level security;
+alter table public.events enable row level security;
+alter table public.season_scores enable row level security;
 alter table public.seasonal_guilds enable row level security;
 alter table public.guild_wars enable row level security;
 alter table public.marketplace_items enable row level security;
@@ -533,6 +590,7 @@ alter table public.flagged_sessions enable row level security;
 alter table public.ai_coach_messages enable row level security;
 alter table public.run_token_wallets enable row level security;
 alter table public.run_token_transactions enable row level security;
+alter table public.push_subscriptions enable row level security;
 alter table public.admin_audit_logs enable row level security;
 alter table public.admin_economy_settings enable row level security;
 alter table public.system_settings enable row level security;
@@ -819,3 +877,47 @@ drop policy if exists "System settings are admin only" on public.system_settings
 create policy "System settings are admin only" on public.system_settings for all using (public.is_admin()) with check (public.is_admin());
 drop policy if exists "Migration history is admin readable" on public.migration_history;
 create policy "Migration history is admin readable" on public.migration_history for select using (public.is_admin());
+
+drop policy if exists "Referrals are readable by authenticated users" on public.referrals;
+create policy "Referrals are readable by authenticated users"
+on public.referrals for select
+using (auth.role() = 'authenticated');
+
+drop policy if exists "Referrals are writable by authenticated users" on public.referrals;
+create policy "Referrals are writable by authenticated users"
+on public.referrals for all
+using (auth.role() = 'authenticated')
+with check (auth.role() = 'authenticated');
+
+drop policy if exists "Events are readable by everyone" on public.events;
+create policy "Events are readable by everyone"
+on public.events for select
+using (true);
+
+drop policy if exists "Events are manageable by admins" on public.events;
+create policy "Events are manageable by admins"
+on public.events for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Season scores are readable by everyone" on public.season_scores;
+create policy "Season scores are readable by everyone"
+on public.season_scores for select
+using (true);
+
+drop policy if exists "Season scores are writable by authenticated users" on public.season_scores;
+create policy "Season scores are writable by authenticated users"
+on public.season_scores for all
+using (auth.role() = 'authenticated')
+with check (auth.role() = 'authenticated');
+
+drop policy if exists "Push subscriptions are readable by owner" on public.push_subscriptions;
+create policy "Push subscriptions are readable by owner"
+on public.push_subscriptions for select
+using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "Push subscriptions are writable by owner" on public.push_subscriptions;
+create policy "Push subscriptions are writable by owner"
+on public.push_subscriptions for all
+using (auth.uid() = user_id or public.is_admin())
+with check (auth.uid() = user_id or public.is_admin());
