@@ -166,6 +166,90 @@ create table if not exists public.character_items (
   acquired_at timestamp with time zone not null default now()
 );
 
+create table if not exists public.race_sessions (
+  id uuid primary key default gen_random_uuid(),
+  course_id uuid references public.courses(id) on delete set null,
+  start_time timestamp with time zone not null default now(),
+  status text not null default 'waiting' check (status in ('waiting', 'running', 'finished', 'cancelled')),
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.race_participants (
+  id uuid primary key default gen_random_uuid(),
+  race_id uuid not null references public.race_sessions(id) on delete cascade,
+  user_id uuid references public.users(id) on delete cascade,
+  character_id uuid references public.characters(id) on delete cascade,
+  distance float8 not null default 0,
+  pace float8 not null default 0,
+  position jsonb,
+  finished_at timestamp with time zone
+);
+
+create table if not exists public.map_zones (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  coordinates jsonb not null default '[]'::jsonb,
+  controlling_guild uuid references public.guilds(id) on delete set null,
+  region text not null default 'Global'
+);
+
+create table if not exists public.zone_activity (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  character_id uuid references public.characters(id) on delete cascade,
+  zone_id uuid not null references public.map_zones(id) on delete cascade,
+  activity_score float8 not null default 0,
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.seasons (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  starts_at timestamp with time zone not null default now(),
+  ends_at timestamp with time zone,
+  active boolean not null default true
+);
+
+create table if not exists public.seasonal_guilds (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid not null references public.seasons(id) on delete cascade,
+  guild_id uuid not null references public.guilds(id) on delete cascade,
+  total_xp int not null default 0,
+  total_distance float8 not null default 0,
+  wins int not null default 0
+);
+
+create table if not exists public.guild_wars (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid references public.seasons(id) on delete cascade,
+  guild_a uuid references public.guilds(id) on delete cascade,
+  guild_b uuid references public.guilds(id) on delete cascade,
+  winner uuid references public.guilds(id) on delete set null,
+  duration int not null default 0,
+  score jsonb not null default '{}'::jsonb,
+  starts_at timestamp with time zone not null default now(),
+  ends_at timestamp with time zone
+);
+
+create table if not exists public.marketplace_items (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid references public.items(id) on delete cascade,
+  seller_id uuid references public.users(id) on delete cascade,
+  price int not null default 0,
+  rarity text not null default 'common',
+  status text not null default 'listed' check (status in ('listed', 'sold', 'cancelled')),
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.transactions (
+  id uuid primary key default gen_random_uuid(),
+  buyer_id uuid references public.users(id) on delete set null,
+  seller_id uuid references public.users(id) on delete set null,
+  item_id uuid references public.items(id) on delete set null,
+  price int not null default 0,
+  timestamp timestamp with time zone not null default now()
+);
+
 create index if not exists idx_courses_area on public.courses(area);
 create index if not exists idx_course_points_course_id on public.course_points(course_id);
 create index if not exists idx_activities_user_id on public.activities(user_id);
@@ -184,6 +268,14 @@ create index if not exists idx_item_ownership_item_id on public.item_ownership(i
 create index if not exists idx_item_drops_character_id on public.item_drops(character_id);
 create index if not exists idx_character_items_character_id on public.character_items(character_id);
 create index if not exists idx_character_items_item_id on public.character_items(item_id);
+create index if not exists idx_race_sessions_status on public.race_sessions(status);
+create index if not exists idx_race_participants_race_id on public.race_participants(race_id);
+create index if not exists idx_map_zones_region on public.map_zones(region);
+create index if not exists idx_zone_activity_zone_id on public.zone_activity(zone_id);
+create index if not exists idx_seasonal_guilds_season_id on public.seasonal_guilds(season_id);
+create index if not exists idx_guild_wars_season_id on public.guild_wars(season_id);
+create index if not exists idx_marketplace_items_status on public.marketplace_items(status);
+create index if not exists idx_transactions_item_id on public.transactions(item_id);
 
 alter table public.users enable row level security;
 alter table public.courses enable row level security;
@@ -201,6 +293,15 @@ alter table public.item_ownership enable row level security;
 alter table public.item_drops enable row level security;
 alter table public.items enable row level security;
 alter table public.character_items enable row level security;
+alter table public.race_sessions enable row level security;
+alter table public.race_participants enable row level security;
+alter table public.map_zones enable row level security;
+alter table public.zone_activity enable row level security;
+alter table public.seasons enable row level security;
+alter table public.seasonal_guilds enable row level security;
+alter table public.guild_wars enable row level security;
+alter table public.marketplace_items enable row level security;
+alter table public.transactions enable row level security;
 
 drop policy if exists "Users are readable by everyone" on public.users;
 create policy "Users are readable by everyone"
@@ -381,3 +482,22 @@ create policy "Character items are writable by everyone in prototype"
 on public.character_items for all
 using (true)
 with check (true);
+
+drop policy if exists "Race sessions are open in prototype" on public.race_sessions;
+create policy "Race sessions are open in prototype" on public.race_sessions for all using (true) with check (true);
+drop policy if exists "Race participants are open in prototype" on public.race_participants;
+create policy "Race participants are open in prototype" on public.race_participants for all using (true) with check (true);
+drop policy if exists "Map zones are open in prototype" on public.map_zones;
+create policy "Map zones are open in prototype" on public.map_zones for all using (true) with check (true);
+drop policy if exists "Zone activity is open in prototype" on public.zone_activity;
+create policy "Zone activity is open in prototype" on public.zone_activity for all using (true) with check (true);
+drop policy if exists "Seasons are open in prototype" on public.seasons;
+create policy "Seasons are open in prototype" on public.seasons for all using (true) with check (true);
+drop policy if exists "Seasonal guilds are open in prototype" on public.seasonal_guilds;
+create policy "Seasonal guilds are open in prototype" on public.seasonal_guilds for all using (true) with check (true);
+drop policy if exists "Guild wars are open in prototype" on public.guild_wars;
+create policy "Guild wars are open in prototype" on public.guild_wars for all using (true) with check (true);
+drop policy if exists "Marketplace items are open in prototype" on public.marketplace_items;
+create policy "Marketplace items are open in prototype" on public.marketplace_items for all using (true) with check (true);
+drop policy if exists "Transactions are open in prototype" on public.transactions;
+create policy "Transactions are open in prototype" on public.transactions for all using (true) with check (true);

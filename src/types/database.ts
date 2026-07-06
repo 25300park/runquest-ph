@@ -557,6 +557,258 @@ export type Database = {
         };
         Relationships: [];
       };
+      race_sessions: {
+        Row: {
+          id: string;
+          course_id: string | null;
+          start_time: string;
+          status: 'waiting' | 'running' | 'finished' | 'cancelled';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          course_id?: string | null;
+          start_time?: string;
+          status?: 'waiting' | 'running' | 'finished' | 'cancelled';
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          course_id?: string | null;
+          start_time?: string;
+          status?: 'waiting' | 'running' | 'finished' | 'cancelled';
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      race_participants: {
+        Row: {
+          id: string;
+          race_id: string;
+          user_id: string | null;
+          character_id: string | null;
+          distance: number;
+          pace: number;
+          position: Json | null;
+          finished_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          race_id: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          distance?: number;
+          pace?: number;
+          position?: Json | null;
+          finished_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          race_id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          distance?: number;
+          pace?: number;
+          position?: Json | null;
+          finished_at?: string | null;
+        };
+        Relationships: [];
+      };
+      map_zones: {
+        Row: {
+          id: string;
+          name: string;
+          coordinates: Json;
+          controlling_guild: string | null;
+          region: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          coordinates?: Json;
+          controlling_guild?: string | null;
+          region?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          coordinates?: Json;
+          controlling_guild?: string | null;
+          region?: string;
+        };
+        Relationships: [];
+      };
+      zone_activity: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          character_id: string | null;
+          zone_id: string;
+          activity_score: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          zone_id: string;
+          activity_score?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          character_id?: string | null;
+          zone_id?: string;
+          activity_score?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      seasons: {
+        Row: {
+          id: string;
+          name: string;
+          starts_at: string;
+          ends_at: string | null;
+          active: boolean;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          starts_at?: string;
+          ends_at?: string | null;
+          active?: boolean;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          starts_at?: string;
+          ends_at?: string | null;
+          active?: boolean;
+        };
+        Relationships: [];
+      };
+      seasonal_guilds: {
+        Row: {
+          id: string;
+          season_id: string;
+          guild_id: string;
+          total_xp: number;
+          total_distance: number;
+          wins: number;
+        };
+        Insert: {
+          id?: string;
+          season_id: string;
+          guild_id: string;
+          total_xp?: number;
+          total_distance?: number;
+          wins?: number;
+        };
+        Update: {
+          id?: string;
+          season_id?: string;
+          guild_id?: string;
+          total_xp?: number;
+          total_distance?: number;
+          wins?: number;
+        };
+        Relationships: [];
+      };
+      guild_wars: {
+        Row: {
+          id: string;
+          season_id: string | null;
+          guild_a: string | null;
+          guild_b: string | null;
+          winner: string | null;
+          duration: number;
+          score: Json;
+          starts_at: string;
+          ends_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          season_id?: string | null;
+          guild_a?: string | null;
+          guild_b?: string | null;
+          winner?: string | null;
+          duration?: number;
+          score?: Json;
+          starts_at?: string;
+          ends_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          season_id?: string | null;
+          guild_a?: string | null;
+          guild_b?: string | null;
+          winner?: string | null;
+          duration?: number;
+          score?: Json;
+          starts_at?: string;
+          ends_at?: string | null;
+        };
+        Relationships: [];
+      };
+      marketplace_items: {
+        Row: {
+          id: string;
+          item_id: string | null;
+          seller_id: string | null;
+          price: number;
+          rarity: string;
+          status: 'listed' | 'sold' | 'cancelled';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          item_id?: string | null;
+          seller_id?: string | null;
+          price?: number;
+          rarity?: string;
+          status?: 'listed' | 'sold' | 'cancelled';
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          item_id?: string | null;
+          seller_id?: string | null;
+          price?: number;
+          rarity?: string;
+          status?: 'listed' | 'sold' | 'cancelled';
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      transactions: {
+        Row: {
+          id: string;
+          buyer_id: string | null;
+          seller_id: string | null;
+          item_id: string | null;
+          price: number;
+          timestamp: string;
+        };
+        Insert: {
+          id?: string;
+          buyer_id?: string | null;
+          seller_id?: string | null;
+          item_id?: string | null;
+          price?: number;
+          timestamp?: string;
+        };
+        Update: {
+          id?: string;
+          buyer_id?: string | null;
+          seller_id?: string | null;
+          item_id?: string | null;
+          price?: number;
+          timestamp?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
