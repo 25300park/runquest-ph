@@ -13,6 +13,13 @@ export type Database = {
           role: 'admin' | 'user';
           status: 'active' | 'suspended' | 'banned';
           subscription_type: 'free' | 'premium';
+          subscription_status: 'free' | 'pending' | 'active' | 'expired' | 'canceled';
+          subscription_plan: 'free' | 'premium_30_day';
+          premium_expires_at: string | null;
+          payment_provider: string | null;
+          payment_customer_id: string | null;
+          payment_reference: string | null;
+          home_region: 'Philippines' | 'Korea' | 'Global';
           referral_code: string | null;
           referred_by: string | null;
           created_at: string;
@@ -26,6 +33,13 @@ export type Database = {
           role?: 'admin' | 'user';
           status?: 'active' | 'suspended' | 'banned';
           subscription_type?: 'free' | 'premium';
+          subscription_status?: 'free' | 'pending' | 'active' | 'expired' | 'canceled';
+          subscription_plan?: 'free' | 'premium_30_day';
+          premium_expires_at?: string | null;
+          payment_provider?: string | null;
+          payment_customer_id?: string | null;
+          payment_reference?: string | null;
+          home_region?: 'Philippines' | 'Korea' | 'Global';
           referral_code?: string | null;
           referred_by?: string | null;
           created_at?: string;
@@ -39,6 +53,13 @@ export type Database = {
           role?: 'admin' | 'user';
           status?: 'active' | 'suspended' | 'banned';
           subscription_type?: 'free' | 'premium';
+          subscription_status?: 'free' | 'pending' | 'active' | 'expired' | 'canceled';
+          subscription_plan?: 'free' | 'premium_30_day';
+          premium_expires_at?: string | null;
+          payment_provider?: string | null;
+          payment_customer_id?: string | null;
+          payment_reference?: string | null;
+          home_region?: 'Philippines' | 'Korea' | 'Global';
           referral_code?: string | null;
           referred_by?: string | null;
           created_at?: string;
@@ -845,6 +866,252 @@ export type Database = {
             total_distance?: number;
             rank_score?: number;
             updated_at?: string;
+          };
+          Relationships: [];
+        };
+        subscription_events: {
+          Row: {
+            id: string;
+            user_id: string | null;
+            payment_provider: string;
+            payment_reference: string | null;
+            event_type: string;
+            plan: string;
+            status: string;
+            amount_cents: number;
+            currency: string;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            user_id?: string | null;
+            payment_provider?: string;
+            payment_reference?: string | null;
+            event_type: string;
+            plan?: string;
+            status?: string;
+            amount_cents?: number;
+            currency?: string;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            user_id?: string | null;
+            payment_provider?: string;
+            payment_reference?: string | null;
+            event_type?: string;
+            plan?: string;
+            status?: string;
+            amount_cents?: number;
+            currency?: string;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        premium_passes: {
+          Row: {
+            id: string;
+            user_id: string;
+            start_date: string;
+            end_date: string;
+            status: 'active' | 'expired' | 'canceled';
+            payment_provider: 'paymongo' | 'xendit' | 'manual';
+            transaction_id: string;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            user_id: string;
+            start_date?: string;
+            end_date: string;
+            status?: 'active' | 'expired' | 'canceled';
+            payment_provider: 'paymongo' | 'xendit' | 'manual';
+            transaction_id: string;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            user_id?: string;
+            start_date?: string;
+            end_date?: string;
+            status?: 'active' | 'expired' | 'canceled';
+            payment_provider?: 'paymongo' | 'xendit' | 'manual';
+            transaction_id?: string;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        revenue_events: {
+          Row: {
+            id: string;
+            user_id: string | null;
+            source: string;
+            amount_cents: number;
+            currency: string;
+            event_type: string;
+            occurred_at: string;
+          };
+          Insert: {
+            id?: string;
+            user_id?: string | null;
+            source?: string;
+            amount_cents?: number;
+            currency?: string;
+            event_type: string;
+            occurred_at?: string;
+          };
+          Update: {
+            id?: string;
+            user_id?: string | null;
+            source?: string;
+            amount_cents?: number;
+            currency?: string;
+            event_type?: string;
+            occurred_at?: string;
+          };
+          Relationships: [];
+        };
+        ai_personalization_cache: {
+          Row: {
+            id: string;
+            user_id: string | null;
+            character_id: string | null;
+            subscription_plan: string;
+            input_hash: string;
+            plan: Json;
+            expires_at: string;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            user_id?: string | null;
+            character_id?: string | null;
+            subscription_plan?: string;
+            input_hash: string;
+            plan?: Json;
+            expires_at?: string;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            user_id?: string | null;
+            character_id?: string | null;
+            subscription_plan?: string;
+            input_hash?: string;
+            plan?: Json;
+            expires_at?: string;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        leaderboard_global: {
+          Row: {
+            id: string;
+            user_id: string | null;
+            character_id: string | null;
+            region: 'Philippines' | 'Korea' | 'Global';
+            timezone: string;
+            total_distance: number;
+            total_xp: number;
+            level: number;
+            weekly_score: number;
+            season_score: number;
+            week_start: string;
+            updated_at: string;
+          };
+          Insert: {
+            id?: string;
+            user_id?: string | null;
+            character_id?: string | null;
+            region?: 'Philippines' | 'Korea' | 'Global';
+            timezone?: string;
+            total_distance?: number;
+            total_xp?: number;
+            level?: number;
+            weekly_score?: number;
+            season_score?: number;
+            week_start?: string;
+            updated_at?: string;
+          };
+          Update: {
+            id?: string;
+            user_id?: string | null;
+            character_id?: string | null;
+            region?: 'Philippines' | 'Korea' | 'Global';
+            timezone?: string;
+            total_distance?: number;
+            total_xp?: number;
+            level?: number;
+            weekly_score?: number;
+            season_score?: number;
+            week_start?: string;
+            updated_at?: string;
+          };
+          Relationships: [];
+        };
+        leaderboard_region: {
+          Row: {
+            id: string;
+            user_id: string | null;
+            character_id: string | null;
+            region: 'Philippines' | 'Korea';
+            timezone: string;
+            weekly_score: number;
+            season_score: number;
+            updated_at: string;
+          };
+          Insert: {
+            id?: string;
+            user_id?: string | null;
+            character_id?: string | null;
+            region: 'Philippines' | 'Korea';
+            timezone?: string;
+            weekly_score?: number;
+            season_score?: number;
+            updated_at?: string;
+          };
+          Update: {
+            id?: string;
+            user_id?: string | null;
+            character_id?: string | null;
+            region?: 'Philippines' | 'Korea';
+            timezone?: string;
+            weekly_score?: number;
+            season_score?: number;
+            updated_at?: string;
+          };
+          Relationships: [];
+        };
+        marketing_campaigns: {
+          Row: {
+            id: string;
+            user_id: string | null;
+            campaign_type: 'inactivity' | 'milestone' | 'leaderboard' | 'weekly_summary';
+            channel: 'push' | 'email';
+            status: 'queued' | 'sent' | 'skipped';
+            payload: Json;
+            scheduled_at: string;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            user_id?: string | null;
+            campaign_type: 'inactivity' | 'milestone' | 'leaderboard' | 'weekly_summary';
+            channel?: 'push' | 'email';
+            status?: 'queued' | 'sent' | 'skipped';
+            payload?: Json;
+            scheduled_at?: string;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            user_id?: string | null;
+            campaign_type?: 'inactivity' | 'milestone' | 'leaderboard' | 'weekly_summary';
+            channel?: 'push' | 'email';
+            status?: 'queued' | 'sent' | 'skipped';
+            payload?: Json;
+            scheduled_at?: string;
+            created_at?: string;
           };
           Relationships: [];
         };

@@ -4,7 +4,7 @@ import { getOutput } from './pipeline-utils.js';
 const schemaPath = 'supabase/schema.sql';
 
 const requiredTables = {
-  users: ['id', 'email', 'name', 'level', 'xp', 'subscription_type', 'referral_code', 'created_at'],
+  users: ['id', 'email', 'name', 'level', 'xp', 'subscription_type', 'subscription_status', 'subscription_plan', 'premium_expires_at', 'payment_provider', 'referral_code', 'home_region', 'created_at'],
   courses: ['id', 'name', 'area', 'difficulty', 'distance', 'created_by', 'created_at'],
   course_points: ['id', 'course_id', 'lat', 'lng', 'order_index', 'type'],
   activities: ['id', 'user_id', 'course_id', 'distance', 'duration', 'xp_earned', 'created_at'],
@@ -16,6 +16,13 @@ const requiredTables = {
   push_subscriptions: ['id', 'user_id', 'endpoint', 'permission'],
   events: ['id', 'season_id', 'name', 'event_type', 'xp_bonus_multiplier'],
   season_scores: ['id', 'season_id', 'user_id', 'character_id', 'rank_score'],
+  subscription_events: ['id', 'user_id', 'payment_provider', 'payment_reference', 'event_type', 'plan', 'status'],
+  premium_passes: ['id', 'user_id', 'start_date', 'end_date', 'status', 'payment_provider', 'transaction_id'],
+  revenue_events: ['id', 'user_id', 'amount_cents', 'event_type'],
+  ai_personalization_cache: ['id', 'user_id', 'input_hash', 'plan', 'expires_at'],
+  leaderboard_global: ['id', 'user_id', 'character_id', 'region', 'weekly_score'],
+  leaderboard_region: ['id', 'user_id', 'character_id', 'region', 'weekly_score'],
+  marketing_campaigns: ['id', 'user_id', 'campaign_type', 'status'],
   migration_history: ['id', 'change_type', 'executed_at', 'status']
 };
 

@@ -6,12 +6,13 @@ import {
   getRedemptionHistory,
   saveRedemption
 } from '../utils/rewardWallet';
+import { startPremiumPassCheckout } from '../services/billingService';
 
 export default function RewardsPage() {
   const progress = getGameProgress();
   const rewardPoints = calculateRewardPoints(progress.totalXp);
   const [history, setHistory] = useState(getRedemptionHistory);
-  const [upgradeState, setUpgradeState] = useState<'free' | 'mock-premium'>('free');
+  const [upgradeState, setUpgradeState] = useState('Free plan active.');
 
   function redeemReward(rewardId: string) {
     const reward = partnerRewards.find((item) => item.id === rewardId);
@@ -108,15 +109,21 @@ export default function RewardsPage() {
               {plan.id === 'premium' && (
                 <button
                   type="button"
-                  onClick={() => setUpgradeState('mock-premium')}
+                  onClick={() => {
+                    setUpgradeState('Opening Premium Pass checkout...');
+                    void startPremiumPassCheckout().catch((error) =>
+                      setUpgradeState(error instanceof Error ? error.message : 'Checkout failed.')
+                    );
+                  }}
                   className="mt-4 w-full rounded-2xl bg-stone-950 px-4 py-3 font-black text-amber-200"
                 >
-                  {upgradeState === 'mock-premium' ? 'Premium Preview Active' : 'Upgrade to Premium'}
+                  Get 30-day Premium Pass
                 </button>
               )}
             </article>
           ))}
         </div>
+        <p className="mt-3 rounded-2xl bg-stone-900 p-3 text-sm text-stone-300">{upgradeState}</p>
       </div>
 
       <div>

@@ -10,6 +10,8 @@ import { getRealtimeCoaching, saveCoachMessage } from '../services/aiCoachServic
 import { analyzeAndStoreGpsSessionSafely } from '../services/antiCheatService';
 import { awardRunTokens } from '../features/economy/tokenEconomyService';
 import { updateSeasonScore } from '../services/seasonService';
+import { updateGlobalLeaderboard } from '../services/globalLeaderboardService';
+import { queueMarketingCampaign } from '../services/marketingAutomationService';
 import type { CompletedActivitySummary } from '../types/activity';
 import type { Course, Difficulty } from '../types/course';
 import {
@@ -107,6 +109,14 @@ export default function QuestCompletedPage() {
           level: reward.nextLevel,
           streakDays: reward.streakDays
         });
+        await updateGlobalLeaderboard({
+          userId: reward.userId,
+          characterId: reward.characterId,
+          region: 'Global',
+          totalDistance: reward.totalDistance,
+          totalXp: reward.totalXp,
+          level: reward.nextLevel
+        });
         await contributeToGuild({
           characterId: reward.characterId,
           xp: reward.xpEarned,
@@ -152,6 +162,15 @@ export default function QuestCompletedPage() {
           message: coachMessage
         });
         await maybeDropEquipment(reward.characterId);
+        await queueMarketingCampaign({
+          userId: reward.userId,
+          campaignType: reward.leveledUp ? 'milestone' : 'weekly_summary',
+          payload: {
+            distanceKm: summary.distanceKm,
+            xpEarned: reward.xpEarned,
+            level: reward.nextLevel
+          }
+        });
 
         const profile = await getCharacterProfile(reward.characterId);
         if (profile) {

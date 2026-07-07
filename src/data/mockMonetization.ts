@@ -11,8 +11,8 @@ export const subscriptionPlans: SubscriptionPlan[] = [
   {
     id: 'premium',
     name: 'Premium Pathfinder',
-    priceLabel: 'Mock upgrade',
-    description: 'Deeper RPG progress, richer rewards, and future premium route perks.',
+    priceLabel: 'PHP 149 / 30 days',
+    description: 'A flexible Premium Pass for GCash, Maya, card, or local PH payment links.',
     benefits: [
       'Premium route previews',
       'Advanced progress insights',

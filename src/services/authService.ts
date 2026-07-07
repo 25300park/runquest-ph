@@ -52,6 +52,8 @@ export async function ensureUserProfile(input?: {
       role: 'user',
       status: 'active',
       subscription_type: 'free',
+      subscription_status: 'free',
+      subscription_plan: 'free',
       referral_code: `RQ-${authUser.id.slice(0, 8).toUpperCase()}`
     })
     .select('*')

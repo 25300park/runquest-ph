@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getCharacterProfile } from '../services/characterService';
 import { generateTrainingPlan, getRealtimeCoaching, type CoachMessage } from '../services/aiCoachService';
+import { getPersonalizedPlan, type PersonalizationPlan } from '../services/aiPersonalizationService';
 import type { CharacterProfile } from '../types/rpgCharacter';
 
 export default function AiCoachPage() {
   const [profile, setProfile] = useState<CharacterProfile | null>(null);
   const [coachMessage, setCoachMessage] = useState<CoachMessage | null>(null);
+  const [personalization, setPersonalization] = useState<PersonalizationPlan | null>(null);
   const [status, setStatus] = useState('Loading coach profile...');
 
   useEffect(() => {
@@ -27,9 +29,11 @@ export default function AiCoachPage() {
           elapsedSeconds: Math.round(averageDistance * 540),
           fatigueLevel: (nextProfile?.stats?.streak_days ?? 0) >= 4 ? 0.8 : 0.35
         });
+        const nextPersonalization = await getPersonalizedPlan(nextProfile);
 
         if (!active) return;
         setCoachMessage(message);
+        setPersonalization(nextPersonalization);
         setStatus(nextProfile ? 'AI coach synced to your running profile.' : 'Create a character to personalize coaching.');
       } catch (error) {
         if (!active) return;
@@ -93,6 +97,19 @@ export default function AiCoachPage() {
           </div>
         </div>
         <p className="mt-4 text-sm leading-6 text-stone-400">{plan.recoveryAdvice}</p>
+      </article>
+
+      <article className="rounded-2xl border border-teal-200/30 bg-teal-950/30 p-5">
+        <p className="text-xs font-black uppercase text-quest-teal">AI personalization v2</p>
+        <h2 className="mt-2 text-2xl font-black capitalize">
+          {personalization?.difficulty ?? 'easy'} adaptive difficulty
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-stone-300">
+          {personalization?.motivation ?? 'Personalization cache is warming up.'}
+        </p>
+        <p className="mt-3 rounded-2xl bg-stone-950 p-3 text-sm text-stone-300">
+          {personalization?.weeklyFocus ?? 'Weekly focus will update after your first synced run.'}
+        </p>
       </article>
 
       <article className="rounded-2xl border border-stone-700 bg-stone-900 p-5">

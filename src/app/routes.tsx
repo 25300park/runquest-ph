@@ -25,6 +25,7 @@ import BgcTestModePage from '../pages/BgcTestModePage';
 import AdminLayout from '../admin/AdminLayout';
 import AdminLogin from '../admin/AdminLogin';
 import AdminDashboard from '../admin/AdminDashboard';
+import AdminRevenue from '../admin/AdminRevenue';
 import { AdminGuard } from '../admin/AdminGuard';
 
 export const appRoutes = (
@@ -71,6 +72,7 @@ export const appRoutes = (
     >
       <Route index element={<AdminDashboard />} />
       <Route path="dashboard" element={<AdminDashboard />} />
+      <Route path="revenue" element={<AdminRevenue />} />
       <Route path="course-builder" element={<AdminCourseBuilderPage />} />
       <Route path="course-builder/:courseId" element={<AdminCourseBuilderPage />} />
     </Route>

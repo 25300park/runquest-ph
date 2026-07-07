@@ -13,6 +13,7 @@
     "migration:check": "node scripts/supabase-migration-check.js",
     "production:safety": "node scripts/production-safety-check.js",
     "health:check": "node scripts/deployment-health-check.js",
+    "passes:expire": "node scripts/expire-premium-passes.js",
     "auto:rollback": "node scripts/auto-rollback.js",
     "vercel-build": "npm run predeploy",
     "release:version": "node scripts/release-version.js",

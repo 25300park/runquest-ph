@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { signOutAdmin } from './adminService';
 
 export default function AdminLayout() {
@@ -28,6 +28,14 @@ export default function AdminLayout() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-4">
+        <nav className="mb-4 flex gap-2 overflow-x-auto text-sm font-bold">
+          <Link className="rounded-md border border-stone-700 px-3 py-2 text-stone-300" to="/admin/dashboard">
+            Dashboard
+          </Link>
+          <Link className="rounded-md border border-stone-700 px-3 py-2 text-stone-300" to="/admin/revenue">
+            Revenue
+          </Link>
+        </nav>
         <Outlet />
       </main>
     </section>

@@ -9,6 +9,13 @@ create table if not exists public.users (
   role text not null default 'user' check (role in ('admin', 'user')),
   status text not null default 'active' check (status in ('active', 'suspended', 'banned')),
   subscription_type text not null default 'free' check (subscription_type in ('free', 'premium')),
+  subscription_status text not null default 'free' check (subscription_status in ('free', 'pending', 'active', 'expired', 'canceled')),
+  subscription_plan text not null default 'free' check (subscription_plan in ('free', 'premium_30_day')),
+  premium_expires_at timestamp with time zone,
+  payment_provider text,
+  payment_customer_id text,
+  payment_reference text,
+  home_region text not null default 'Philippines' check (home_region in ('Philippines', 'Korea', 'Global')),
   referral_code text unique,
   referred_by uuid references public.users(id) on delete set null,
   created_at timestamp with time zone not null default now()
@@ -181,6 +188,13 @@ alter table public.equipment_items add column if not exists drop_rate float8 not
 alter table public.users add column if not exists role text not null default 'user' check (role in ('admin', 'user'));
 alter table public.users add column if not exists status text not null default 'active' check (status in ('active', 'suspended', 'banned'));
 alter table public.users add column if not exists subscription_type text not null default 'free' check (subscription_type in ('free', 'premium'));
+alter table public.users add column if not exists subscription_status text not null default 'free' check (subscription_status in ('free', 'pending', 'active', 'expired', 'canceled'));
+alter table public.users add column if not exists subscription_plan text not null default 'free' check (subscription_plan in ('free', 'premium_30_day'));
+alter table public.users add column if not exists premium_expires_at timestamp with time zone;
+alter table public.users add column if not exists payment_provider text;
+alter table public.users add column if not exists payment_customer_id text;
+alter table public.users add column if not exists payment_reference text;
+alter table public.users add column if not exists home_region text not null default 'Philippines' check (home_region in ('Philippines', 'Korea', 'Global'));
 alter table public.users add column if not exists referral_code text unique;
 alter table public.users add column if not exists referred_by uuid references public.users(id) on delete set null;
 insert into public.users (id, email, name, role, status)
@@ -374,6 +388,89 @@ create table if not exists public.season_scores (
   updated_at timestamp with time zone not null default now()
 );
 
+create table if not exists public.subscription_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete set null,
+  payment_provider text not null default 'manual',
+  payment_reference text,
+  event_type text not null,
+  plan text not null default 'free',
+  status text not null default 'free',
+  amount_cents int not null default 0,
+  currency text not null default 'PHP',
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.premium_passes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  start_date timestamp with time zone not null default now(),
+  end_date timestamp with time zone not null,
+  status text not null default 'active' check (status in ('active', 'expired', 'canceled')),
+  payment_provider text not null check (payment_provider in ('paymongo', 'xendit', 'manual')),
+  transaction_id text not null,
+  created_at timestamp with time zone not null default now(),
+  unique (payment_provider, transaction_id)
+);
+
+create table if not exists public.revenue_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete set null,
+  source text not null default 'manual',
+  amount_cents int not null default 0,
+  currency text not null default 'PHP',
+  event_type text not null,
+  occurred_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.ai_personalization_cache (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  character_id uuid references public.characters(id) on delete cascade,
+  subscription_plan text not null default 'free',
+  input_hash text not null,
+  plan jsonb not null default '{}'::jsonb,
+  expires_at timestamp with time zone not null default now() + interval '7 days',
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.leaderboard_global (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  character_id uuid references public.characters(id) on delete cascade,
+  region text not null default 'Global' check (region in ('Philippines', 'Korea', 'Global')),
+  timezone text not null default 'UTC',
+  total_distance float8 not null default 0,
+  total_xp int not null default 0,
+  level int not null default 1,
+  weekly_score float8 not null default 0,
+  season_score float8 not null default 0,
+  week_start date not null default date_trunc('week', now())::date,
+  updated_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.leaderboard_region (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  character_id uuid references public.characters(id) on delete cascade,
+  region text not null check (region in ('Philippines', 'Korea')),
+  timezone text not null default 'UTC',
+  weekly_score float8 not null default 0,
+  season_score float8 not null default 0,
+  updated_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.marketing_campaigns (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  campaign_type text not null check (campaign_type in ('inactivity', 'milestone', 'leaderboard', 'weekly_summary')),
+  channel text not null default 'push' check (channel in ('push', 'email')),
+  status text not null default 'queued' check (status in ('queued', 'sent', 'skipped')),
+  payload jsonb not null default '{}'::jsonb,
+  scheduled_at timestamp with time zone not null default now(),
+  created_at timestamp with time zone not null default now()
+);
+
 create table if not exists public.seasonal_guilds (
   id uuid primary key default gen_random_uuid(),
   season_id uuid not null references public.seasons(id) on delete cascade,
@@ -534,6 +631,14 @@ create index if not exists idx_zone_activity_zone_id on public.zone_activity(zon
 create index if not exists idx_seasonal_guilds_season_id on public.seasonal_guilds(season_id);
 create index if not exists idx_events_active on public.events(active, starts_at);
 create index if not exists idx_season_scores_rank on public.season_scores(season_id, rank_score desc);
+create index if not exists idx_subscription_events_created on public.subscription_events(created_at desc);
+create index if not exists idx_premium_passes_user_status on public.premium_passes(user_id, status, end_date desc);
+create index if not exists idx_premium_passes_transaction on public.premium_passes(payment_provider, transaction_id);
+create index if not exists idx_revenue_events_occurred on public.revenue_events(occurred_at desc);
+create index if not exists idx_ai_personalization_user on public.ai_personalization_cache(user_id, expires_at desc);
+create index if not exists idx_leaderboard_global_region_score on public.leaderboard_global(region, weekly_score desc);
+create index if not exists idx_leaderboard_region_score on public.leaderboard_region(region, weekly_score desc);
+create index if not exists idx_marketing_campaigns_user_status on public.marketing_campaigns(user_id, status);
 create index if not exists idx_guild_wars_season_id on public.guild_wars(season_id);
 create index if not exists idx_marketplace_items_status on public.marketplace_items(status);
 create index if not exists idx_transactions_item_id on public.transactions(item_id);
@@ -579,6 +684,13 @@ alter table public.zone_activity enable row level security;
 alter table public.seasons enable row level security;
 alter table public.events enable row level security;
 alter table public.season_scores enable row level security;
+alter table public.subscription_events enable row level security;
+alter table public.premium_passes enable row level security;
+alter table public.revenue_events enable row level security;
+alter table public.ai_personalization_cache enable row level security;
+alter table public.leaderboard_global enable row level security;
+alter table public.leaderboard_region enable row level security;
+alter table public.marketing_campaigns enable row level security;
 alter table public.seasonal_guilds enable row level security;
 alter table public.guild_wars enable row level security;
 alter table public.marketplace_items enable row level security;
@@ -921,3 +1033,83 @@ create policy "Push subscriptions are writable by owner"
 on public.push_subscriptions for all
 using (auth.uid() = user_id or public.is_admin())
 with check (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "Subscription events are admin readable" on public.subscription_events;
+create policy "Subscription events are admin readable"
+on public.subscription_events for select
+using (public.is_admin());
+
+drop policy if exists "Subscription events are service writable" on public.subscription_events;
+create policy "Subscription events are service writable"
+on public.subscription_events for insert
+with check (true);
+
+drop policy if exists "Premium passes are owner readable" on public.premium_passes;
+create policy "Premium passes are owner readable"
+on public.premium_passes for select
+using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "Premium passes are service writable" on public.premium_passes;
+create policy "Premium passes are service writable"
+on public.premium_passes for insert
+with check (true);
+
+drop policy if exists "Premium passes are admin manageable" on public.premium_passes;
+create policy "Premium passes are admin manageable"
+on public.premium_passes for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Revenue events are admin readable" on public.revenue_events;
+create policy "Revenue events are admin readable"
+on public.revenue_events for select
+using (public.is_admin());
+
+drop policy if exists "Revenue events are service writable" on public.revenue_events;
+create policy "Revenue events are service writable"
+on public.revenue_events for insert
+with check (true);
+
+drop policy if exists "AI personalization cache owner readable" on public.ai_personalization_cache;
+create policy "AI personalization cache owner readable"
+on public.ai_personalization_cache for select
+using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "AI personalization cache owner writable" on public.ai_personalization_cache;
+create policy "AI personalization cache owner writable"
+on public.ai_personalization_cache for all
+using (auth.uid() = user_id or public.is_admin())
+with check (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "Global leaderboard is readable by everyone" on public.leaderboard_global;
+create policy "Global leaderboard is readable by everyone"
+on public.leaderboard_global for select
+using (true);
+
+drop policy if exists "Global leaderboard is writable by authenticated users" on public.leaderboard_global;
+create policy "Global leaderboard is writable by authenticated users"
+on public.leaderboard_global for all
+using (auth.role() = 'authenticated')
+with check (auth.role() = 'authenticated');
+
+drop policy if exists "Regional leaderboard is readable by everyone" on public.leaderboard_region;
+create policy "Regional leaderboard is readable by everyone"
+on public.leaderboard_region for select
+using (true);
+
+drop policy if exists "Regional leaderboard is writable by authenticated users" on public.leaderboard_region;
+create policy "Regional leaderboard is writable by authenticated users"
+on public.leaderboard_region for all
+using (auth.role() = 'authenticated')
+with check (auth.role() = 'authenticated');
+
+drop policy if exists "Marketing campaigns are owner readable" on public.marketing_campaigns;
+create policy "Marketing campaigns are owner readable"
+on public.marketing_campaigns for select
+using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "Marketing campaigns are writable by authenticated users" on public.marketing_campaigns;
+create policy "Marketing campaigns are writable by authenticated users"
+on public.marketing_campaigns for all
+using (auth.role() = 'authenticated' or public.is_admin())
+with check (auth.role() = 'authenticated' or public.is_admin());
