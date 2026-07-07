@@ -1,9 +1,32 @@
+import { webcrypto as crypto } from 'node:crypto';
+
 function readEnv(name) {
   return process.env[name] ?? '';
 }
 
 function encodeBasicAuth(secret) {
   return Buffer.from(`${secret}:`).toString('base64');
+}
+
+async function hmacSha256(secret, payload) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+  return Array.from(new Uint8Array(signature))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function signatureMatches(secret, payload, signatureHeader) {
+  if (!secret) return true;
+  if (!signatureHeader) return false;
+  const expected = await hmacSha256(secret, payload);
+  return signatureHeader.includes(expected);
 }
 
 function appUrlFromRequest(request) {
@@ -39,6 +62,10 @@ export class PaymentProvider {
 
   async verifyPayment() {
     throw new Error(`${this.name} verifyPayment() is not implemented.`);
+  }
+
+  async handleWebhook({ event, rawBody, signature }) {
+    return this.verifyPayment(event, signature, rawBody);
   }
 
   async getPaymentStatus() {
@@ -85,6 +112,10 @@ export class ManualPaymentProvider extends PaymentProvider {
       amountCents: event.amount_cents ?? event.amount ?? 0,
       currency: event.currency ?? 'PHP'
     };
+  }
+
+  async handleWebhook({ event }) {
+    return this.verifyPayment(event);
   }
 
   async getPaymentStatus(status) {
@@ -153,16 +184,35 @@ export class PayMongoProvider extends PaymentProvider {
     };
   }
 
-  async verifyPayment(event, signatureHeader) {
+  async verifyPayment(event, signatureHeader, rawBody) {
     const eventObject = event.data?.attributes ?? event.data ?? event;
+    const verified = await signatureMatches(
+      readEnv('PAYMONGO_WEBHOOK_SECRET'),
+      rawBody?.toString('utf8') ?? JSON.stringify(event),
+      signatureHeader
+    );
+    const metadata =
+      eventObject.metadata ??
+      eventObject.data?.attributes?.metadata ??
+      eventObject.payments?.[0]?.attributes?.metadata ??
+      {};
     return {
-      verified: Boolean(signatureHeader || !readEnv('PAYMONGO_WEBHOOK_SECRET')),
+      verified,
       status: normalizePaymentStatus(eventObject.status ?? eventObject.payment_status),
-      transactionId: event.data?.id ?? event.id ?? eventObject.payment_intent_id ?? null,
-      userId: eventObject.metadata?.user_id ?? null,
+      transactionId:
+        event.data?.id ??
+        event.id ??
+        eventObject.payment_intent_id ??
+        eventObject.checkout_session_id ??
+        null,
+      userId: metadata.user_id ?? null,
       amountCents: eventObject.amount ?? eventObject.amount_total ?? 0,
       currency: eventObject.currency ?? 'PHP'
     };
+  }
+
+  async handleWebhook({ event, rawBody, signature }) {
+    return this.verifyPayment(event, signature, rawBody);
   }
 
   async getPaymentStatus(status) {
@@ -231,6 +281,10 @@ export class XenditProvider extends PaymentProvider {
       amountCents: Number(event.amount ?? 0) * 100,
       currency: event.currency ?? 'PHP'
     };
+  }
+
+  async handleWebhook({ event, signature }) {
+    return this.verifyPayment(event, signature);
   }
 
   async getPaymentStatus(status) {

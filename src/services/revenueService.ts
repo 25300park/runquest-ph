@@ -2,6 +2,8 @@ import { requireSupabaseClient } from '../lib/supabase';
 
 export type RevenueMetrics = {
   mrrCents: number;
+  totalRevenueCents: number;
+  dailySalesCents: number;
   totalSubscribers: number;
   activeSubscribers: number;
   churnRate: number;
@@ -32,8 +34,18 @@ export async function getRevenueMetrics(): Promise<RevenueMetrics> {
     const previous = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
     return date.getUTCFullYear() === previous.getUTCFullYear() && date.getUTCMonth() === previous.getUTCMonth();
   });
+  const today = revenue.filter((event) => {
+    const date = new Date(event.occurred_at);
+    return (
+      date.getUTCFullYear() === now.getUTCFullYear() &&
+      date.getUTCMonth() === now.getUTCMonth() &&
+      date.getUTCDate() === now.getUTCDate()
+    );
+  });
   const currentRevenue = currentMonth.reduce((sum, event) => sum + (event.amount_cents ?? 0), 0);
   const previousRevenue = previousMonth.reduce((sum, event) => sum + (event.amount_cents ?? 0), 0);
+  const totalRevenue = revenue.reduce((sum, event) => sum + (event.amount_cents ?? 0), 0);
+  const dailySales = today.reduce((sum, event) => sum + (event.amount_cents ?? 0), 0);
   const activeSubscribers = users.filter((user) => {
     const expiresAt = user.premium_expires_at ? new Date(user.premium_expires_at).getTime() : 0;
     return (
@@ -49,6 +61,8 @@ export async function getRevenueMetrics(): Promise<RevenueMetrics> {
 
   return {
     mrrCents: currentRevenue,
+    totalRevenueCents: totalRevenue,
+    dailySalesCents: dailySales,
     totalSubscribers,
     activeSubscribers,
     churnRate: totalSubscribers > 0 ? canceled / totalSubscribers : 0,

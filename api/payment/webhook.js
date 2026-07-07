@@ -126,10 +126,15 @@ export default async function handler(request, response) {
     const event = JSON.parse(rawBody.toString('utf8'));
     const providerName = providerNameFromRequest(request, event);
     const provider = createProvider(providerName);
-    const verification = await provider.verifyPayment(
+    const verification = await provider.handleWebhook({
       event,
-      request.headers['x-callback-token'] || request.headers['paymongo-signature'] || request.headers['x-signature']
-    );
+      rawBody,
+      signature:
+        request.headers['x-callback-token'] ||
+        request.headers['paymongo-signature'] ||
+        request.headers['x-paymongo-signature'] ||
+        request.headers['x-signature']
+    });
 
     if (!verification.verified) {
       response.status(400).json({ error: 'Payment verification failed.' });

@@ -3,6 +3,8 @@ import { getRevenueMetrics, subscribeToRevenue, type RevenueMetrics } from '../s
 
 const emptyMetrics: RevenueMetrics = {
   mrrCents: 0,
+  totalRevenueCents: 0,
+  dailySalesCents: 0,
   totalSubscribers: 0,
   activeSubscribers: 0,
   churnRate: 0,
@@ -11,7 +13,7 @@ const emptyMetrics: RevenueMetrics = {
 };
 
 function money(cents: number) {
-  return `PHP ${(cents / 100).toFixed(2)}`;
+  return `₱${(cents / 100).toFixed(2)}`;
 }
 
 function percent(value: number) {
@@ -48,6 +50,8 @@ export default function AdminRevenue() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {[
+          ['Total revenue', money(metrics.totalRevenueCents)],
+          ['Daily sales', money(metrics.dailySalesCents)],
           ['Monthly pass revenue', money(metrics.mrrCents)],
           ['Total pass buyers', metrics.totalSubscribers],
           ['Active premium users', metrics.activeSubscribers],

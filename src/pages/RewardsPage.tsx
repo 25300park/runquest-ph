@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { partnerRewards, runQuestEvents, subscriptionPlans } from '../data/mockMonetization';
 import { getGameProgress } from '../utils/gameProgress';
 import {
@@ -7,12 +7,38 @@ import {
   saveRedemption
 } from '../utils/rewardWallet';
 import { startPremiumPassCheckout } from '../services/billingService';
+import { ensureUserProfile } from '../services/authService';
+import { getPremiumAccess, type PremiumAccess } from '../services/premiumAccessService';
 
 export default function RewardsPage() {
   const progress = getGameProgress();
   const rewardPoints = calculateRewardPoints(progress.totalXp);
   const [history, setHistory] = useState(getRedemptionHistory);
   const [upgradeState, setUpgradeState] = useState('Free plan active.');
+  const [premiumAccess, setPremiumAccess] = useState<PremiumAccess>({
+    active: false,
+    plan: 'free',
+    endDate: null,
+    provider: null
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    void ensureUserProfile()
+      .then((profile) => getPremiumAccess(profile.id))
+      .then((access) => {
+        if (mounted) setPremiumAccess(access);
+      })
+      .catch(() => {
+        if (mounted) {
+          setPremiumAccess({ active: false, plan: 'free', endDate: null, provider: null });
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function redeemReward(rewardId: string) {
     const reward = partnerRewards.find((item) => item.id === rewardId);
@@ -79,7 +105,22 @@ export default function RewardsPage() {
       </div>
 
       <div>
-        <h2 className="font-black">Subscription plans</h2>
+        <h2 className="font-black">Premium Pass</h2>
+        <div className="mt-3 rounded-2xl border border-amber-200/30 bg-stone-900 p-4">
+          <p className="text-xs font-black uppercase text-amber-200">Current access</p>
+          <p className="mt-2 text-2xl font-black">
+            {premiumAccess.active ? 'Premium Pass active' : 'Free tier active'}
+          </p>
+          <p className="mt-2 text-sm text-stone-400">
+            {premiumAccess.active && premiumAccess.endDate
+              ? `Expires ${new Date(premiumAccess.endDate).toLocaleDateString('en-PH', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}`
+              : 'Buy a 30-day pass to unlock advanced AI coaching, XP boost, exclusive routes, and guild bonuses.'}
+          </p>
+        </div>
         <div className="mt-3 grid gap-3">
           {subscriptionPlans.map((plan) => (
             <article
