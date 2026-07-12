@@ -104,7 +104,7 @@ function AdminDashboardContent() {
   }
 
   return (
-    <div className="min-h-screen space-y-4 bg-black text-white p-4">
+    <div data-testid="admin-dashboard" className="min-h-screen space-y-4 bg-black text-white p-4">
 
       {/* HEADER */}
       <section className="rounded-lg border border-stone-800 bg-stone-950 p-4">
@@ -157,6 +157,7 @@ function AdminDashboardContent() {
         ].map(([key, label]) => (
           <button
             key={key}
+            data-testid={`admin-tab-${key}`}
             onClick={() => setActiveTab(key as AdminTab)}
             className={`p-3 text-xs font-bold rounded ${
               activeTab === key

@@ -63,7 +63,7 @@ export default function RewardsPage() {
   }
 
   return (
-    <section className="min-h-full space-y-5 bg-[#111816] px-4 py-6 text-stone-50">
+    <section data-testid="rewards-page" className="min-h-full space-y-5 bg-[#111816] px-4 py-6 text-stone-50">
       <div className="rounded-[1.35rem] border border-amber-200/30 bg-stone-900 p-5 shadow-2xl">
         <p className="text-sm font-black uppercase text-amber-200">RunQuest economy</p>
         <h1 className="mt-2 text-4xl font-black leading-tight">Rewards and Premium</h1>
@@ -149,6 +149,7 @@ export default function RewardsPage() {
               </div>
               {plan.id === 'premium' && (
                 <button
+                  data-testid="buy-premium-pass"
                   type="button"
                   onClick={() => {
                     setUpgradeState('Opening Premium Pass checkout...');

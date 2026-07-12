@@ -1,4 +1,5 @@
 import { createProvider } from './providers.js';
+import { detectPaymentFraud } from './fraud.js';
 
 function readEnv(name) {
   return process.env[name] ?? '';
@@ -101,6 +102,22 @@ async function createPremiumPass({ userId, provider, transactionId, passDays }) 
     })
   });
 
+  await supabaseFetch('subscription_changes', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      user_id: userId,
+      from_plan: 'free',
+      to_plan: 'premium_30_day',
+      change_type: latest ? 'renewal' : 'upgrade',
+      metadata: {
+        payment_provider: provider,
+        transaction_id: transactionId,
+        premium_pass_id: passRows?.[0]?.id ?? null
+      }
+    })
+  });
+
   return { pass: passRows?.[0] ?? null, duplicate: false };
 }
 
@@ -166,6 +183,18 @@ export default async function handler(request, response) {
       return;
     }
 
+    const fraudLog = await detectPaymentFraud({
+      supabaseFetch,
+      userId: verification.userId,
+      provider: provider.name,
+      transactionId: verification.transactionId,
+      amountCents: verification.amountCents,
+      request
+    }).catch((error) => {
+      console.warn('Payment fraud logging failed:', error instanceof Error ? error.message : error);
+      return null;
+    });
+
     const { duplicate, pass } = await createPremiumPass({
       userId: verification.userId,
       provider: provider.name,
@@ -185,7 +214,7 @@ export default async function handler(request, response) {
       })
     });
 
-    response.status(200).json({ received: true, activated: !duplicate, pass });
+    response.status(200).json({ received: true, activated: !duplicate, pass, fraud: fraudLog });
   } catch (error) {
     response.status(500).json({
       error: error instanceof Error ? error.message : 'Payment webhook failed.'

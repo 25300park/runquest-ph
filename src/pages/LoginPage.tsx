@@ -25,7 +25,7 @@ export default function LoginPage() {
   }
 
   return (
-    <section className="min-h-full bg-[#111816] px-4 py-8 text-stone-50">
+    <section data-testid="login-page" className="min-h-full bg-[#111816] px-4 py-8 text-stone-50">
       <div className="rounded-[1.5rem] border border-teal-200/20 bg-stone-900 p-5 shadow-2xl">
         <p className="text-sm font-black uppercase text-amber-200">Adventurer login</p>
         <h1 className="mt-3 text-4xl font-black leading-tight">Return to your map</h1>
@@ -37,6 +37,7 @@ export default function LoginPage() {
           <label className="block">
             <span className="text-sm font-black text-stone-200">Email</span>
             <input
+              data-testid="login-email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="mt-2 w-full rounded-2xl border border-stone-700 bg-stone-950 px-4 py-4 text-stone-50 outline-none ring-quest-teal/40 focus:ring-4"
@@ -48,6 +49,7 @@ export default function LoginPage() {
           <label className="block">
             <span className="text-sm font-black text-stone-200">Password</span>
             <input
+              data-testid="login-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="mt-2 w-full rounded-2xl border border-stone-700 bg-stone-950 px-4 py-4 text-stone-50 outline-none ring-quest-teal/40 focus:ring-4"
@@ -61,6 +63,7 @@ export default function LoginPage() {
             </div>
           )}
           <button
+            data-testid="login-submit"
             type="submit"
             disabled={loading}
             className="block rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 text-center font-black text-stone-950 shadow-[0_8px_0_rgba(120,53,15,0.55)] transition active:translate-y-1 active:shadow-[0_4px_0_rgba(120,53,15,0.55)]"

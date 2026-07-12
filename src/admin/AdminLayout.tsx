@@ -35,6 +35,15 @@ export default function AdminLayout() {
           <Link className="rounded-md border border-stone-700 px-3 py-2 text-stone-300" to="/admin/revenue">
             Revenue
           </Link>
+          <Link className="rounded-md border border-stone-700 px-3 py-2 text-stone-300" to="/admin/investor">
+            Investor
+          </Link>
+          <Link className="rounded-md border border-stone-700 px-3 py-2 text-stone-300" to="/admin/board">
+            Board
+          </Link>
+          <Link className="rounded-md border border-stone-700 px-3 py-2 text-stone-300" to="/admin/test-agent">
+            Test Agent
+          </Link>
         </nav>
         <Outlet />
       </main>

@@ -423,6 +423,149 @@ create table if not exists public.revenue_events (
   occurred_at timestamp with time zone not null default now()
 );
 
+create table if not exists public.payment_fraud_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete set null,
+  payment_provider text not null default 'manual',
+  transaction_id text,
+  fraud_score int not null default 0 check (fraud_score >= 0 and fraud_score <= 100),
+  risk_level text not null default 'low' check (risk_level in ('low', 'medium', 'high')),
+  action text not null default 'allow' check (action in ('allow', 'review', 'block')),
+  reasons jsonb not null default '[]'::jsonb,
+  ip_address text,
+  user_agent text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.subscription_changes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  from_plan text not null default 'free',
+  to_plan text not null,
+  change_type text not null check (change_type in ('upgrade', 'downgrade', 'renewal', 'enterprise_upgrade')),
+  effective_at timestamp with time zone not null default now(),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.enterprise_accounts (
+  id uuid primary key default gen_random_uuid(),
+  company_name text not null,
+  billing_email text,
+  status text not null default 'active' check (status in ('active', 'overdue', 'suspended', 'cancelled')),
+  seats int not null default 1,
+  price_per_seat_cents int not null default 0,
+  currency text not null default 'PHP',
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.enterprise_users (
+  id uuid primary key default gen_random_uuid(),
+  enterprise_account_id uuid not null references public.enterprise_accounts(id) on delete cascade,
+  user_id uuid references public.users(id) on delete cascade,
+  role text not null default 'member' check (role in ('owner', 'admin', 'member')),
+  status text not null default 'active' check (status in ('active', 'invited', 'removed')),
+  joined_at timestamp with time zone not null default now(),
+  unique (enterprise_account_id, user_id)
+);
+
+create table if not exists public.invoices (
+  id uuid primary key default gen_random_uuid(),
+  enterprise_account_id uuid references public.enterprise_accounts(id) on delete cascade,
+  invoice_number text not null unique,
+  amount_cents int not null default 0,
+  currency text not null default 'PHP',
+  status text not null default 'draft' check (status in ('draft', 'issued', 'paid', 'void', 'overdue')),
+  due_date date,
+  paid_at timestamp with time zone,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.ai_revenue_optimizations (
+  id uuid primary key default gen_random_uuid(),
+  segment text not null default 'all_users',
+  input_hash text not null,
+  churn_probability float8 not null default 0,
+  conversion_rate float8 not null default 0,
+  engagement_level text not null default 'medium' check (engagement_level in ('low', 'medium', 'high')),
+  pricing_suggestion jsonb not null default '{}'::jsonb,
+  discount_triggers jsonb not null default '[]'::jsonb,
+  upgrade_prompts jsonb not null default '[]'::jsonb,
+  retention_strategy text,
+  expires_at timestamp with time zone not null default now() + interval '7 days',
+  created_at timestamp with time zone not null default now()
+);
+
+create table if not exists public.kpi_reports (
+  id uuid primary key default gen_random_uuid(),
+  report_date date not null,
+  period text not null default 'daily' check (period in ('daily', 'weekly', 'monthly')),
+  metrics jsonb not null default '{}'::jsonb,
+  summary text,
+  anomalies jsonb not null default '[]'::jsonb,
+  source text not null default 'manual',
+  created_at timestamp with time zone not null default now(),
+  unique (report_date, period)
+);
+
+create table if not exists public.board_reports (
+  id uuid primary key default gen_random_uuid(),
+  report_date date not null,
+  company_health_score int not null default 0 check (company_health_score >= 0 and company_health_score <= 100),
+  revenue_trend jsonb not null default '{}'::jsonb,
+  user_growth jsonb not null default '{}'::jsonb,
+  risk_indicators jsonb not null default '[]'::jsonb,
+  ai_insights jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now(),
+  unique (report_date)
+);
+
+create table if not exists public.ai_business_strategies (
+  id uuid primary key default gen_random_uuid(),
+  strategy_week date not null,
+  input_hash text not null,
+  recommendations jsonb not null default '[]'::jsonb,
+  pricing_adjustments jsonb not null default '{}'::jsonb,
+  feature_priorities jsonb not null default '[]'::jsonb,
+  growth_strategies jsonb not null default '[]'::jsonb,
+  explainability jsonb not null default '{}'::jsonb,
+  expires_at timestamp with time zone not null default now() + interval '7 days',
+  created_at timestamp with time zone not null default now(),
+  unique (strategy_week, input_hash)
+);
+
+create table if not exists public.company_valuations (
+  id uuid primary key default gen_random_uuid(),
+  valuation_date date not null,
+  arr_cents int not null default 0,
+  mrr_growth_rate float8 not null default 0,
+  churn_rate float8 not null default 0,
+  user_growth_rate float8 not null default 0,
+  engagement_score float8 not null default 0,
+  valuation_low_cents int not null default 0,
+  valuation_high_cents int not null default 0,
+  risk_adjusted_valuation_cents int not null default 0,
+  assumptions jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now(),
+  unique (valuation_date)
+);
+
+create table if not exists public.global_expansion_intelligence (
+  id uuid primary key default gen_random_uuid(),
+  report_month text not null,
+  top_regions jsonb not null default '[]'::jsonb,
+  recommended_next_market text,
+  localization_readiness jsonb not null default '{}'::jsonb,
+  demand_prediction jsonb not null default '{}'::jsonb,
+  expansion_roadmap jsonb not null default '[]'::jsonb,
+  expected_revenue_impact_cents int not null default 0,
+  created_at timestamp with time zone not null default now(),
+  unique (report_month)
+);
+
 create table if not exists public.ai_personalization_cache (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.users(id) on delete cascade,
@@ -635,6 +778,18 @@ create index if not exists idx_subscription_events_created on public.subscriptio
 create index if not exists idx_premium_passes_user_status on public.premium_passes(user_id, status, end_date desc);
 create index if not exists idx_premium_passes_transaction on public.premium_passes(payment_provider, transaction_id);
 create index if not exists idx_revenue_events_occurred on public.revenue_events(occurred_at desc);
+create index if not exists idx_payment_fraud_logs_risk on public.payment_fraud_logs(risk_level, created_at desc);
+create index if not exists idx_payment_fraud_logs_user on public.payment_fraud_logs(user_id, created_at desc);
+create index if not exists idx_subscription_changes_user on public.subscription_changes(user_id, created_at desc);
+create index if not exists idx_enterprise_accounts_status on public.enterprise_accounts(status);
+create index if not exists idx_enterprise_users_account on public.enterprise_users(enterprise_account_id);
+create index if not exists idx_invoices_enterprise_status on public.invoices(enterprise_account_id, status);
+create index if not exists idx_ai_revenue_optimizations_segment on public.ai_revenue_optimizations(segment, expires_at desc);
+create index if not exists idx_kpi_reports_date on public.kpi_reports(report_date desc, period);
+create index if not exists idx_board_reports_date on public.board_reports(report_date desc);
+create index if not exists idx_ai_business_strategies_week on public.ai_business_strategies(strategy_week desc, expires_at desc);
+create index if not exists idx_company_valuations_date on public.company_valuations(valuation_date desc);
+create index if not exists idx_global_expansion_month on public.global_expansion_intelligence(report_month desc);
 create index if not exists idx_ai_personalization_user on public.ai_personalization_cache(user_id, expires_at desc);
 create index if not exists idx_leaderboard_global_region_score on public.leaderboard_global(region, weekly_score desc);
 create index if not exists idx_leaderboard_region_score on public.leaderboard_region(region, weekly_score desc);
@@ -687,6 +842,17 @@ alter table public.season_scores enable row level security;
 alter table public.subscription_events enable row level security;
 alter table public.premium_passes enable row level security;
 alter table public.revenue_events enable row level security;
+alter table public.payment_fraud_logs enable row level security;
+alter table public.subscription_changes enable row level security;
+alter table public.enterprise_accounts enable row level security;
+alter table public.enterprise_users enable row level security;
+alter table public.invoices enable row level security;
+alter table public.ai_revenue_optimizations enable row level security;
+alter table public.kpi_reports enable row level security;
+alter table public.board_reports enable row level security;
+alter table public.ai_business_strategies enable row level security;
+alter table public.company_valuations enable row level security;
+alter table public.global_expansion_intelligence enable row level security;
 alter table public.ai_personalization_cache enable row level security;
 alter table public.leaderboard_global enable row level security;
 alter table public.leaderboard_region enable row level security;
@@ -1068,6 +1234,104 @@ using (public.is_admin());
 drop policy if exists "Revenue events are service writable" on public.revenue_events;
 create policy "Revenue events are service writable"
 on public.revenue_events for insert
+with check (true);
+
+drop policy if exists "Payment fraud logs are admin readable" on public.payment_fraud_logs;
+create policy "Payment fraud logs are admin readable"
+on public.payment_fraud_logs for select
+using (public.is_admin());
+
+drop policy if exists "Payment fraud logs are service writable" on public.payment_fraud_logs;
+create policy "Payment fraud logs are service writable"
+on public.payment_fraud_logs for insert
+with check (true);
+
+drop policy if exists "Subscription changes are admin readable" on public.subscription_changes;
+create policy "Subscription changes are admin readable"
+on public.subscription_changes for select
+using (public.is_admin());
+
+drop policy if exists "Subscription changes are service writable" on public.subscription_changes;
+create policy "Subscription changes are service writable"
+on public.subscription_changes for insert
+with check (true);
+
+drop policy if exists "Enterprise accounts are admin only" on public.enterprise_accounts;
+create policy "Enterprise accounts are admin only"
+on public.enterprise_accounts for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Enterprise users are admin only" on public.enterprise_users;
+create policy "Enterprise users are admin only"
+on public.enterprise_users for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Invoices are admin only" on public.invoices;
+create policy "Invoices are admin only"
+on public.invoices for all
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "AI revenue optimizations are admin readable" on public.ai_revenue_optimizations;
+create policy "AI revenue optimizations are admin readable"
+on public.ai_revenue_optimizations for select
+using (public.is_admin());
+
+drop policy if exists "AI revenue optimizations are service writable" on public.ai_revenue_optimizations;
+create policy "AI revenue optimizations are service writable"
+on public.ai_revenue_optimizations for insert
+with check (true);
+
+drop policy if exists "KPI reports are admin readable" on public.kpi_reports;
+create policy "KPI reports are admin readable"
+on public.kpi_reports for select
+using (public.is_admin());
+
+drop policy if exists "KPI reports are service writable" on public.kpi_reports;
+create policy "KPI reports are service writable"
+on public.kpi_reports for insert
+with check (true);
+
+drop policy if exists "Board reports are admin readable" on public.board_reports;
+create policy "Board reports are admin readable"
+on public.board_reports for select
+using (public.is_admin());
+
+drop policy if exists "Board reports are service writable" on public.board_reports;
+create policy "Board reports are service writable"
+on public.board_reports for insert
+with check (true);
+
+drop policy if exists "AI business strategies are admin readable" on public.ai_business_strategies;
+create policy "AI business strategies are admin readable"
+on public.ai_business_strategies for select
+using (public.is_admin());
+
+drop policy if exists "AI business strategies are service writable" on public.ai_business_strategies;
+create policy "AI business strategies are service writable"
+on public.ai_business_strategies for insert
+with check (true);
+
+drop policy if exists "Company valuations are admin readable" on public.company_valuations;
+create policy "Company valuations are admin readable"
+on public.company_valuations for select
+using (public.is_admin());
+
+drop policy if exists "Company valuations are service writable" on public.company_valuations;
+create policy "Company valuations are service writable"
+on public.company_valuations for insert
+with check (true);
+
+drop policy if exists "Global expansion intelligence is admin readable" on public.global_expansion_intelligence;
+create policy "Global expansion intelligence is admin readable"
+on public.global_expansion_intelligence for select
+using (public.is_admin());
+
+drop policy if exists "Global expansion intelligence is service writable" on public.global_expansion_intelligence;
+create policy "Global expansion intelligence is service writable"
+on public.global_expansion_intelligence for insert
 with check (true);
 
 drop policy if exists "AI personalization cache owner readable" on public.ai_personalization_cache;

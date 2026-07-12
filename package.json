@@ -14,13 +14,19 @@
     "production:safety": "node scripts/production-safety-check.js",
     "health:check": "node scripts/deployment-health-check.js",
     "passes:expire": "node scripts/expire-premium-passes.js",
+    "executive:report": "node scripts/generate-executive-report.js",
     "auto:rollback": "node scripts/auto-rollback.js",
     "vercel-build": "npm run predeploy",
     "release:version": "node scripts/release-version.js",
     "devops": "node scripts/devops-cli.js",
     "safe-push": "node scripts/safe-push.js",
     "push:supabase-map": "node scripts/supabase-map-safe-push.js",
-    "rollback": "node scripts/rollback.js"
+    "rollback": "node scripts/rollback.js",
+    "test:e2e": "playwright test",
+    "test:agent": "tsx tests/agent/test-agent.ts",
+    "test:headed": "playwright test --headed",
+    "test:mobile": "playwright test --project=mobile-chrome",
+    "test:report": "playwright show-report"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",
@@ -34,6 +40,7 @@
     "vite-plugin-pwa": "^1.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/geojson": "^7946.0.16",
     "@types/leaflet": "^1.9.17",
     "@types/react": "^19.1.8",
@@ -41,6 +48,7 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.23.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
   }

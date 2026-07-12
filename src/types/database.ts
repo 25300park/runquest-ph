@@ -971,6 +971,417 @@ export type Database = {
           };
           Relationships: [];
         };
+        payment_fraud_logs: {
+          Row: {
+            id: string;
+            user_id: string | null;
+            payment_provider: string;
+            transaction_id: string | null;
+            fraud_score: number;
+            risk_level: 'low' | 'medium' | 'high';
+            action: 'allow' | 'review' | 'block';
+            reasons: Json;
+            ip_address: string | null;
+            user_agent: string | null;
+            metadata: Json;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            user_id?: string | null;
+            payment_provider?: string;
+            transaction_id?: string | null;
+            fraud_score?: number;
+            risk_level?: 'low' | 'medium' | 'high';
+            action?: 'allow' | 'review' | 'block';
+            reasons?: Json;
+            ip_address?: string | null;
+            user_agent?: string | null;
+            metadata?: Json;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            user_id?: string | null;
+            payment_provider?: string;
+            transaction_id?: string | null;
+            fraud_score?: number;
+            risk_level?: 'low' | 'medium' | 'high';
+            action?: 'allow' | 'review' | 'block';
+            reasons?: Json;
+            ip_address?: string | null;
+            user_agent?: string | null;
+            metadata?: Json;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        subscription_changes: {
+          Row: {
+            id: string;
+            user_id: string | null;
+            from_plan: string;
+            to_plan: string;
+            change_type: 'upgrade' | 'downgrade' | 'renewal' | 'enterprise_upgrade';
+            effective_at: string;
+            metadata: Json;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            user_id?: string | null;
+            from_plan?: string;
+            to_plan: string;
+            change_type: 'upgrade' | 'downgrade' | 'renewal' | 'enterprise_upgrade';
+            effective_at?: string;
+            metadata?: Json;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            user_id?: string | null;
+            from_plan?: string;
+            to_plan?: string;
+            change_type?: 'upgrade' | 'downgrade' | 'renewal' | 'enterprise_upgrade';
+            effective_at?: string;
+            metadata?: Json;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        enterprise_accounts: {
+          Row: {
+            id: string;
+            company_name: string;
+            billing_email: string | null;
+            status: 'active' | 'overdue' | 'suspended' | 'cancelled';
+            seats: number;
+            price_per_seat_cents: number;
+            currency: string;
+            created_at: string;
+            updated_at: string;
+          };
+          Insert: {
+            id?: string;
+            company_name: string;
+            billing_email?: string | null;
+            status?: 'active' | 'overdue' | 'suspended' | 'cancelled';
+            seats?: number;
+            price_per_seat_cents?: number;
+            currency?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+          Update: {
+            id?: string;
+            company_name?: string;
+            billing_email?: string | null;
+            status?: 'active' | 'overdue' | 'suspended' | 'cancelled';
+            seats?: number;
+            price_per_seat_cents?: number;
+            currency?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+          Relationships: [];
+        };
+        enterprise_users: {
+          Row: {
+            id: string;
+            enterprise_account_id: string;
+            user_id: string | null;
+            role: 'owner' | 'admin' | 'member';
+            status: 'active' | 'invited' | 'removed';
+            joined_at: string;
+          };
+          Insert: {
+            id?: string;
+            enterprise_account_id: string;
+            user_id?: string | null;
+            role?: 'owner' | 'admin' | 'member';
+            status?: 'active' | 'invited' | 'removed';
+            joined_at?: string;
+          };
+          Update: {
+            id?: string;
+            enterprise_account_id?: string;
+            user_id?: string | null;
+            role?: 'owner' | 'admin' | 'member';
+            status?: 'active' | 'invited' | 'removed';
+            joined_at?: string;
+          };
+          Relationships: [];
+        };
+        invoices: {
+          Row: {
+            id: string;
+            enterprise_account_id: string | null;
+            invoice_number: string;
+            amount_cents: number;
+            currency: string;
+            status: 'draft' | 'issued' | 'paid' | 'void' | 'overdue';
+            due_date: string | null;
+            paid_at: string | null;
+            metadata: Json;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            enterprise_account_id?: string | null;
+            invoice_number: string;
+            amount_cents?: number;
+            currency?: string;
+            status?: 'draft' | 'issued' | 'paid' | 'void' | 'overdue';
+            due_date?: string | null;
+            paid_at?: string | null;
+            metadata?: Json;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            enterprise_account_id?: string | null;
+            invoice_number?: string;
+            amount_cents?: number;
+            currency?: string;
+            status?: 'draft' | 'issued' | 'paid' | 'void' | 'overdue';
+            due_date?: string | null;
+            paid_at?: string | null;
+            metadata?: Json;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        ai_revenue_optimizations: {
+          Row: {
+            id: string;
+            segment: string;
+            input_hash: string;
+            churn_probability: number;
+            conversion_rate: number;
+            engagement_level: 'low' | 'medium' | 'high';
+            pricing_suggestion: Json;
+            discount_triggers: Json;
+            upgrade_prompts: Json;
+            retention_strategy: string | null;
+            expires_at: string;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            segment?: string;
+            input_hash: string;
+            churn_probability?: number;
+            conversion_rate?: number;
+            engagement_level?: 'low' | 'medium' | 'high';
+            pricing_suggestion?: Json;
+            discount_triggers?: Json;
+            upgrade_prompts?: Json;
+            retention_strategy?: string | null;
+            expires_at?: string;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            segment?: string;
+            input_hash?: string;
+            churn_probability?: number;
+            conversion_rate?: number;
+            engagement_level?: 'low' | 'medium' | 'high';
+            pricing_suggestion?: Json;
+            discount_triggers?: Json;
+            upgrade_prompts?: Json;
+            retention_strategy?: string | null;
+            expires_at?: string;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        kpi_reports: {
+          Row: {
+            id: string;
+            report_date: string;
+            period: 'daily' | 'weekly' | 'monthly';
+            metrics: Json;
+            summary: string | null;
+            anomalies: Json;
+            source: string;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            report_date: string;
+            period?: 'daily' | 'weekly' | 'monthly';
+            metrics?: Json;
+            summary?: string | null;
+            anomalies?: Json;
+            source?: string;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            report_date?: string;
+            period?: 'daily' | 'weekly' | 'monthly';
+            metrics?: Json;
+            summary?: string | null;
+            anomalies?: Json;
+            source?: string;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        board_reports: {
+          Row: {
+            id: string;
+            report_date: string;
+            company_health_score: number;
+            revenue_trend: Json;
+            user_growth: Json;
+            risk_indicators: Json;
+            ai_insights: Json;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            report_date: string;
+            company_health_score?: number;
+            revenue_trend?: Json;
+            user_growth?: Json;
+            risk_indicators?: Json;
+            ai_insights?: Json;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            report_date?: string;
+            company_health_score?: number;
+            revenue_trend?: Json;
+            user_growth?: Json;
+            risk_indicators?: Json;
+            ai_insights?: Json;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        ai_business_strategies: {
+          Row: {
+            id: string;
+            strategy_week: string;
+            input_hash: string;
+            recommendations: Json;
+            pricing_adjustments: Json;
+            feature_priorities: Json;
+            growth_strategies: Json;
+            explainability: Json;
+            expires_at: string;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            strategy_week: string;
+            input_hash: string;
+            recommendations?: Json;
+            pricing_adjustments?: Json;
+            feature_priorities?: Json;
+            growth_strategies?: Json;
+            explainability?: Json;
+            expires_at?: string;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            strategy_week?: string;
+            input_hash?: string;
+            recommendations?: Json;
+            pricing_adjustments?: Json;
+            feature_priorities?: Json;
+            growth_strategies?: Json;
+            explainability?: Json;
+            expires_at?: string;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        company_valuations: {
+          Row: {
+            id: string;
+            valuation_date: string;
+            arr_cents: number;
+            mrr_growth_rate: number;
+            churn_rate: number;
+            user_growth_rate: number;
+            engagement_score: number;
+            valuation_low_cents: number;
+            valuation_high_cents: number;
+            risk_adjusted_valuation_cents: number;
+            assumptions: Json;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            valuation_date: string;
+            arr_cents?: number;
+            mrr_growth_rate?: number;
+            churn_rate?: number;
+            user_growth_rate?: number;
+            engagement_score?: number;
+            valuation_low_cents?: number;
+            valuation_high_cents?: number;
+            risk_adjusted_valuation_cents?: number;
+            assumptions?: Json;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            valuation_date?: string;
+            arr_cents?: number;
+            mrr_growth_rate?: number;
+            churn_rate?: number;
+            user_growth_rate?: number;
+            engagement_score?: number;
+            valuation_low_cents?: number;
+            valuation_high_cents?: number;
+            risk_adjusted_valuation_cents?: number;
+            assumptions?: Json;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
+        global_expansion_intelligence: {
+          Row: {
+            id: string;
+            report_month: string;
+            top_regions: Json;
+            recommended_next_market: string | null;
+            localization_readiness: Json;
+            demand_prediction: Json;
+            expansion_roadmap: Json;
+            expected_revenue_impact_cents: number;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            report_month: string;
+            top_regions?: Json;
+            recommended_next_market?: string | null;
+            localization_readiness?: Json;
+            demand_prediction?: Json;
+            expansion_roadmap?: Json;
+            expected_revenue_impact_cents?: number;
+            created_at?: string;
+          };
+          Update: {
+            id?: string;
+            report_month?: string;
+            top_regions?: Json;
+            recommended_next_market?: string | null;
+            localization_readiness?: Json;
+            demand_prediction?: Json;
+            expansion_roadmap?: Json;
+            expected_revenue_impact_cents?: number;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
         ai_personalization_cache: {
           Row: {
             id: string;

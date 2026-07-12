@@ -26,6 +26,9 @@ import AdminLayout from '../admin/AdminLayout';
 import AdminLogin from '../admin/AdminLogin';
 import AdminDashboard from '../admin/AdminDashboard';
 import AdminRevenue from '../admin/AdminRevenue';
+import AdminInvestor from '../admin/AdminInvestor';
+import AdminBoard from '../admin/AdminBoard';
+import AdminTestAgent from '../admin/AdminTestAgent';
 import { AdminGuard } from '../admin/AdminGuard';
 
 export const appRoutes = (
@@ -73,6 +76,9 @@ export const appRoutes = (
       <Route index element={<AdminDashboard />} />
       <Route path="dashboard" element={<AdminDashboard />} />
       <Route path="revenue" element={<AdminRevenue />} />
+      <Route path="investor" element={<AdminInvestor />} />
+      <Route path="board" element={<AdminBoard />} />
+      <Route path="test-agent" element={<AdminTestAgent />} />
       <Route path="course-builder" element={<AdminCourseBuilderPage />} />
       <Route path="course-builder/:courseId" element={<AdminCourseBuilderPage />} />
     </Route>

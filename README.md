@@ -180,3 +180,8 @@ Phase 5 should implement admin course management.
 Phase 6 should improve game features and user retention.
 
 The first goal is not to build a perfect app, but to create a working MVP that proves users can select a course, run, complete it, earn points, and level up.
+
+
+## Test Agent
+
+See [docs/11_TEST_AGENT.md](docs/11_TEST_AGENT.md) for setup, usage, safety rules, and CI instructions.
