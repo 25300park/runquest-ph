@@ -18,8 +18,8 @@ export default function LoginPage() {
           navigate('/character-dashboard', { replace: true });
         }
       })
-      .catch((error) => {
-        console.error('SESSION_RESTORE_ERROR', error);
+      .catch(() => {
+        // Keep the login page usable when session restoration fails.
       });
 
     return () => {
@@ -94,6 +94,11 @@ export default function LoginPage() {
           New adventurer?{' '}
           <Link to="/register" className="font-black text-quest-teal">
             Register
+          </Link>
+        </p>
+        <p className="mt-3 text-center text-sm text-stone-400">
+          <Link to="/forgot-password" className="font-black text-amber-200">
+            Forgot password?
           </Link>
         </p>
       </div>

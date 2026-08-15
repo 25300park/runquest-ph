@@ -17,6 +17,8 @@ import LandingPage from '../pages/LandingPage';
 import LeaderboardPage from '../pages/LeaderboardPage';
 import LaunchPage from '../pages/LaunchPage';
 import LoginPage from '../pages/LoginPage';
+import ForgotPasswordPage from '../pages/ForgotPasswordPage';
+import UpdatePasswordPage from '../pages/UpdatePasswordPage';
 import ProfilePage from '../pages/ProfilePage';
 import QuestCompletedPage from '../pages/QuestCompletedPage';
 import RegisterPage from '../pages/RegisterPage';
@@ -35,6 +37,8 @@ export const appRoutes = (
   <Routes>
     <Route path="/" element={<LandingPage />} />
     <Route path="/login" element={<LoginPage />} />
+    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+    <Route path="/update-password" element={<UpdatePasswordPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/character" element={<CharacterSelectPage />} />
     <Route path="/character/create" element={<CharacterCreation />} />

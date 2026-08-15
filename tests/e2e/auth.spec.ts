@@ -12,6 +12,19 @@ test('auth pages render login and register safely', async ({ page }) => {
   await expect(referralInput).not.toHaveAttribute('required', '');
 });
 
+
+test('password recovery pages are publicly reachable', async ({ page }) => {
+  await page.goto('/login');
+  await expect(page.getByRole('link', { name: /forgot password/i })).toBeVisible();
+
+  await page.getByRole('link', { name: /forgot password/i }).click();
+  await expect(page.getByTestId('forgot-password-page')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /reset your password/i })).toBeVisible();
+
+  await page.goto('/update-password');
+  await expect(page.getByTestId('update-password-page')).toBeVisible();
+});
+
 test('unauthorized admin access redirects or blocks', async ({ page }) => {
   await page.goto('/admin');
   await page.waitForLoadState('networkidle').catch(() => undefined);

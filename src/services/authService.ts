@@ -81,6 +81,45 @@ export async function getRunQuestSession() {
   return data.session;
 }
 
+
+export async function requestRunQuestPasswordReset(email: string) {
+  const client = requireSupabaseClient();
+  const normalizedEmail = email.trim();
+
+  if (!normalizedEmail) {
+    throw new Error('Enter the email address for your RunQuest account.');
+  }
+
+  const redirectTo =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/update-password`
+      : undefined;
+
+  const { error } = await client.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo
+  });
+
+  if (error) throw error;
+}
+
+export async function updateRunQuestPassword(password: string) {
+  const client = requireSupabaseClient();
+
+  if (password.length < 6) {
+    throw new Error('Password must be at least 6 characters.');
+  }
+
+  const { data: sessionData, error: sessionError } = await client.auth.getSession();
+  if (sessionError) throw sessionError;
+
+  if (!sessionData.session) {
+    throw new Error('Password reset session is missing or expired. Request a new reset link.');
+  }
+
+  const { error } = await client.auth.updateUser({ password });
+  if (error) throw error;
+}
+
 export async function signInRunQuest(email: string, password: string) {
   const client = requireSupabaseClient();
   const { error } = await client.auth.signInWithPassword({ email, password });
