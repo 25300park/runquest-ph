@@ -132,8 +132,7 @@ export async function registerRunQuest(input: {
         referredUserId: profile.id,
         referralCode: normalizedReferralCode
       });
-    } catch (error) {
-      console.error('REFERRAL_APPLY_ERROR', error);
+    } catch {
       referralWarning = 'Account created, but the referral code could not be applied.';
     }
   }
