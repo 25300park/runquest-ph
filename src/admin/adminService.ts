@@ -36,7 +36,13 @@ export async function getCurrentAdminProfile() {
   const client = requireSupabaseClient();
   const { data: userData, error: userError } = await client.auth.getUser();
 
-  if (userError) throw userError;
+  if (userError) {
+    const message = userError.message.toLowerCase();
+    if (message.includes('auth session missing') || message.includes('session missing')) {
+      return null;
+    }
+    throw userError;
+  }
   const authUser = userData.user;
   if (!authUser) return null;
 

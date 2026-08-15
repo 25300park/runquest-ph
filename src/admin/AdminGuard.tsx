@@ -25,12 +25,12 @@ export function AdminGuard({ children }: { children: ReactNode }) {
       .then((currentProfile) => {
         if (!active) return;
         if (!currentProfile) {
-          setRedirectTo('/admin/login');
+          setRedirectTo('/login');
           return;
         }
 
         if (currentProfile.role !== 'admin' || currentProfile.status !== 'active') {
-          setRedirectTo('/admin/login');
+          setRedirectTo('/login');
         }
       })
       .catch((guardError) => {

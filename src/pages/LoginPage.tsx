@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { signInRunQuest } from '../services/authService';
+import { getRunQuestSession, signInRunQuest } from '../services/authService';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -8,6 +8,24 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    void getRunQuestSession()
+      .then((session) => {
+        if (active && session) {
+          navigate('/character-dashboard', { replace: true });
+        }
+      })
+      .catch((error) => {
+        console.error('SESSION_RESTORE_ERROR', error);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [navigate]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -17,7 +17,22 @@ export default function RegisterPage() {
     setStatus('Creating your RunQuest account...');
 
     try {
-      await registerRunQuest({ email, password, name, referralCode: referralCode.trim() || undefined });
+      const result = await registerRunQuest({
+        email,
+        password,
+        name,
+        referralCode: referralCode.trim() || undefined
+      });
+
+      if (result.requiresEmailConfirmation) {
+        setStatus('Account created. Check your email to confirm the account, then log in.');
+        return;
+      }
+
+      if (result.referralWarning) {
+        console.warn(result.referralWarning);
+      }
+
       navigate('/character-dashboard', { replace: true });
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Registration failed.');
@@ -27,7 +42,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <section className="min-h-full bg-[#111816] px-4 py-8 text-stone-50">
+    <section data-testid="register-page" className="min-h-full bg-[#111816] px-4 py-8 text-stone-50">
       <div className="rounded-[1.5rem] border border-amber-200/20 bg-stone-900 p-5 shadow-2xl">
         <p className="text-sm font-black uppercase text-amber-200">New quest file</p>
         <h1 className="mt-3 text-4xl font-black leading-tight">Create your adventurer</h1>
@@ -69,7 +84,7 @@ export default function RegisterPage() {
             />
           </label>
           <label className="block">
-            <span className="text-sm font-black text-stone-200">Referral code</span>
+            <span className="text-sm font-black text-stone-200">Referral code <span className="font-normal text-stone-500">(optional)</span></span>
             <input
               value={referralCode}
               onChange={(event) => setReferralCode(event.target.value)}

@@ -37,13 +37,14 @@ export async function applyReferral(input: {
   referredUserId: string;
   referralCode?: string | null;
 }) {
-  if (!input.referralCode) return null;
+  const referralCode = input.referralCode?.trim();
+  if (!referralCode) return null;
 
   const client = requireSupabaseClient();
   const { data: referrer, error: referrerError } = await client
     .from('users')
     .select('id,xp,referral_code')
-    .eq('referral_code', input.referralCode)
+    .eq('referral_code', referralCode)
     .maybeSingle();
 
   if (referrerError) throw referrerError;
@@ -57,7 +58,7 @@ export async function applyReferral(input: {
     .insert({
       referrer_user_id: referrer.id,
       referred_user_id: input.referredUserId,
-      referral_code: input.referralCode,
+      referral_code: referralCode,
       reward_xp: rewardXp,
       status: 'rewarded'
     })

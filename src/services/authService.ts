@@ -74,6 +74,13 @@ export async function ensureDefaultCharacter(profile: LiveUserProfile) {
   });
 }
 
+export async function getRunQuestSession() {
+  const client = requireSupabaseClient();
+  const { data, error } = await client.auth.getSession();
+  if (error) throw error;
+  return data.session;
+}
+
 export async function signInRunQuest(email: string, password: string) {
   const client = requireSupabaseClient();
   const { error } = await client.auth.signInWithPassword({ email, password });
@@ -91,23 +98,51 @@ export async function registerRunQuest(input: {
   referralCode?: string;
 }) {
   const client = requireSupabaseClient();
-  const { error } = await client.auth.signUp({
-    email: input.email,
+  const normalizedReferralCode = input.referralCode?.trim() || undefined;
+  const { data, error } = await client.auth.signUp({
+    email: input.email.trim(),
     password: input.password,
     options: {
       data: {
-        name: input.name
+        name: input.name.trim()
       }
     }
   });
 
   if (error) throw error;
 
+  // Supabase projects with email confirmation enabled create the auth user
+  // without creating a browser session. Profile/character setup must wait
+  // until the user has confirmed the email and logged in.
+  if (!data.session) {
+    return {
+      profile: null,
+      character: null,
+      requiresEmailConfirmation: true,
+      referralWarning: null
+    };
+  }
+
   const profile = await ensureUserProfile({ name: input.name });
-  await applyReferral({
-    referredUserId: profile.id,
-    referralCode: input.referralCode
-  });
+  let referralWarning: string | null = null;
+
+  if (normalizedReferralCode) {
+    try {
+      await applyReferral({
+        referredUserId: profile.id,
+        referralCode: normalizedReferralCode
+      });
+    } catch (error) {
+      console.error('REFERRAL_APPLY_ERROR', error);
+      referralWarning = 'Account created, but the referral code could not be applied.';
+    }
+  }
+
   const character = await ensureDefaultCharacter(profile);
-  return { profile, character };
+  return {
+    profile,
+    character,
+    requiresEmailConfirmation: false,
+    referralWarning
+  };
 }

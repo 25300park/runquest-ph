@@ -7,6 +7,9 @@ test('auth pages render login and register safely', async ({ page }) => {
 
   await page.goto('/register');
   await expect(page.locator('body')).toContainText(/register|adventurer|email/i);
+  const referralInput = page.getByLabel(/referral code/i);
+  await expect(referralInput).toBeVisible();
+  await expect(referralInput).not.toHaveAttribute('required', '');
 });
 
 test('unauthorized admin access redirects or blocks', async ({ page }) => {

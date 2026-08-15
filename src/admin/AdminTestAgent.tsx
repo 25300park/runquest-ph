@@ -64,7 +64,7 @@ export default function AdminTestAgent() {
   }
 
   return (
-    <section className="space-y-4">
+    <section data-testid="admin-test-agent-page" className="space-y-4">
       <div className="rounded-lg border border-stone-800 bg-stone-950 p-4">
         <p className="text-xs font-black uppercase text-amber-200">Human-guided AI test agent</p>
         <h2 className="mt-1 text-2xl font-black">Test Request Console</h2>

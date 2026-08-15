@@ -1,4 +1,5 @@
 import { Component, useEffect, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { getAdminDashboardStats, subscribeToAdminRealtime } from './adminService';
 import AdminCharacters from './AdminCharacters';
 import AdminCourses from './AdminCourses';
@@ -124,6 +125,12 @@ function AdminDashboardContent() {
             <p className="mt-1 text-red-200">{environmentHealth.messages.join(' ')}</p>
           )}
         </div>
+        <Link
+          to="/admin/test-agent"
+          className="mt-3 inline-flex rounded-md border border-amber-200/60 px-3 py-2 text-sm font-black text-amber-200"
+        >
+          Test Agent
+        </Link>
       </section>
 
       {/* STATS */}
