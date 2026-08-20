@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { MapContainer, Marker, Polyline, TileLayer } from 'react-leaflet';
+import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import type { ActivityState, CompletedActivitySummary } from '../types/activity';
 import type { LatLngTuple } from '../types/area';
-import type { Course } from '../types/course';
+import type { Course, CourseCheckpoint } from '../types/course';
 import { calculateActivityReward, getGameProgress } from '../utils/gameProgress';
 import { calculateRouteProgress } from '../utils/route';
 import {
@@ -71,7 +72,6 @@ function createLoopedCourse(baseCourse: Course, loopCount: number): Course {
 function formatElapsedTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
@@ -79,12 +79,48 @@ function formatPace(distanceKm: number, elapsedSeconds: number) {
   if (distanceKm <= 0 || elapsedSeconds <= 0) {
     return '--:--';
   }
-
   const paceSeconds = Math.round(elapsedSeconds / distanceKm);
   const minutes = Math.floor(paceSeconds / 60);
   const seconds = paceSeconds % 60;
-
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+const checkpointColors: Record<CourseCheckpoint['type'], string> = {
+  START: '#22c55e',
+  CHECKPOINT: '#facc15',
+  REST: '#38bdf8',
+  VIEW: '#a78bfa',
+  VIEW_SPOT: '#a78bfa',
+  WATER: '#0ea5e9',
+  TOILET: '#94a3b8',
+  CAFE: '#fb923c',
+  CAUTION: '#fb7185',
+  FINISH: '#f97316'
+};
+
+const userGpsIcon = L.divIcon({
+  className: '',
+  html: `
+    <div class="relative flex items-center justify-center">
+      <div class="absolute w-8 h-8 rounded-full bg-emerald-400/40 animate-ping"></div>
+      <div class="relative w-6 h-6 rounded-full border-2 border-white bg-gradient-to-tr from-emerald-500 to-teal-300 shadow-[0_0_16px_rgba(16,185,129,0.9)] flex items-center justify-center">
+        <div class="w-2 h-2 rounded-full bg-white"></div>
+      </div>
+    </div>
+  `,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16]
+});
+
+// 지도 중심을 사용자 위치에 맞추는 헬퍼 컴포넌트
+function MapRecenter({ position, isTracking }: { position: LatLngTuple; isTracking: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (isTracking) {
+      map.panTo(position, { animate: true, duration: 1 });
+    }
+  }, [position, isTracking, map]);
+  return null;
 }
 
 export default function ActivityTrackingPage() {
@@ -97,13 +133,16 @@ export default function ActivityTrackingPage() {
   const baseCourse = isRunNavigationState(navigationState)
     ? (navigationState.baseCourse ?? navigationState.course)
     : initialCourse;
+  
   const [loopCount, setLoopCount] = useState(
     isRunNavigationState(navigationState) ? (navigationState.loopCount ?? 1) : 1
   );
+  
   const course = useMemo(
     () => (baseCourse ? createLoopedCourse(baseCourse, loopCount) : null),
     [baseCourse, loopCount]
   );
+
   const [activityState, setActivityState] = useState<ActivityState>('idle');
   const [gpsSessionId, setGpsSessionId] = useState<string | null>(null);
   const [distanceKm, setDistanceKm] = useState(0);
@@ -111,8 +150,12 @@ export default function ActivityTrackingPage() {
   const [currentPosition, setCurrentPosition] = useState<LatLngTuple>(
     course?.startPoint ?? [14.5503, 121.0507]
   );
+  // 1분 단위로 수집된 GPS 궤적 좌표 리스트 (Step 2 & 3 연동)
+  const [trackedPath, setTrackedPath] = useState<LatLngTuple[]>([]);
   const [gpsStatus, setGpsStatus] = useState('GPS ready');
   const isStartingRef = useRef(false);
+
+  // 캐릭터 기본 스탯
   const progressSnapshot = getGameProgress();
   const rewardPreview = course
     ? calculateActivityReward(course, distanceKm, progressSnapshot.completedActivities)
@@ -122,7 +165,6 @@ export default function ActivityTrackingPage() {
   const routeMatch = calculateRouteProgress(currentPosition, routeCoordinates);
   const distanceProgress = course ? Math.min(distanceKm / course.distanceKm, 1) : 0;
   const routeProgress = Math.max(routeMatch.progressPercent / 100, distanceProgress);
-  const completedSegment = routeMatch.completedSegment;
   const nextCheckpoint = useMemo(
     () =>
       course?.checkpoints.find((checkpoint) => checkpoint.distanceFromStartKm > distanceKm) ??
@@ -141,9 +183,11 @@ export default function ActivityTrackingPage() {
       setCurrentPosition(course.startPoint);
       setDistanceKm(0);
       setGpsSessionId(null);
+      setTrackedPath([course.startPoint]);
     }
   }, [activityState, course]);
 
+  // 경과 시간 타이머
   useEffect(() => {
     if (activityState !== 'running') {
       return undefined;
@@ -156,18 +200,26 @@ export default function ActivityTrackingPage() {
     return () => window.clearInterval(timer);
   }, [activityState]);
 
+  // 1분 단위 GPS 추적 + 5m Jittering 방지 연동 (Step 2)
   useEffect(() => {
     if (!course || activityState !== 'running' || !gpsSessionId) {
       return undefined;
     }
 
-    setGpsStatus('Waiting for GPS lock...');
+    setGpsStatus('Searching GPS signals...');
     return watchBrowserGpsSession({
       sessionId: gpsSessionId,
+      intervalMs: 60_000, // 정확히 60초 간격 수집
+      minDistanceMeters: 5, // 5m 미만 떨림 필터링
+      onRawPoint: (rawPoint) => {
+        // 실시간 지도 마커 위치 업데이트
+        setCurrentPosition([rawPoint.lat, rawPoint.lng]);
+      },
       onPoint: (point, session) => {
-        setCurrentPosition([point.lat, point.lng]);
+        // 60초 주기 & 5m 이상 이동 시 Polyline 궤적 배열에 추가
+        setTrackedPath((prev) => [...prev, [point.lat, point.lng]]);
         setDistanceKm(Math.min(session.total_distance, course.distanceKm));
-        setGpsStatus(`GPS active +/-${Math.round(point.accuracy ?? 0)}m`);
+        setGpsStatus(`GPS Active +/-${Math.round(point.accuracy ?? 0)}m (1min sync)`);
       },
       onError: (error) => {
         const message = error instanceof Error ? error.message : 'GPS tracking failed.';
@@ -194,7 +246,7 @@ export default function ActivityTrackingPage() {
     }
 
     isStartingRef.current = true;
-    setGpsStatus('Starting tracker...');
+    setGpsStatus('Acquiring satellite lock...');
 
     try {
       const session = await startGpsSession({ provider: 'browser_geolocation' });
@@ -246,139 +298,250 @@ export default function ActivityTrackingPage() {
     return null;
   }
 
-  const primaryAction =
-    activityState === 'idle' ? (
-      <button
-        type="button"
-        onClick={() => void startActivity()}
-        className="rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 font-black text-stone-950"
-      >
-        Start
-      </button>
-    ) : activityState === 'paused' ? (
-      <button
-        type="button"
-        onClick={resumeActivity}
-        className="rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 font-black text-stone-950"
-      >
-        Resume
-      </button>
-    ) : (
-      <button
-        type="button"
-        onClick={pauseActivity}
-        className="rounded-2xl border border-stone-700 bg-stone-900 px-4 py-4 font-black text-stone-100"
-      >
-        Pause
-      </button>
-    );
+  const isTracking = activityState === 'running';
 
   return (
-    <section className="min-h-full bg-[#111816] px-4 py-4 text-stone-50">
-      <div className="rounded-2xl border border-stone-700 bg-stone-900 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-black uppercase text-quest-teal">
-              Verified real GPS activity
-            </p>
-            <h1 className="mt-1 text-2xl font-black">{course.name}</h1>
-          </div>
-          <span className="rounded-full bg-teal-950 px-3 py-2 text-xs font-black uppercase text-quest-teal">
-            {activityState}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-stone-700 bg-stone-900 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-black uppercase text-amber-200">Loop multiplier</p>
-            <p className="mt-1 text-sm text-stone-400">
-              {baseCourse?.distanceKm.toFixed(2)} km to {course.distanceKm.toFixed(2)} km (
-              {loopCount}x)
-            </p>
-          </div>
-        </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {[1, 2, 3].map((count) => (
-            <button
-              key={count}
-              type="button"
-              onClick={() => setLoopCount(count)}
-              disabled={activityState !== 'idle'}
-              className={`rounded-xl border px-4 py-3 font-black ${
-                loopCount === count
-                  ? 'border-amber-200 bg-amber-300 text-stone-950'
-                  : 'border-stone-700 bg-stone-950 text-stone-300'
-              } disabled:cursor-not-allowed disabled:opacity-60`}
-            >
-              {count}x
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-4 overflow-hidden rounded-2xl border border-stone-700">
-        <MapContainer center={course.startPoint} zoom={16} scrollWheelZoom={false}>
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none">
+      {/* 1. 배경: 풀스크린 탐험 지도 (Step 1 & Step 3) */}
+      <div className="absolute inset-0 z-0">
+        <MapContainer
+          center={currentPosition}
+          zoom={16}
+          scrollWheelZoom={false}
+          zoomControl={false}
+          className="w-full h-full"
+        >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <Polyline positions={course.routeCoordinates} color="#475569" weight={6} />
-          <Polyline positions={completedSegment} color="#facc15" weight={7} />
-          <Marker position={currentPosition} />
-        </MapContainer>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-        <div className="rounded-2xl bg-stone-900 p-4">
-          <p className="text-xs font-bold uppercase text-stone-500">Distance</p>
-          <p className="mt-1 text-2xl font-black">{distanceKm.toFixed(2)} km</p>
-        </div>
-        <div className="rounded-2xl bg-stone-900 p-4">
-          <p className="text-xs font-bold uppercase text-stone-500">Elapsed</p>
-          <p className="mt-1 text-2xl font-black">{formatElapsedTime(elapsedSeconds)}</p>
-        </div>
-        <div className="rounded-2xl bg-stone-900 p-4">
-          <p className="text-xs font-bold uppercase text-stone-500">Avg pace</p>
-          <p className="mt-1 text-2xl font-black">{formatPace(distanceKm, elapsedSeconds)}</p>
-        </div>
-        <div className="rounded-2xl bg-stone-900 p-4">
-          <p className="text-xs font-bold uppercase text-stone-500">XP</p>
-          <p className="mt-1 text-2xl font-black text-amber-200">{xpEarned}</p>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-stone-700 bg-stone-900 p-4">
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-black uppercase text-stone-500">Route progress</span>
-          <span className="font-black text-amber-200">{Math.round(routeProgress * 100)}%</span>
-        </div>
-        <div className="mt-3 h-3 overflow-hidden rounded-full bg-stone-950">
-          <div
-            className="h-full rounded-full bg-amber-300 transition-all duration-500"
-            style={{ width: `${routeProgress * 100}%` }}
+          <MapRecenter position={currentPosition} isTracking={isTracking} />
+          
+          {/* 전체 계획 코스 가이드선 (반투명 슬레이트) */}
+          <Polyline 
+            positions={course.routeCoordinates} 
+            pathOptions={{ color: '#64748b', weight: 6, opacity: 0.45, dashArray: '8, 8' }} 
           />
+
+          {/* Step 3: 실시간 1분 단위 GPS 수집 궤적 Polyline (네온 황금빛 라인) */}
+          <Polyline 
+            positions={trackedPath} 
+            pathOptions={{ color: '#facc15', weight: 7, opacity: 0.95 }} 
+          />
+
+          {/* 체크포인트 마커들 */}
+          {course.checkpoints.map((cp) => (
+            <CircleMarker
+              key={cp.id}
+              center={cp.position}
+              radius={cp.type === 'START' || cp.type === 'FINISH' ? 9 : 6}
+              pathOptions={{
+                color: '#0f172a',
+                fillColor: checkpointColors[cp.type] ?? '#facc15',
+                fillOpacity: 1,
+                weight: 2
+              }}
+            />
+          ))}
+
+          {/* 유저 실시간 GPS 위치 마커 */}
+          <Marker position={currentPosition} icon={userGpsIcon} />
+        </MapContainer>
+
+        {/* 맵 가장자리 비네팅 및 HUD 가독성 오버레이 */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/80 via-transparent to-slate-950/90" />
+      </div>
+
+      {/* 2. 상단 오버레이: RPG 플레이어 스탯 HUD 바 (Step 1) */}
+      <header className="absolute top-0 left-0 right-0 z-20 px-4 pt-4 pb-2">
+        <div className="max-w-lg mx-auto bg-slate-900/85 backdrop-blur-md border border-slate-700/70 rounded-2xl p-3 shadow-2xl shadow-black/70">
+          <div className="flex items-center justify-between gap-3">
+            {/* 레벨 & 프로필 뱃지 */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-indigo-600 border border-amber-300/40 shadow-inner font-black text-amber-100 text-xs">
+                Lv.12
+              </div>
+            </div>
+
+            {/* HP 및 EXP 게이지 */}
+            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+              {/* HP 바 */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-black text-rose-400 uppercase">HP</span>
+                <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                  <div 
+                    className="h-full bg-gradient-to-r from-rose-600 to-rose-400 transition-all duration-300"
+                    style={{ width: `${Math.max(20, 100 - (distanceProgress * 50))}%` }}
+                  />
+                </div>
+                <span className="text-[9px] font-bold text-slate-300 tabular-nums">
+                  {Math.round(Math.max(20, 100 - (distanceProgress * 50)))}/100
+                </span>
+              </div>
+
+              {/* EXP 게이지 (루트 달성률 기반) */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-black text-amber-400 uppercase">EXP</span>
+                <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                  <div 
+                    className="h-full bg-gradient-to-r from-amber-500 to-yellow-300 transition-all duration-300"
+                    style={{ width: `${Math.round(routeProgress * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[9px] font-medium text-amber-300 tabular-nums">
+                  {Math.round(routeProgress * 100)}%
+                </span>
+              </div>
+            </div>
+
+            {/* 획득 보상 토큰/골드 */}
+            <div className="flex items-center gap-1 bg-slate-800/90 border border-amber-400/40 px-2.5 py-1 rounded-xl">
+              <span className="text-xs">🪙</span>
+              <span className="text-xs font-black text-yellow-300 tabular-nums">
+                +{xpEarned} <span className="text-[9px] font-medium text-slate-400">XP</span>
+              </span>
+            </div>
+          </div>
+
+          {/* 서브 퀘스트 정보 & 목표 체크포인트 & 루프 배수 선택 바 */}
+          <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-xs gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="px-1.5 py-0.5 rounded bg-teal-950 text-teal-400 font-black text-[9px] border border-teal-500/30 shrink-0">
+                QUEST
+              </span>
+              <span className="font-bold text-slate-200 truncate">{course.name}</span>
+              <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                • 목표: <span className="text-amber-300 font-bold">{nextCheckpoint?.name ?? 'Finish'}</span>
+              </span>
+            </div>
+            
+            {/* 루프 배수 조절 버튼 (탐험 대기 중일 때만 변경 가능) */}
+            <div className="flex items-center gap-1 shrink-0">
+              {[1, 2, 3].map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => setLoopCount(count)}
+                  disabled={activityState !== 'idle'}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                    loopCount === count
+                      ? 'bg-amber-400 text-slate-950 shadow-sm shadow-amber-400/50'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                  } disabled:cursor-not-allowed disabled:opacity-60`}
+                >
+                  {count}x
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-        <p className="mt-4 text-sm text-stone-500">Next checkpoint</p>
-        <p className="mt-1 font-black text-stone-50">{nextCheckpoint?.name ?? 'Finish line'}</p>
-        <div className="mt-4 rounded-xl bg-stone-950 p-3">
-          <p className="text-xs font-black uppercase text-stone-500">Tracking mode</p>
-          <p className="mt-1 text-sm font-bold text-stone-300">{gpsStatus}</p>
+      </header>
+
+      {/* 3. 중앙 캐릭터 영상 Placeholder 영역 (Step 1) */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-52 top-28 z-10 flex items-center justify-center">
+        <div className="relative">
+          {/* 캐릭터 아우라 효과 */}
+          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-32 h-8 bg-teal-500/20 rounded-full blur-xl animate-pulse" />
+          
+          {/* 캐릭터 Video/Canvas 컨테이너 Placeholder */}
+          <div className="relative w-44 h-52 rounded-3xl border border-teal-400/30 bg-slate-900/50 backdrop-blur-sm flex flex-col items-center justify-center p-3 text-center shadow-2xl overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
+            
+            <div className="relative z-10 flex flex-col items-center gap-2">
+              <div className="w-16 h-16 rounded-2xl bg-teal-950/80 border border-teal-400/40 flex items-center justify-center text-2xl shadow-lg">
+                {isTracking ? '🏃‍♂️' : '🛡️'}
+              </div>
+              <p className="text-xs font-bold text-teal-200">
+                {isTracking ? '⚔️ 퀘스트 진행 중' : '모험 준비 완료'}
+              </p>
+              <span className="text-[9px] text-slate-400">
+                [캐릭터 Video/3D Canvas]
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        {primaryAction}
-        <button
-          type="button"
-          onClick={() => void completeActivity()}
-          disabled={activityState === 'idle'}
-          className="rounded-2xl bg-quest-teal px-4 py-4 font-black text-white disabled:cursor-not-allowed disabled:bg-stone-800 disabled:text-stone-500"
-        >
-          Finish
-        </button>
-      </div>
-    </section>
+      {/* 4. 하단 플로팅 액션바 & 대형 START 버튼 (Step 1) */}
+      <footer className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-6 pt-2">
+        <div className="max-w-lg mx-auto flex flex-col gap-2.5">
+          {/* GPS 상태 표시줄 */}
+          <div className="flex items-center justify-between text-[11px] px-2 text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${isTracking ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              {gpsStatus}
+            </span>
+            <span className="font-mono">{loopCount}x Loop ({course.distanceKm.toFixed(2)} km)</span>
+          </div>
+
+          {/* 탐험 중 실시간 대시보드 지표 */}
+          {activityState !== 'idle' && (
+            <div className="grid grid-cols-3 gap-2 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-2.5 shadow-xl text-center">
+              <div className="p-1">
+                <div className="text-[9px] font-black text-slate-400 uppercase">탐험 시간</div>
+                <div className="text-base font-black text-slate-100 tabular-nums">
+                  {formatElapsedTime(elapsedSeconds)}
+                </div>
+              </div>
+              <div className="p-1 border-x border-slate-800">
+                <div className="text-[9px] font-black text-slate-400 uppercase">이동 거리</div>
+                <div className="text-base font-black text-teal-400 tabular-nums">
+                  {distanceKm.toFixed(2)} <span className="text-[10px] text-slate-400 font-normal">km</span>
+                </div>
+              </div>
+              <div className="p-1">
+                <div className="text-[9px] font-black text-slate-400 uppercase">평균 페이스</div>
+                <div className="text-base font-black text-amber-300 tabular-nums">
+                  {formatPace(distanceKm, elapsedSeconds)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 대형 START / PAUSE / FINISH 플로팅 버튼 */}
+          {activityState === 'idle' ? (
+            <button
+              onClick={() => void startActivity()}
+              type="button"
+              className="group relative w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 font-black text-lg tracking-wider uppercase shadow-xl shadow-emerald-500/30 hover:shadow-emerald-500/50 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3 border border-emerald-300/60"
+            >
+              <span className="text-xl">⚔️</span>
+              <span>QUEST START (퀘스트 시작)</span>
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400" />
+              </span>
+            </button>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {activityState === 'running' ? (
+                <button
+                  type="button"
+                  onClick={pauseActivity}
+                  className="py-3.5 px-4 rounded-xl bg-slate-800/90 border border-slate-600 text-slate-200 font-black text-sm tracking-wide uppercase shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <span>⏸️</span> 일시 정지
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={resumeActivity}
+                  className="py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-sm tracking-wide uppercase shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <span>▶️</span> 탐험 재개
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => void completeActivity()}
+                className="py-3.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 text-white font-black text-sm tracking-wide uppercase shadow-lg shadow-rose-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-rose-400/40"
+              >
+                <span>🏁</span> 퀘스트 완료
+              </button>
+            </div>
+          )}
+        </div>
+      </footer>
+    </div>
   );
 }

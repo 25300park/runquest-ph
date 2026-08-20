@@ -19,6 +19,9 @@ export type NormalizedGpsPoint = {
 export type WatchGpsSessionInput = {
   sessionId: string;
   raceParticipantId?: string;
+  intervalMs?: number;
+  minDistanceMeters?: number;
+  onRawPoint?: (point: NormalizedGpsPoint) => void;
   onPoint?: (point: GpsPoint, session: GpsSession) => void;
   onError?: (error: GeolocationPositionError | Error) => void;
 };
@@ -198,17 +201,54 @@ export function watchBrowserGpsSession(input: WatchGpsSessionInput) {
     return () => undefined;
   }
 
+  const intervalMs = input.intervalMs ?? 60_000; // 기본 1분 (60초)
+  const minDistanceKm = (input.minDistanceMeters ?? 5) / 1000; // 기본 5m (0.005km)
+
+  let lastSavedTimestamp = 0;
+  let lastSavedPoint: LatLngTuple | null = null;
+  let isPushing = false;
+
   const watchId = navigator.geolocation.watchPosition(
     async (position) => {
+      const normalizedPoint = positionToPoint(position);
+      const currentTuple: LatLngTuple = [normalizedPoint.lat, normalizedPoint.lng];
+      const currentTime = new Date(normalizedPoint.recordedAt).getTime();
+
+      // 매 수신마다 실시간 위치 콜백 실행 (지도 마커 부드러운 이동용)
+      input.onRawPoint?.(normalizedPoint);
+
+      // 1. 시간 주기 확인: 첫 기록이거나 지정된 intervalMs(60초) 이상 경과했는지 검사
+      const timeElapsed = currentTime - lastSavedTimestamp;
+      if (lastSavedTimestamp > 0 && timeElapsed < intervalMs) {
+        return;
+      }
+
+      // 2. Jittering(튀는 GPS) 방지: 이전 기록 지점과 비교하여 최소 거리(5m) 이상 이동했는지 검사
+      if (lastSavedPoint) {
+        const distanceMovedKm = calculateHaversineDistanceKm(lastSavedPoint, currentTuple);
+        if (distanceMovedKm < minDistanceKm) {
+          return;
+        }
+      }
+
+      if (isPushing) {
+        return;
+      }
+
+      isPushing = true;
       try {
         const result = await pushGpsPoint({
           sessionId: input.sessionId,
-          point: positionToPoint(position),
+          point: normalizedPoint,
           raceParticipantId: input.raceParticipantId
         });
+        lastSavedTimestamp = currentTime;
+        lastSavedPoint = currentTuple;
         input.onPoint?.(result.point, result.session);
       } catch (error) {
         input.onError?.(error instanceof Error ? error : new Error('GPS sync failed.'));
+      } finally {
+        isPushing = false;
       }
     },
     (error) => input.onError?.(error),
