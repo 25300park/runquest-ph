@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import CourseBuilderMap from '../components/CourseBuilderMap';
-import GPXUploader, { type GeneratedCourseMetadata } from '../components/GPXUploader';
 import { mockAreas } from '../data/mockAreas';
 import type { LatLngTuple } from '../types/area';
 import type { CheckpointType, CourseCheckpoint, Difficulty } from '../types/course';
@@ -12,22 +11,7 @@ import {
   updateCourse,
   type CourseArea
 } from '../services/courseService';
-import {
-  testFetchCourses,
-  testInsertCourse,
-  testSaveGPXCourse
-} from '../services/supabaseTestService';
-import { calculateRouteDistanceKm, estimatePaceLabel } from '../utils/route';
-
-type SavedCourse = {
-  id: string;
-  name: string;
-  areaName: string;
-  difficulty: Difficulty;
-  routePoints: LatLngTuple[];
-  checkpoints: CourseCheckpoint[];
-  databaseId?: string;
-};
+import { calculateHaversineDistanceKm, calculateRouteDistanceKm } from '../utils/route';
 
 const difficulties: Difficulty[] = ['Easy', 'Normal', 'Hard', 'Challenge'];
 
@@ -35,11 +19,9 @@ function toDatabaseArea(areaName: string): CourseArea {
   if (areaName.includes('Makati')) {
     return 'Makati';
   }
-
   if (areaName.includes('MOA')) {
     return 'MOA';
   }
-
   return 'BGC';
 }
 
@@ -63,49 +45,40 @@ function buildCheckpoints(routePoints: LatLngTuple[]): CourseCheckpoint[] {
 }
 
 export default function CourseBuilder() {
+  const navigate = useNavigate();
   const { courseId } = useParams();
-  const [courseName, setCourseName] = useState('Creator Route');
+  const [courseName, setCourseName] = useState('My Field Route');
   const [areaId, setAreaId] = useState(mockAreas[0].id);
   const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
-  const [generatedXpReward, setGeneratedXpReward] = useState(0);
-  const [paceEstimate, setPaceEstimate] = useState('Waiting for route');
-  const [generatedMetadata, setGeneratedMetadata] = useState<GeneratedCourseMetadata | null>(null);
   const [routePoints, setRoutePoints] = useState<LatLngTuple[]>([]);
-  const [gpxCheckpoints, setGpxCheckpoints] = useState<CourseCheckpoint[]>([]);
-  const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
   const [saveStatus, setSaveStatus] = useState('');
-  const [testStatus, setTestStatus] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
   const [isLoadingCourse, setIsLoadingCourse] = useState(Boolean(courseId));
+  
+  // 실시간 GPS 필드 레코딩 상태
+  const [isGpsRecording, setIsGpsRecording] = useState(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const lastPointRef = useRef<LatLngTuple | null>(null);
+
   const selectedArea = mockAreas.find((area) => area.id === areaId) ?? mockAreas[0];
-  const checkpoints = useMemo(
-    () => (gpxCheckpoints.length > 0 ? gpxCheckpoints : buildCheckpoints(routePoints)),
-    [gpxCheckpoints, routePoints]
-  );
+  const checkpoints = useMemo(() => buildCheckpoints(routePoints), [routePoints]);
   const routeDistanceKm = useMemo(() => calculateRouteDistanceKm(routePoints), [routePoints]);
 
+  // 기존 코스 수정 시 로드
   useEffect(() => {
     let isMounted = true;
 
     async function loadEditableCourse() {
-      if (!courseId) {
-        return;
-      }
+      if (!courseId) return;
 
       try {
         setIsLoadingCourse(true);
         setSaveStatus('Loading course for editing...');
         const editableCourse = await getCourseById(courseId);
 
-        if (!isMounted) {
-          return;
-        }
-
-        if (!editableCourse) {
-          setSaveStatus('Course not found.');
-          return;
-        }
+        if (!isMounted || !editableCourse) return;
 
         const matchingArea = mockAreas.find((area) => toDatabaseArea(area.name) === editableCourse.area);
         setCourseName(editableCourse.name);
@@ -114,89 +87,127 @@ export default function CourseBuilder() {
         setRoutePoints(
           editableCourse.course_points.map((point) => [point.lat, point.lng] as LatLngTuple)
         );
-        setGpxCheckpoints([]);
-        setGeneratedMetadata(null);
-        setGeneratedXpReward(Math.round(editableCourse.distance * 100));
-        setPaceEstimate(estimatePaceLabel(editableCourse.distance));
-        setSaveStatus(`Editing Supabase course: ${editableCourse.id}`);
+        setSaveStatus(`Editing course: ${editableCourse.id}`);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown course load error.';
-        setSaveStatus(`Could not load course for editing. ${message}`);
+        const message = error instanceof Error ? error.message : 'Course load error.';
+        setSaveStatus(`Load failed: ${message}`);
       } finally {
-        if (isMounted) {
-          setIsLoadingCourse(false);
-        }
+        if (isMounted) setIsLoadingCourse(false);
       }
     }
 
     loadEditableCourse();
-
     return () => {
       isMounted = false;
     };
   }, [courseId]);
 
+  // GPS 트래킹 정리
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
+  // 실시간 GPS 기록 시작 함수
+  function startGpsRecording() {
+    if (!('geolocation' in navigator)) {
+      setGpsError('Geolocation is not supported on this device.');
+      return;
+    }
+
+    setIsGpsRecording(true);
+    setGpsError(null);
+    setSaveStatus('📍 GPS Field Tracking Active...');
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const currentCoord: LatLngTuple = [position.coords.latitude, position.coords.longitude];
+        setGpsAccuracy(Math.round(position.coords.accuracy));
+
+        // Jittering 방지: 마지막 포인트에서 최소 3m 이상 이동 시에만 포인트 추가
+        if (lastPointRef.current) {
+          const distanceKm = calculateHaversineDistanceKm(lastPointRef.current, currentCoord);
+          if (distanceKm < 0.003) {
+            return;
+          }
+        }
+
+        lastPointRef.current = currentCoord;
+        setRoutePoints((prev) => [...prev, currentCoord]);
+      },
+      (error) => {
+        setGpsError(error.message);
+        setSaveStatus(`GPS error: ${error.message}`);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 3000,
+        timeout: 10000
+      }
+    );
+  }
+
+  // 실시간 GPS 기록 정지 함수
+  function stopGpsRecording() {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsGpsRecording(false);
+    lastPointRef.current = null;
+    setSaveStatus('GPS Tracking stopped.');
+  }
+
   function addRoutePoint(position: LatLngTuple) {
     setRoutePoints((currentPoints) => [...currentPoints, position]);
-    setGpxCheckpoints([]);
-    setGeneratedMetadata(null);
   }
 
   function moveRoutePoint(index: number, position: LatLngTuple) {
     setRoutePoints((currentPoints) =>
       currentPoints.map((point, pointIndex) => (pointIndex === index ? position : point))
     );
-    setGpxCheckpoints([]);
-    setGeneratedMetadata(null);
   }
 
   function deleteRoutePoint(index: number) {
     setRoutePoints((currentPoints) =>
       currentPoints.filter((_, pointIndex) => pointIndex !== index)
     );
-    setGpxCheckpoints([]);
-    setGeneratedMetadata(null);
   }
 
   function undoLastPoint() {
     setRoutePoints((currentPoints) => currentPoints.slice(0, -1));
-    setGpxCheckpoints([]);
-    setGeneratedMetadata(null);
   }
 
   function clearRoute() {
+    if (isGpsRecording) {
+      stopGpsRecording();
+    }
     setRoutePoints([]);
-    setGpxCheckpoints([]);
-    setGeneratedMetadata(null);
-    setGeneratedXpReward(0);
-    setPaceEstimate('Waiting for route');
+    setSaveStatus('');
   }
 
-  function importRoute(coordinates: LatLngTuple[], metadata: GeneratedCourseMetadata) {
-    setRoutePoints(coordinates);
-    setCourseName(metadata.name);
-    setDifficulty(metadata.difficulty);
-    setGeneratedXpReward(metadata.xpReward);
-    setPaceEstimate(metadata.paceEstimate);
-    setGpxCheckpoints(metadata.checkpoints);
-    setGeneratedMetadata(metadata);
-  }
-
+  // 코스 저장 및 종료
   async function saveCourse() {
+    if (isGpsRecording) {
+      stopGpsRecording();
+    }
+
     if (routePoints.length < 2) {
+      setSaveStatus('⚠️ 최소 2개 이상의 포인트가 필요합니다.');
       return;
     }
 
     setIsSaving(true);
-    setSaveStatus('');
-    let databaseId: string | undefined;
+    setSaveStatus('Saving course...');
     const databaseArea = toDatabaseArea(selectedArea.name);
     const distance = routeDistanceKm;
-    const fallbackId = `saved-course-${Date.now()}`;
 
     try {
       if (courseId) {
-        databaseId = await updateCourse(
+        const id = await updateCourse(
           {
             id: courseId,
             name: courseName.trim() || 'Creator Route',
@@ -206,9 +217,9 @@ export default function CourseBuilder() {
           },
           routePoints
         );
-        setSaveStatus(`Updated Supabase course: ${databaseId}`);
+        setSaveStatus(`✅ 코스 수정 완료: ${id}`);
       } else {
-        databaseId = await saveRouteAsCourse(
+        const id = await saveRouteAsCourse(
           {
             name: courseName.trim() || 'Creator Route',
             area: databaseArea,
@@ -217,92 +228,73 @@ export default function CourseBuilder() {
           },
           routePoints
         );
-        setSaveStatus(`Saved to Supabase: ${databaseId}`);
+        setSaveStatus(`✅ 새 코스 저장 완료: ${id}`);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown Supabase save error.';
+      const message = error instanceof Error ? error.message : 'Save error.';
       setSaveStatus(
         isSupabaseConfigured
-          ? `Supabase save failed. Saved locally only. ${message}`
-          : 'Saved locally only. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env to enable database saves.'
+          ? `❌ DB 저장 실패: ${message}`
+          : '⚠️ 로컬 저장만 완료 (Supabase 설정 확인 필요)'
       );
-    }
-
-    setSavedCourses((courses) => [
-      {
-        id: databaseId ?? fallbackId,
-        name: courseName.trim() || 'Creator Route',
-        areaName: selectedArea.name,
-        difficulty,
-        routePoints,
-        checkpoints,
-        databaseId
-      },
-      ...courses
-    ]);
-    setIsSaving(false);
-  }
-
-  async function runSupabaseTest(testName: 'insert' | 'fetch' | 'gpx') {
-    setIsTestingSupabase(true);
-    setTestStatus(`Running ${testName} test...`);
-
-    try {
-      if (testName === 'insert') {
-        const result = await testInsertCourse();
-        setTestStatus(`INSERT RESULT success: ${result.id}`);
-      }
-
-      if (testName === 'fetch') {
-        const result = await testFetchCourses();
-        setTestStatus(`FETCH RESULT success: ${result.length} courses found`);
-      }
-
-      if (testName === 'gpx') {
-        const result = await testSaveGPXCourse(routePoints);
-        setTestStatus(`GPX SAVE RESULT success: ${result.courseId}`);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown Supabase test error.';
-      setTestStatus(`${testName.toUpperCase()} test failed: ${message}`);
     } finally {
-      setIsTestingSupabase(false);
+      setIsSaving(false);
     }
   }
 
   return (
-    <section className="min-h-full bg-[#111816] text-stone-50">
-      <div className="space-y-4 px-4 py-4">
-        <div className="rounded-2xl border border-amber-200/30 bg-stone-900 p-4">
-          <p className="text-xs font-black uppercase text-amber-200">
-            {courseId ? 'Course Edit Mode' : 'Course Creator'}
-          </p>
-          <h1 className="mt-1 text-3xl font-black">
-            {courseId ? 'Edit RunQuest route' : 'Build a RunQuest route'}
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-stone-400">
-            Click the map to add route points, or import a GPX file to render a saved route.
-          </p>
-        </div>
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none">
+      {/* 1. 풀스크린 지도 (Step 2) */}
+      <div className="absolute inset-0 z-0">
+        <CourseBuilderMap
+          center={routePoints.length > 0 ? routePoints[routePoints.length - 1] : selectedArea.mapCenter}
+          routePoints={routePoints}
+          checkpoints={checkpoints}
+          onAddRoutePoint={addRoutePoint}
+          onMoveRoutePoint={moveRoutePoint}
+          onDeleteRoutePoint={deleteRoutePoint}
+        />
+        {/* 비네팅 가독성 오버레이 */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/80 via-transparent to-slate-950/90" />
+      </div>
 
-        <div className="grid gap-3 rounded-2xl border border-stone-700 bg-stone-900 p-4">
-          <label>
-            <span className="text-xs font-black uppercase text-stone-400">Name</span>
+      {/* 2. 상단 모바일 HUD 헤더 (코스 설정 및 정보) */}
+      <header className="absolute top-0 left-0 right-0 z-20 px-3 pt-3 pb-2">
+        <div className="max-w-lg mx-auto bg-slate-900/90 backdrop-blur-md border border-slate-700/70 rounded-2xl p-3 shadow-2xl shadow-black/80 flex flex-col gap-2">
+          {/* 상단 라인: 뒤로가기 & 코스명 & 상태 */}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300 hover:text-white shrink-0"
+            >
+              ← 나가기
+            </button>
+
             <input
+              type="text"
               value={courseName}
-              onChange={(event) => setCourseName(event.target.value)}
-              disabled={isLoadingCourse}
-              className="mt-2 w-full rounded-xl border border-stone-700 bg-stone-950 px-3 py-3 text-stone-50 outline-none focus:ring-4 focus:ring-teal-500/20"
+              onChange={(e) => setCourseName(e.target.value)}
+              placeholder="코스 이름 입력"
+              className="flex-1 min-w-0 bg-slate-950/80 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-100 placeholder-slate-500 outline-none focus:border-teal-400"
             />
-          </label>
 
-          <div className="grid grid-cols-2 gap-3">
-            <label>
-              <span className="text-xs font-black uppercase text-stone-400">Area</span>
+            <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase shrink-0 ${
+              isGpsRecording 
+                ? 'bg-rose-950 text-rose-300 border border-rose-500/40 animate-pulse' 
+                : 'bg-teal-950 text-teal-300 border border-teal-500/40'
+            }`}>
+              {isGpsRecording ? '🔴 REC' : 'READY'}
+            </span>
+          </div>
+
+          {/* 하단 라인: 지역, 난이도, 실시간 지표 */}
+          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800 gap-2">
+            <div className="flex items-center gap-1.5">
               <select
                 value={areaId}
-                onChange={(event) => setAreaId(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-stone-700 bg-stone-950 px-3 py-3 text-stone-50"
+                onChange={(e) => setAreaId(e.target.value)}
+                className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-200"
               >
                 {mockAreas.map((area) => (
                   <option key={area.id} value={area.id}>
@@ -310,226 +302,99 @@ export default function CourseBuilder() {
                   </option>
                 ))}
               </select>
-            </label>
 
-            <label>
-              <span className="text-xs font-black uppercase text-stone-400">Difficulty</span>
               <select
                 value={difficulty}
-                onChange={(event) => setDifficulty(event.target.value as Difficulty)}
-                className="mt-2 w-full rounded-xl border border-stone-700 bg-stone-950 px-3 py-3 text-stone-50"
+                onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+                className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-amber-300"
               >
-                {difficulties.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                {difficulties.map((diff) => (
+                  <option key={diff} value={diff}>
+                    {diff}
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
+
+            {/* 실시간 수집 지표 */}
+            <div className="flex items-center gap-2 font-mono text-[11px]">
+              <span className="text-slate-400">
+                P: <strong className="text-slate-100 font-bold">{routePoints.length}</strong>
+              </span>
+              <span className="text-teal-400 font-bold">
+                {routeDistanceKm.toFixed(2)} km
+              </span>
+            </div>
           </div>
         </div>
+      </header>
 
-        <GPXUploader onRouteImported={importRoute} />
+      {/* 3. 우측 상단 플로팅 퀵 툴즈 (수동 조작용) */}
+      <aside className="absolute right-3 top-32 z-20 flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={undoLastPoint}
+          disabled={routePoints.length === 0}
+          className="w-10 h-10 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-700 text-slate-200 text-xs font-black shadow-lg flex items-center justify-center active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+          title="마지막 포인트 취소"
+        >
+          ↩️
+        </button>
+        <button
+          type="button"
+          onClick={clearRoute}
+          disabled={routePoints.length === 0}
+          className="w-10 h-10 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-700 text-rose-400 text-xs font-black shadow-lg flex items-center justify-center active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+          title="전체 초기화"
+        >
+          🗑️
+        </button>
+      </aside>
 
-        <div className="rounded-2xl border border-amber-200/30 bg-stone-900 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase text-amber-200">Supabase test panel</p>
-              <h2 className="mt-1 text-xl font-black">End-to-end DB checks</h2>
-            </div>
-            <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-black text-quest-teal">
-              {isSupabaseConfigured ? 'Configured' : 'Missing env'}
-            </span>
-          </div>
-          <p className="mt-2 text-sm leading-6 text-stone-400">
-            Buttons log INSERT RESULT, FETCH RESULT, and GPX SAVE RESULT in the browser console.
-          </p>
-          <div className="mt-4 grid gap-2">
-            <button
-              type="button"
-              onClick={() => runSupabaseTest('insert')}
-              disabled={isTestingSupabase}
-              className="rounded-2xl bg-quest-teal px-4 py-3 font-black text-white disabled:bg-stone-800 disabled:text-stone-500"
-            >
-              Test Insert Course
-            </button>
-            <button
-              type="button"
-              onClick={() => runSupabaseTest('fetch')}
-              disabled={isTestingSupabase}
-              className="rounded-2xl bg-stone-950 px-4 py-3 font-black text-stone-100 disabled:text-stone-500"
-            >
-              Test Fetch Courses
-            </button>
-            <button
-              type="button"
-              onClick={() => runSupabaseTest('gpx')}
-              disabled={isTestingSupabase}
-              className="rounded-2xl border border-amber-200 bg-amber-300 px-4 py-3 font-black text-stone-950 disabled:border-stone-700 disabled:bg-stone-800 disabled:text-stone-500"
-            >
-              Test GPX Save
-            </button>
-          </div>
-          {testStatus && (
-            <div className="mt-4 rounded-xl bg-stone-950 p-3 text-sm font-bold text-stone-300">
-              {testStatus}
+      {/* 4. 하단 모바일 플로팅 제어 액션바 (Step 2) */}
+      <footer className="absolute bottom-0 left-0 right-0 z-20 px-3 pb-6 pt-2">
+        <div className="max-w-lg mx-auto flex flex-col gap-2">
+          {/* 상태/에러 메시지 토스트 */}
+          {(saveStatus || gpsError) && (
+            <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-3 py-2 text-center text-xs font-bold text-teal-300 shadow-xl">
+              {saveStatus || gpsError} {gpsAccuracy !== null && `(±${gpsAccuracy}m)`}
             </div>
           )}
-        </div>
 
-        {generatedMetadata && (
-          <div className="rounded-2xl border border-amber-200/30 bg-amber-300 p-4 text-stone-950">
-            <p className="text-xs font-black uppercase">Auto course generated</p>
-            <h2 className="mt-1 text-xl font-black">{generatedMetadata.name}</h2>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-              <p>
-                <span className="font-black">Distance:</span>{' '}
-                {generatedMetadata.distanceKm.toFixed(2)} km
-              </p>
-              <p>
-                <span className="font-black">XP:</span> {generatedMetadata.xpReward}
-              </p>
-              <p>
-                <span className="font-black">Difficulty:</span> {generatedMetadata.difficulty}
-              </p>
-              <p>
-                <span className="font-black">Pace:</span> {generatedMetadata.paceEstimate}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="h-[58vh] min-h-[500px] overflow-hidden border-y border-stone-700">
-        <CourseBuilderMap
-          center={selectedArea.mapCenter}
-          routePoints={routePoints}
-          checkpoints={checkpoints}
-          onAddRoutePoint={addRoutePoint}
-          onMoveRoutePoint={moveRoutePoint}
-          onDeleteRoutePoint={deleteRoutePoint}
-        />
-      </div>
-
-      <div className="space-y-4 px-4 py-4">
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-xl bg-stone-900 p-3">
-            <p className="text-xs text-stone-500">Points</p>
-            <p className="font-black">{routePoints.length}</p>
-          </div>
-          <div className="rounded-xl bg-stone-900 p-3">
-            <p className="text-xs text-stone-500">Distance</p>
-            <p className="font-black">{routeDistanceKm.toFixed(2)} km</p>
-          </div>
-          <div className="rounded-xl bg-stone-900 p-3">
-            <p className="text-xs text-stone-500">Mode</p>
-            <p className="font-black">{courseId ? 'Edit' : 'Create'}</p>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-stone-700 bg-stone-900 p-4">
-          <p className="text-xs font-black uppercase text-quest-teal">Generated metadata</p>
-          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-            <p className="rounded-xl bg-stone-950 p-3">
-              XP reward: <span className="font-black text-amber-200">{generatedXpReward || Math.round(routeDistanceKm * 100)}</span>
-            </p>
-            <p className="rounded-xl bg-stone-950 p-3">
-              Pace: <span className="font-black">{generatedMetadata ? paceEstimate : estimatePaceLabel(routeDistanceKm)}</span>
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-amber-200/30 bg-stone-900 p-4">
-          <p className="text-xs font-black uppercase text-amber-200">Editor controls</p>
-          <p className="mt-1 text-sm text-stone-400">
-            Drag markers to reposition. Click a marker to delete it.
-          </p>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={undoLastPoint}
-              disabled={routePoints.length === 0}
-              className="rounded-2xl bg-stone-950 px-3 py-4 font-black text-stone-200 disabled:text-stone-600"
-            >
-              Undo
-            </button>
-            <button
-              type="button"
-              onClick={clearRoute}
-              disabled={routePoints.length === 0}
-              className="rounded-2xl bg-stone-950 px-3 py-4 font-black text-stone-200 disabled:text-stone-600"
-            >
-              Clear All
-            </button>
-            <button
-              type="button"
-              onClick={saveCourse}
-              disabled={routePoints.length < 2 || isSaving || isLoadingCourse}
-              className="rounded-2xl border border-amber-200 bg-amber-300 px-3 py-4 font-black text-stone-950 disabled:border-stone-700 disabled:bg-stone-800 disabled:text-stone-500"
-            >
-              {isSaving ? 'Saving...' : courseId ? 'Update' : 'Save'}
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={undoLastPoint}
-            disabled={routePoints.length === 0}
-            className="rounded-2xl bg-stone-900 px-4 py-4 font-black text-stone-300"
-          >
-            Undo Last Point
-          </button>
-          <button
-            type="button"
-            onClick={clearRoute}
-            disabled={routePoints.length === 0}
-            className="rounded-2xl bg-stone-900 px-4 py-4 font-black text-stone-300 disabled:text-stone-600"
-          >
-            Clear Route
-          </button>
-        </div>
-
-        {saveStatus && (
-          <div className="rounded-2xl border border-teal-200/30 bg-teal-950/30 p-4 text-sm font-bold text-teal-100">
-            {saveStatus}
-          </div>
-        )}
-
-        <div>
-          <h2 className="font-black">Saved creator courses</h2>
-          <div className="mt-3 grid gap-3">
-            {savedCourses.length === 0 ? (
-              <div className="rounded-2xl border border-stone-700 bg-stone-900 p-4 text-center text-sm text-stone-400">
-                No saved creator courses yet.
-              </div>
+          {/* 대형 제어 버튼 그룹 */}
+          <div className="grid grid-cols-2 gap-2.5">
+            {!isGpsRecording ? (
+              <button
+                type="button"
+                onClick={startGpsRecording}
+                className="py-4 px-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-sm tracking-wider uppercase shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-emerald-300/50"
+              >
+                <span className="text-lg">▶️</span>
+                <span>코스 기록 시작</span>
+              </button>
             ) : (
-              savedCourses.map((course) => (
-                <article key={course.id} className="rounded-2xl border border-stone-700 bg-stone-900 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black uppercase text-quest-teal">
-                        {course.areaName}
-                      </p>
-                      <h3 className="mt-1 text-lg font-black">{course.name}</h3>
-                    </div>
-                    <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-black text-amber-200">
-                      {course.difficulty}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-sm text-stone-400">
-                    {course.routePoints.length} points · {course.checkpoints.length} checkpoints
-                  </p>
-                  {course.databaseId && (
-                    <p className="mt-2 text-xs text-quest-teal">Database ID: {course.databaseId}</p>
-                  )}
-                </article>
-              ))
+              <button
+                type="button"
+                onClick={stopGpsRecording}
+                className="py-4 px-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-sm tracking-wider uppercase shadow-xl shadow-amber-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-amber-300/50 animate-pulse"
+              >
+                <span className="text-lg">⏸️</span>
+                <span>기록 일시정지</span>
+              </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => void saveCourse()}
+              disabled={routePoints.length < 2 || isSaving || isLoadingCourse}
+              className="py-4 px-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-cyan-600 text-white font-black text-sm tracking-wider uppercase shadow-xl shadow-indigo-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-cyan-300/40 disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <span className="text-lg">⏹️</span>
+              <span>{isSaving ? '저장 중...' : '기록 종료 및 저장'}</span>
+            </button>
           </div>
         </div>
-      </div>
-    </section>
+      </footer>
+    </div>
   );
 }

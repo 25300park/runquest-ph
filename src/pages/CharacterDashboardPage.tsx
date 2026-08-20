@@ -149,12 +149,27 @@ export default function CharacterDashboardPage() {
         ))}
       </div>
 
-      <Link
-        to="/map"
-        className="mt-5 block rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 text-center font-black text-stone-950"
-      >
-        Start Run
-      </Link>
+      {/* 🚀 필드 테스트 및 퀘스트 진입 액션 버튼 그룹 */}
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Link
+          to="/course-builder"
+          className="group relative flex items-center justify-center gap-2.5 rounded-2xl border border-teal-400/40 bg-gradient-to-r from-teal-600 to-emerald-600 px-4 py-4 text-center font-black text-white shadow-lg shadow-teal-500/20 active:scale-[0.98] transition-all"
+        >
+          <span className="text-xl">📍</span>
+          <span className="text-base tracking-wide">새로운 코스 기록하기</span>
+          <span className="rounded-full bg-teal-900/60 px-2 py-0.5 text-[10px] font-bold text-teal-200 border border-teal-300/30">
+            Builder
+          </span>
+        </Link>
+
+        <Link
+          to="/map"
+          className="flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 text-center font-black text-stone-950 shadow-lg shadow-amber-300/20 active:scale-[0.98] transition-all"
+        >
+          <span className="text-xl">⚔️</span>
+          <span className="text-base tracking-wide">Start Run (탐험 시작)</span>
+        </Link>
+      </div>
     </section>
   );
 }
