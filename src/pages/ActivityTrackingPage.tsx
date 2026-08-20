@@ -187,6 +187,40 @@ export default function ActivityTrackingPage() {
     }
   }, [activityState, course]);
 
+  // Screen Wake Lock (화면 꺼짐 방지)
+  useEffect(() => {
+    let wakeLock: WakeLockSentinel | null = null;
+
+    async function requestLock() {
+      try {
+        if ('wakeLock' in navigator && activityState === 'running') {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch {
+        // 미지원 브라우저 등 무시
+      }
+    }
+
+    if (activityState === 'running') {
+      void requestLock();
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && activityState === 'running') {
+        void requestLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (wakeLock) {
+        void wakeLock.release();
+      }
+    };
+  }, [activityState]);
+
   // 경과 시간 타이머
   useEffect(() => {
     if (activityState !== 'running') {
@@ -200,7 +234,7 @@ export default function ActivityTrackingPage() {
     return () => window.clearInterval(timer);
   }, [activityState]);
 
-  // 1분 단위 GPS 추적 + 5m Jittering 방지 연동 (Step 2)
+  // 하이브리드 GPS 추적 (10m 거리 / 10초 보완 / 3m Jittering 방지)
   useEffect(() => {
     if (!course || activityState !== 'running' || !gpsSessionId) {
       return undefined;
@@ -209,17 +243,18 @@ export default function ActivityTrackingPage() {
     setGpsStatus('Searching GPS signals...');
     return watchBrowserGpsSession({
       sessionId: gpsSessionId,
-      intervalMs: 60_000, // 정확히 60초 간격 수집
-      minDistanceMeters: 5, // 5m 미만 떨림 필터링
+      minDistanceMeters: 10, // 10m 이상 이동 시 (코너링/러닝 대응)
+      fallbackTimeIntervalMs: 10_000, // 10초 경과 보완
+      minJitterMeters: 3, // 3m 미만 떨림 필터링
       onRawPoint: (rawPoint) => {
         // 실시간 지도 마커 위치 업데이트
         setCurrentPosition([rawPoint.lat, rawPoint.lng]);
       },
       onPoint: (point, session) => {
-        // 60초 주기 & 5m 이상 이동 시 Polyline 궤적 배열에 추가
+        // 하이브리드 조건 충족 시 Polyline 궤적 배열에 추가
         setTrackedPath((prev) => [...prev, [point.lat, point.lng]]);
         setDistanceKm(Math.min(session.total_distance, course.distanceKm));
-        setGpsStatus(`GPS Active +/-${Math.round(point.accuracy ?? 0)}m (1min sync)`);
+        setGpsStatus(`GPS Active +/-${Math.round(point.accuracy ?? 0)}m (Hybrid)`);
       },
       onError: (error) => {
         const message = error instanceof Error ? error.message : 'GPS tracking failed.';

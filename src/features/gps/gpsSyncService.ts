@@ -19,8 +19,9 @@ export type NormalizedGpsPoint = {
 export type WatchGpsSessionInput = {
   sessionId: string;
   raceParticipantId?: string;
-  intervalMs?: number;
-  minDistanceMeters?: number;
+  minDistanceMeters?: number; // 기본 10m
+  fallbackTimeIntervalMs?: number; // 기본 10,000ms (10초)
+  minJitterMeters?: number; // 기본 3m (Jittering 방지)
   onRawPoint?: (point: NormalizedGpsPoint) => void;
   onPoint?: (point: GpsPoint, session: GpsSession) => void;
   onError?: (error: GeolocationPositionError | Error) => void;
@@ -195,14 +196,21 @@ export async function pushGpsPoint(input: {
   };
 }
 
+/**
+ * 하이브리드 GPS 추적 세션
+ * - 조건 A: 이전 기록 좌표 대비 10미터 이상 이동 시 즉시 기록 (코너링 & 러닝 대응)
+ * - 조건 B: 10초 경과 + 3미터 이상 이동 시 기록 (느린 걸음/정지 후 출발 보완)
+ * - 3미터 미만 오차는 Jittering(튀는 GPS)으로 자동 무시
+ */
 export function watchBrowserGpsSession(input: WatchGpsSessionInput) {
   if (!isBrowserGpsAvailable()) {
     input.onError?.(new Error('Browser geolocation is not available on this device.'));
     return () => undefined;
   }
 
-  const intervalMs = input.intervalMs ?? 60_000; // 기본 1분 (60초)
-  const minDistanceKm = (input.minDistanceMeters ?? 5) / 1000; // 기본 5m (0.005km)
+  const minDistanceKm = (input.minDistanceMeters ?? 10) / 1000; // 기본 10m
+  const fallbackIntervalMs = input.fallbackTimeIntervalMs ?? 10_000; // 기본 10초
+  const minJitterKm = (input.minJitterMeters ?? 3) / 1000; // 기본 3m
 
   let lastSavedTimestamp = 0;
   let lastSavedPoint: LatLngTuple | null = null;
@@ -214,24 +222,34 @@ export function watchBrowserGpsSession(input: WatchGpsSessionInput) {
       const currentTuple: LatLngTuple = [normalizedPoint.lat, normalizedPoint.lng];
       const currentTime = new Date(normalizedPoint.recordedAt).getTime();
 
-      // 매 수신마다 실시간 위치 콜백 실행 (지도 마커 부드러운 이동용)
+      // 지도 위 마커 실시간 부드러운 이동용 콜백
       input.onRawPoint?.(normalizedPoint);
 
-      // 1. 시간 주기 확인: 첫 기록이거나 지정된 intervalMs(60초) 이상 경과했는지 검사
-      const timeElapsed = currentTime - lastSavedTimestamp;
-      if (lastSavedTimestamp > 0 && timeElapsed < intervalMs) {
-        return;
-      }
+      let shouldRecord = false;
 
-      // 2. Jittering(튀는 GPS) 방지: 이전 기록 지점과 비교하여 최소 거리(5m) 이상 이동했는지 검사
-      if (lastSavedPoint) {
+      if (!lastSavedPoint || lastSavedTimestamp === 0) {
+        // 첫 번째 GPS 좌표는 즉시 기록
+        shouldRecord = true;
+      } else {
         const distanceMovedKm = calculateHaversineDistanceKm(lastSavedPoint, currentTuple);
-        if (distanceMovedKm < minDistanceKm) {
+        const timeElapsedMs = currentTime - lastSavedTimestamp;
+
+        // 1. Jittering 방지: 3m 미만 이동은 무시
+        if (distanceMovedKm < minJitterKm) {
           return;
+        }
+
+        // 2. 조건 A: 10m 이상 이동했을 때 즉시 기록 (코너링 & 속도 대응)
+        if (distanceMovedKm >= minDistanceKm) {
+          shouldRecord = true;
+        }
+        // 3. 조건 B: 10초가 경과했고, 3m 이상 이동했을 때 기록 (느린 걸음 보완)
+        else if (timeElapsedMs >= fallbackIntervalMs && distanceMovedKm >= minJitterKm) {
+          shouldRecord = true;
         }
       }
 
-      if (isPushing) {
+      if (!shouldRecord || isPushing) {
         return;
       }
 
@@ -254,8 +272,8 @@ export function watchBrowserGpsSession(input: WatchGpsSessionInput) {
     (error) => input.onError?.(error),
     {
       enableHighAccuracy: true,
-      maximumAge: 5000,
-      timeout: 12000
+      maximumAge: 2000,
+      timeout: 10000
     }
   );
 
