@@ -189,9 +189,23 @@ export default function CourseBuilder() {
     setIsGpsRecording(true);
     setBuilderState('recording');
     setGpsError(null);
-    setSaveStatus('');
+    setSaveStatus('📍 GPS 기록 시작! 이동하면 경로가 지도에 표시됩니다.');
     lastSavedTimeRef.current = Date.now();
     lastPositionTimeRef.current = Date.now();
+
+    // 시작 즉시 첫 현재 위치를 첫 번째 핀으로 등록
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const startCoord: LatLngTuple = [pos.coords.latitude, pos.coords.longitude];
+        lastPointRef.current = startCoord;
+        setGpsAccuracy(Math.round(pos.coords.accuracy));
+        setRoutePoints((prev) => (prev.length === 0 ? [startCoord] : prev));
+      },
+      (err) => {
+        console.warn('Initial GPS position error:', err.message);
+      },
+      { enableHighAccuracy: true, timeout: 5000 }
+    );
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -219,17 +233,17 @@ export default function CourseBuilder() {
           const distanceMovedKm = calculateHaversineDistanceKm(lastPointRef.current, currentCoord);
           const timeElapsedMs = currentTime - lastSavedTimeRef.current;
 
-          // Jittering 방지: 3m 미만 무시
-          if (distanceMovedKm < 0.003) {
+          // Jittering 방지: 2m 미만 무시
+          if (distanceMovedKm < 0.002) {
             return;
           }
 
-          // 조건 A: 10m 이상 이동 시 즉시 추가 (러닝/코너링)
-          if (distanceMovedKm >= 0.01) {
+          // 조건 A: 5m 이상 이동 시 추가 (러닝/코너링 반응성 향상)
+          if (distanceMovedKm >= 0.005) {
             shouldAddPoint = true;
           }
-          // 조건 B: 10초 경과 + 3m 이상 이동 시 추가 (느린 걸음 보완)
-          else if (timeElapsedMs >= 10000 && distanceMovedKm >= 0.003) {
+          // 조건 B: 5초 경과 + 2m 이상 이동 시 추가 (느린 걸음 보완)
+          else if (timeElapsedMs >= 5000 && distanceMovedKm >= 0.002) {
             shouldAddPoint = true;
           }
         }
@@ -268,18 +282,18 @@ export default function CourseBuilder() {
     stopGpsRecording();
 
     if (routePoints.length < 2) {
-      setSaveStatus('⚠️ 최소 2개 이상의 포인트가 필요합니다.');
+      setSaveStatus('⚠️ 최소 2개 이상의 포인트가 필요합니다. 지도를 클릭하거나 [🧪 테스트 궤적]을 눌러보세요.');
       return;
     }
 
     setBuilderState('matching');
-    setSaveStatus('🛣️ GPS 궤적을 도로망에 맞게 정밀 교정하는 중...');
+    setSaveStatus('🛣️ GPS 궤적을 도로망에 맞게 정밀 교정하는 중 (OSRM)...');
 
     try {
       const result = await snapToRoad(routePoints);
       setRoutePoints(result.matchedPoints);
       setBuilderState('reviewing');
-      setSaveStatus('✨ 도로망 매칭 완료! 경로를 확인 후 최종 저장하세요.');
+      setSaveStatus(`✨ 도로망 매칭 완료! (${result.originalCount}P → ${result.matchedCount}P) 경로를 확인 후 최종 저장하세요.`);
     } catch {
       setBuilderState('reviewing');
       setSaveStatus('⚠️ 도로 매칭에 실패하여 원본 경로로 검토합니다.');
@@ -288,6 +302,7 @@ export default function CourseBuilder() {
 
   function addRoutePoint(position: LatLngTuple) {
     setRoutePoints((currentPoints) => [...currentPoints, position]);
+    setSaveStatus(`📍 포인트가 추가되었습니다 (${routePoints.length + 1}개)`);
   }
 
   function moveRoutePoint(index: number, position: LatLngTuple) {
@@ -314,6 +329,21 @@ export default function CourseBuilder() {
     setElapsedSeconds(0);
     setBuilderState('idle');
     setSaveStatus('');
+  }
+
+  // 테스트용 BGC 코스 시뮬레이션 궤적 주입 함수
+  function loadMockCourseForTesting() {
+    const mockBgcTrack: LatLngTuple[] = [
+      [14.5492, 121.0505],
+      [14.5510, 121.0520],
+      [14.5528, 121.0545],
+      [14.5540, 121.0532],
+      [14.5522, 121.0510],
+      [14.5505, 121.0490]
+    ];
+    setRoutePoints(mockBgcTrack);
+    setElapsedSeconds(180);
+    setSaveStatus('🧪 테스트 궤적 6개가 주입되었습니다! [⏹️ 기록 종료]를 눌러 맵 매칭을 확인하세요.');
   }
 
   // 8. 최종 코스 저장 (Step 3: 유저 최종 승인 시 실행)
@@ -410,8 +440,17 @@ export default function CourseBuilder() {
         </div>
       </header>
 
-      {/* 3. 우측 플로팅 퀵 툴 (되돌리기 / 초기화) */}
+      {/* 3. 우측 플로팅 퀵 툴 (되돌리기 / 초기화 / 테스트 시뮬레이션) */}
       <aside className="absolute right-4 top-20 z-20 flex flex-col gap-2.5">
+        <button
+          type="button"
+          onClick={loadMockCourseForTesting}
+          disabled={builderState === 'matching'}
+          className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md border border-violet-200 text-violet-700 font-black shadow-lg flex items-center justify-center active:scale-90 disabled:opacity-40 disabled:pointer-events-none transition-all text-xs"
+          title="테스트 궤적 불러오기"
+        >
+          🧪
+        </button>
         <button
           type="button"
           onClick={undoLastPoint}
