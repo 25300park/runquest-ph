@@ -96,7 +96,7 @@ function toMapCourse(course: CourseWithPoints): Course | null {
 
 export default function ExplorationMapPage() {
   const [selectedAreaId, setSelectedAreaId] = useState(mockAreas[0].id);
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null); // Step 1: null이면 '전체 보기'
   const [loopCount, setLoopCount] = useState(1);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
@@ -115,35 +115,16 @@ export default function ExplorationMapPage() {
           .map(toMapCourse)
           .filter((course): course is Course => Boolean(course));
 
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
         setCourses(mappedCourses);
-        setSelectedCourseId((currentCourseId) => {
-          const currentCourseStillExists = mappedCourses.some(
-            (course) => course.id === currentCourseId
-          );
-
-          return currentCourseStillExists ? currentCourseId : mappedCourses[0]?.id ?? null;
-        });
-        console.log('MAP UPDATED FROM SUPABASE', {
-          renderedCourses: mappedCourses.length,
-          courseIds: mappedCourses.map((course) => course.id)
-        });
       } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
+        if (!isMounted) return;
         const message = error instanceof Error ? error.message : 'Unable to load Supabase courses.';
-        console.error('FETCHED COURSES', error);
         setCourseLoadError(message);
         setCourses([]);
       } finally {
-        if (isMounted) {
-          setIsLoadingCourses(false);
-        }
+        if (isMounted) setIsLoadingCourses(false);
       }
     }
 
@@ -154,36 +135,48 @@ export default function ExplorationMapPage() {
     };
   }, []);
 
-  const selectedCourse = useMemo(
-    () => courses.find((course) => course.id === selectedCourseId) ?? courses[0],
-    [courses, selectedCourseId]
-  );
   const selectedArea = mockAreas.find((area) => area.id === selectedAreaId) ?? mockAreas[0];
-  const areaCourses = courses.filter((course) => course.areaId === selectedAreaId);
-  const previewUserPosition = selectedCourse?.routeCoordinates[1] ?? selectedCourse?.startPoint;
-  const selectedBaseDistanceKm = selectedCourse?.distanceKm ?? 0;
+  const areaCourses = useMemo(
+    () => courses.filter((course) => course.areaId === selectedAreaId),
+    [courses, selectedAreaId]
+  );
+
+  // Step 3: 지도에 렌더링할 코스 필터링
+  const displayedCourses = useMemo(() => {
+    if (selectedCourseId) {
+      return areaCourses.filter((course) => course.id === selectedCourseId);
+    }
+    return areaCourses;
+  }, [areaCourses, selectedCourseId]);
+
+  // 화면 중심 및 디테일에 표시될 활성 코스
+  const activeCourse = useMemo(() => {
+    if (selectedCourseId) {
+      return areaCourses.find((course) => course.id === selectedCourseId) ?? areaCourses[0];
+    }
+    return areaCourses[0];
+  }, [areaCourses, selectedCourseId]);
+
+  const previewUserPosition = activeCourse?.routeCoordinates[1] ?? activeCourse?.startPoint;
+  const selectedBaseDistanceKm = activeCourse?.distanceKm ?? 0;
   const selectedTotalDistanceKm = Number((selectedBaseDistanceKm * loopCount).toFixed(2));
 
+  // Step 1: 지역 변경 시 코스 선택 초기화 (전체 보기로 복귀)
   function selectArea(areaId: string) {
     setSelectedAreaId(areaId);
-    const firstCourse = courses.find((course) => course.areaId === areaId);
-    setSelectedCourseId(firstCourse?.id ?? null);
+    setSelectedCourseId(null);
     setLoopCount(1);
   }
 
   function selectCourse(courseId: string) {
-    const course = courses.find((item) => item.id === courseId);
-    if (course) {
-      setSelectedAreaId(course.areaId);
-      setSelectedCourseId(course.id);
-      setLoopCount(1);
-    }
+    setSelectedCourseId(courseId);
+    setLoopCount(1);
   }
 
   return (
     <section className="min-h-full bg-slate-50 text-slate-900 font-sans pb-8 select-none">
-      <div className="space-y-3 px-4 py-4">
-        {/* 상단 레벨 & 타이틀 카드 */}
+      <div className="space-y-2.5 px-4 py-4">
+        {/* 1. 상단 레벨 & 타이틀 카드 */}
         <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -199,8 +192,8 @@ export default function ExplorationMapPage() {
           </div>
         </div>
 
-        {/* 지역 필터 버튼 칩 */}
-        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {/* 2. 지역 선택 탭 (BGC, Makati, MOA) */}
+        <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
           {mockAreas.map((area) => (
             <button
               key={area.id}
@@ -216,15 +209,54 @@ export default function ExplorationMapPage() {
             </button>
           ))}
         </div>
+
+        {/* 3. 코스 필터링 칩(Chips/Pills) 목록 (Step 2) */}
+        {areaCourses.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar pt-1 border-t border-slate-200/60">
+            {/* 전체 보기 칩 */}
+            <button
+              type="button"
+              onClick={() => setSelectedCourseId(null)}
+              className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5 ${
+                selectedCourseId === null
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span>🌐</span>
+              <span>All Courses ({areaCourses.length})</span>
+            </button>
+
+            {/* 개별 코스 칩들 */}
+            {areaCourses.map((course) => (
+              <button
+                key={course.id}
+                type="button"
+                onClick={() => selectCourse(course.id)}
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  selectedCourseId === course.id
+                    ? 'bg-violet-600 text-white shadow-sm'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span>📍</span>
+                <span className="max-w-[140px] truncate">{course.name}</span>
+                <span className={`text-[10px] ${selectedCourseId === course.id ? 'text-violet-200' : 'text-slate-400'}`}>
+                  {course.distanceKm}km
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* 지도 컨테이너 & 반투명 플로팅 오버레이 */}
-      <div className="relative h-[58vh] min-h-[460px] overflow-hidden border-y border-slate-200">
-        {selectedCourse && previewUserPosition ? (
+      {/* 4. 지도 컨테이너 & 반투명 플로팅 오버레이 (Step 3: 필터링된 코스 렌더링) */}
+      <div className="relative h-[55vh] min-h-[440px] overflow-hidden border-y border-slate-200">
+        {displayedCourses.length > 0 && activeCourse && previewUserPosition ? (
           <ExplorationMap
             areas={mockAreas}
-            courses={courses}
-            selectedCourse={selectedCourse}
+            courses={displayedCourses}
+            selectedCourse={activeCourse}
             userPosition={previewUserPosition}
             onSelectCourse={selectCourse}
           />
@@ -245,24 +277,28 @@ export default function ExplorationMapPage() {
         )}
         <div className="pointer-events-none absolute left-4 top-4 rounded-2xl border border-slate-200/80 bg-white/90 px-3.5 py-2.5 backdrop-blur-md shadow-md">
           <p className="text-[10px] font-black uppercase text-violet-600">{selectedArea.worldZone}</p>
-          <p className="mt-0.5 text-xs font-black text-slate-800">{selectedArea.name}</p>
+          <p className="mt-0.5 text-xs font-black text-slate-800">
+            {selectedCourseId ? activeCourse?.name : selectedArea.name}
+          </p>
         </div>
       </div>
 
-      {/* 하단 선택된 코스 상세 정보 카드 */}
+      {/* 5. 하단 선택된 코스 상세 정보 카드 */}
       <div className="space-y-3 px-4 py-4">
-        {selectedCourse && (
+        {activeCourse && (
           <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Selected route</p>
-                <h2 className="mt-0.5 text-xl font-black text-slate-900">{selectedCourse.name}</h2>
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  {selectedCourseId ? 'Selected Route' : 'Featured Route'}
+                </p>
+                <h2 className="mt-0.5 text-xl font-black text-slate-900">{activeCourse.name}</h2>
               </div>
               <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-black text-violet-700">
-                {selectedCourse.difficulty}
+                {activeCourse.difficulty}
               </span>
             </div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">{selectedCourse.description}</p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">{activeCourse.description}</p>
 
             {/* 루프 설정 */}
             <div className="mt-3.5 rounded-2xl border border-slate-100 bg-slate-50 p-3">
@@ -293,43 +329,22 @@ export default function ExplorationMapPage() {
               </div>
               <div className="rounded-xl bg-slate-50 border border-slate-100 p-2.5">
                 <p className="text-[10px] text-slate-400 font-bold">Reward</p>
-                <p className="font-black text-amber-600 text-xs mt-0.5">+{selectedCourse.xpReward} XP</p>
+                <p className="font-black text-amber-600 text-xs mt-0.5">+{activeCourse.xpReward} XP</p>
               </div>
               <div className="rounded-xl bg-slate-50 border border-slate-100 p-2.5">
                 <p className="text-[10px] text-slate-400 font-bold">Explore</p>
-                <p className="font-black text-teal-600 text-xs mt-0.5">+{selectedCourse.explorationReward}%</p>
+                <p className="font-black text-teal-600 text-xs mt-0.5">+{activeCourse.explorationReward}%</p>
               </div>
             </div>
 
             <Link
-              to={`/courses/${selectedCourse.id}`}
+              to={`/courses/${activeCourse.id}`}
               className="mt-4 block w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-center font-bold text-sm text-white shadow-lg shadow-violet-500/25 active:scale-95 transition-all"
             >
               View Route Details
             </Link>
           </div>
         )}
-
-        {/* 하단 지역 코스 목록 */}
-        <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar">
-          {areaCourses.map((course) => (
-            <button
-              key={course.id}
-              type="button"
-              onClick={() => selectCourse(course.id)}
-              className={`min-w-52 rounded-2xl p-3.5 text-left border transition-all ${
-                course.id === selectedCourse?.id
-                  ? 'border-violet-300 bg-violet-50 shadow-sm'
-                  : 'border-slate-200 bg-white hover:bg-slate-50'
-              }`}
-            >
-              <p className="font-black text-xs text-slate-900 truncate">{course.name}</p>
-              <p className="mt-1 text-[11px] text-slate-500">
-                {course.distanceKm} km • {course.estimatedTimeMin} min
-              </p>
-            </button>
-          ))}
-        </div>
       </div>
     </section>
   );
