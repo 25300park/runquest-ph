@@ -4,14 +4,21 @@ import { getCharacterProfile, subscribeToCharacterUpdates } from '../services/ch
 import { subscribeToAvatarRealtime } from '../services/aiAvatarService';
 import { subscribeToEquipmentEconomy } from '../services/equipmentEconomyService';
 import type { CharacterProfile } from '../types/rpgCharacter';
-import { buildAvatarPrompt, describeOutfitLayer } from '../utils/avatarEngine';
 import { getLevelProgress, xpPerLevel } from '../utils/characterRpg';
 
-const equipmentSlots = ['shoes', 'backpack', 'hat', 'accessory'] as const;
+const weekdays = [
+  { day: 'Mon', date: '18' },
+  { day: 'Tue', date: '19' },
+  { day: 'Wed', date: '20' },
+  { day: 'Thu', date: '21' },
+  { day: 'Fri', date: '22' },
+  { day: 'Sat', date: '23', isToday: true },
+  { day: 'Sun', date: '24' },
+];
 
 export default function CharacterDashboardPage() {
   const [profile, setProfile] = useState<CharacterProfile | null>(null);
-  const [status, setStatus] = useState('Loading character...');
+  const [status, setStatus] = useState('Loading hero...');
 
   useEffect(() => {
     const unsubscribers: Array<() => void> = [];
@@ -48,19 +55,23 @@ export default function CharacterDashboardPage() {
     () => profile?.equipment.filter((equipment) => equipment.equipped) ?? [],
     [profile]
   );
-  const avatarPrompt = profile ? buildAvatarPrompt(profile) : '';
   const xpProgress = profile ? getLevelProgress(profile.character.xp) : 0;
+  const currentLevel = profile?.character.level ?? 1;
+  const runnerName = profile?.character.name ?? 'Adventurer';
 
   if (!profile) {
     return (
-      <section className="grid min-h-full place-items-center bg-[#111816] px-4 py-8 text-center text-stone-50">
-        <div className="rounded-2xl border border-stone-700 bg-stone-900 p-5">
-          <p className="text-xs font-black uppercase text-amber-200">Character dashboard</p>
-          <h1 className="mt-2 text-3xl font-black">Create your hero first</h1>
-          <p className="mt-3 text-sm text-stone-400">{status}</p>
+      <section className="grid min-h-screen place-items-center bg-slate-900 px-4 py-8 text-center text-white font-sans">
+        <div className="rounded-3xl border border-slate-700 bg-slate-800/90 p-6 max-w-sm w-full shadow-2xl">
+          <div className="w-16 h-16 bg-violet-600/20 text-violet-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">
+            🧙
+          </div>
+          <p className="text-xs font-black uppercase text-amber-300">RunQuest Hero</p>
+          <h1 className="mt-2 text-2xl font-black">Create your hero first</h1>
+          <p className="mt-2 text-sm text-slate-400">{status}</p>
           <Link
             to="/character/create"
-            className="mt-5 block rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 font-black text-stone-950"
+            className="mt-6 block w-full rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3.5 font-bold text-white shadow-lg shadow-violet-600/30 active:scale-95 transition-all"
           >
             Create Character
           </Link>
@@ -70,106 +81,203 @@ export default function CharacterDashboardPage() {
   }
 
   return (
-    <section className="min-h-full bg-[#111816] px-4 py-5 text-stone-50">
-      <div className="grid grid-cols-[1fr_1.15fr_1fr] gap-3">
-        <aside className="rounded-2xl border border-stone-700 bg-stone-900 p-3">
-          <p className="text-xs font-black uppercase text-amber-200">Stats</p>
-          <div className="mt-3 space-y-3 text-sm">
-            <div>
-              <p className="text-stone-500">Level</p>
-              <p className="text-xl font-black">{profile.character.level}</p>
-            </div>
-            <div>
-              <p className="text-stone-500">XP</p>
-              <p className="text-xl font-black">{profile.character.xp}</p>
-            </div>
-            <div>
-              <p className="text-stone-500">Distance</p>
-              <p className="text-xl font-black">
-                {(profile.stats?.total_distance ?? 0).toFixed(1)} km
-              </p>
-            </div>
-          </div>
-        </aside>
-
-        <main className="rounded-2xl border border-amber-200/30 bg-stone-900 p-3 text-center">
-          <div className="mx-auto grid h-40 w-40 place-items-center rounded-full border-4 border-amber-200 bg-quest-teal text-4xl font-black shadow-[0_0_42px_rgba(250,204,21,0.22)]">
-            {profile.character.name.slice(0, 2).toUpperCase()}
-          </div>
-          <h1 className="mt-3 text-2xl font-black">{profile.character.name}</h1>
-          <p className="mt-1 text-xs font-black uppercase text-quest-teal">Persistent RPG runner</p>
-          <div className="mt-4 h-3 overflow-hidden rounded-full bg-stone-950">
-            <div
-              className="h-full rounded-full bg-amber-300 transition-all"
-              style={{ width: `${(xpProgress / xpPerLevel) * 100}%` }}
-            />
-          </div>
-          <p className="mt-2 text-xs text-stone-400">
-            {xpProgress}/{xpPerLevel} XP to next level
-          </p>
-        </main>
-
-        <aside className="rounded-2xl border border-stone-700 bg-stone-900 p-3">
-          <p className="text-xs font-black uppercase text-amber-200">Equipment</p>
-          <div className="mt-3 space-y-2">
-            {equipmentSlots.map((slot) => {
-              const equipped = equippedItems.find((equipment) => equipment.item.type === slot);
-              return (
-                <div key={slot} className="rounded-xl bg-stone-950 p-2">
-                  <p className="text-[10px] font-black uppercase text-stone-500">{slot}</p>
-                  <p className="mt-1 text-xs font-black">
-                    {equipped?.item.name ?? 'Empty slot'}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </aside>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-stone-700 bg-stone-900 p-4">
-        <p className="text-xs font-black uppercase text-amber-200">AI avatar engine</p>
-        <p className="mt-2 text-sm leading-6 text-stone-400">
-          Identity is fixed. Equipment changes are outfit layers only.
-        </p>
-        <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap rounded-xl bg-stone-950 p-3 text-xs text-stone-300">
-          {avatarPrompt}
-        </pre>
-      </div>
-
-      <div className="mt-4 grid gap-3">
-        {equippedItems.map((equipment) => (
-          <article key={equipment.id} className="rounded-2xl border border-stone-700 bg-stone-900 p-4">
-            <p className="text-xs font-black uppercase text-quest-teal">
-              {equipment.item.rarity} {equipment.item.type}
-            </p>
-            <h2 className="mt-1 font-black">{equipment.item.name}</h2>
-            <p className="mt-2 text-sm text-stone-400">{describeOutfitLayer(equipment.item)}</p>
-          </article>
-        ))}
-      </div>
-
-      {/* 🚀 필드 테스트 및 퀘스트 진입 액션 버튼 그룹 */}
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Link
-          to="/course-builder"
-          className="group relative flex items-center justify-center gap-2.5 rounded-2xl border border-teal-400/40 bg-gradient-to-r from-teal-600 to-emerald-600 px-4 py-4 text-center font-black text-white shadow-lg shadow-teal-500/20 active:scale-[0.98] transition-all"
-        >
-          <span className="text-xl">📍</span>
-          <span className="text-base tracking-wide">새로운 코스 기록하기</span>
-          <span className="rounded-full bg-teal-900/60 px-2 py-0.5 text-[10px] font-bold text-teal-200 border border-teal-300/30">
-            Builder
+    <div className="min-h-full bg-slate-50 text-slate-900 font-sans pb-12 select-none">
+      {/* 1. 상단 프로필 헤더 */}
+      <header className="pt-4 px-5 flex items-center justify-between">
+        <div>
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+            Welcome back
           </span>
-        </Link>
+          <div className="flex items-center gap-2 mt-0.5">
+            <h1 className="text-xl font-black text-slate-900">
+              Hello, {runnerName} 👋
+            </h1>
+            <span className="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-black uppercase tracking-tight">
+              Novice Runner
+            </span>
+          </div>
+        </div>
 
+        {/* 우측 프로필 아바타 버튼 */}
         <Link
-          to="/map"
-          className="flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 text-center font-black text-stone-950 shadow-lg shadow-amber-300/20 active:scale-[0.98] transition-all"
+          to="/profile"
+          className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-sm flex items-center justify-center shadow-md shadow-violet-500/25 active:scale-95 transition-all border-2 border-white"
         >
-          <span className="text-xl">⚔️</span>
-          <span className="text-base tracking-wide">Start Run (탐험 시작)</span>
+          {runnerName.slice(0, 2).toUpperCase()}
         </Link>
-      </div>
-    </section>
+      </header>
+
+      {/* 2. 주간 캘린더 스트립 (Mon ~ Sun) */}
+      <section className="px-5 pt-4 pb-2">
+        <div className="bg-white rounded-2xl p-2.5 shadow-sm border border-slate-100 flex items-center justify-between gap-1">
+          {weekdays.map((item) => (
+            <div
+              key={item.day}
+              className={`flex-1 py-2 rounded-xl flex flex-col items-center justify-center transition-all ${
+                item.isToday
+                  ? 'bg-gradient-to-b from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/30 scale-105'
+                  : 'text-slate-400 hover:bg-slate-50'
+              }`}
+            >
+              <span className="text-[10px] font-bold uppercase">{item.day}</span>
+              <span className={`text-xs font-black mt-0.5 ${item.isToday ? 'text-white' : 'text-slate-700'}`}>
+                {item.date}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 3. 메인 RPG 카드 (핵심: 9:16 캐릭터 숏폼 영상 + HUD + Start CTA) */}
+      <section className="px-5 py-2">
+        <div className="bg-white rounded-3xl p-4 shadow-xl border border-slate-100 relative overflow-hidden flex flex-col gap-3">
+          {/* 캐릭터 9:16 루프 영상 Placeholder 영역 */}
+          <div className="relative w-full aspect-[9/16] max-h-[380px] rounded-2xl overflow-hidden bg-slate-950 shadow-inner">
+            {/* 실제 캐릭터 루프 영상 태그 */}
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover opacity-85"
+              poster="/characters/starter-preview.png"
+            >
+              <source src="/characters/tiger-runner-loop.mp4" type="video/mp4" />
+            </video>
+
+            {/* 비디오 위 가독성 그라데이션 오버레이 */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/40 pointer-events-none" />
+
+            {/* 상단 오버레이: HP 및 상태 배지 */}
+            <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+              <span className="px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700 text-[10px] font-black text-rose-400 flex items-center gap-1 shadow-sm">
+                <span>❤️</span> HP 100/100
+              </span>
+              <span className="px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700 text-[10px] font-black text-emerald-400 flex items-center gap-1 shadow-sm">
+                <span>⚡</span> Stamina 92%
+              </span>
+            </div>
+
+            {/* 하단 오버레이: 레벨 & EXP 프로그레스 바 */}
+            <div className="absolute bottom-3 left-3 right-3 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 text-white">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-black text-amber-300">Level {currentLevel}</span>
+                <span className="text-[11px] text-slate-300 font-mono">
+                  {xpProgress}/{xpPerLevel} XP
+                </span>
+              </div>
+              <div className="mt-1.5 h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-300 transition-all duration-500"
+                  style={{ width: `${Math.min(100, (xpProgress / xpPerLevel) * 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 카드 최하단 메인 액션 버튼 */}
+          <Link
+            to="/map"
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-teal-500 text-white font-black text-sm tracking-wider uppercase shadow-xl shadow-violet-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-white/20"
+          >
+            <span className="text-lg">▶️</span>
+            <span>Start Daily Quest</span>
+          </Link>
+        </div>
+      </section>
+
+      {/* 4. 스와이프 가능한 서브 퀘스트 섹션 (Step 3) */}
+      <section className="px-5 pt-4 pb-2">
+        <div className="flex items-center justify-between mb-2.5">
+          <h2 className="text-sm font-black text-slate-900">Available Quests</h2>
+          <Link to="/map" className="text-xs font-bold text-violet-600 hover:underline">
+            View All →
+          </Link>
+        </div>
+
+        {/* 가로 스와이프 카드 컨테이너 */}
+        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar snap-x">
+          {/* 퀘스트 1 */}
+          <div className="min-w-[210px] bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 snap-start flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xl">🏃</span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  +150 XP
+                </span>
+              </div>
+              <h3 className="font-black text-xs text-slate-900 mt-2">Morning 3km Dash</h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">3.0 km • Easy Pace</p>
+            </div>
+            <Link
+              to="/course-builder"
+              className="mt-3 block w-full py-2 text-center rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 active:scale-95 transition-all"
+            >
+              Start Run
+            </Link>
+          </div>
+
+          {/* 퀘스트 2 */}
+          <div className="min-w-[210px] bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 snap-start flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xl">📍</span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">
+                  +300 XP
+                </span>
+              </div>
+              <h3 className="font-black text-xs text-slate-900 mt-2">BGC Route Pioneer</h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">Record new route</p>
+            </div>
+            <Link
+              to="/course-builder"
+              className="mt-3 block w-full py-2 text-center rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 active:scale-95 transition-all"
+            >
+              Build Course
+            </Link>
+          </div>
+
+          {/* 퀘스트 3 */}
+          <div className="min-w-[210px] bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 snap-start flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xl">⚔️</span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                  Crew Battle
+                </span>
+              </div>
+              <h3 className="font-black text-xs text-slate-900 mt-2">Makati Sprint 5km</h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">Ranked multiplayer</p>
+            </div>
+            <Link
+              to="/community"
+              className="mt-3 block w-full py-2 text-center rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 active:scale-95 transition-all"
+            >
+              Join Crew
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. 장착 장비 퀵 슬롯 */}
+      {equippedItems.length > 0 && (
+        <section className="px-5 pt-3">
+          <h2 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+            Equipped Gear ({equippedItems.length})
+          </h2>
+          <div className="grid grid-cols-2 gap-2">
+            {equippedItems.map((gear) => (
+              <div key={gear.id} className="bg-white rounded-xl p-2.5 border border-slate-100 shadow-sm flex items-center gap-2">
+                <span className="text-lg">👟</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-800 truncate">{gear.item.name}</p>
+                  <p className="text-[10px] font-extrabold text-violet-600 uppercase">{gear.item.rarity}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
   );
 }

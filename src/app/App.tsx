@@ -1,59 +1,51 @@
 import type { ReactNode } from 'react';
-import { BrowserRouter, Link, NavLink, useLocation } from 'react-router-dom';
+import { BrowserRouter, Link, useLocation } from 'react-router-dom';
 import { appRoutes } from './routes';
-
-const navItems = [
-  { to: '/map', label: 'Map' },
-  { to: '/coach', label: 'Coach' },
-  { to: '/community', label: 'Crew' },
-  { to: '/profile', label: 'Profile' }
-];
+import BottomNav from '../components/layout/BottomNav';
 
 function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
+  const isFullScreenRoute =
+    location.pathname === '/' ||
+    location.pathname === '/login' ||
+    location.pathname === '/register' ||
+    location.pathname === '/course-builder' ||
+    location.pathname.startsWith('/course-builder/') ||
+    location.pathname === '/run' ||
+    location.pathname.startsWith('/activity/');
 
   if (isAdminRoute) {
     return <>{children}</>;
   }
 
+  if (isFullScreenRoute) {
+    return <>{children}</>;
+  }
+
   return (
-    <div className="min-h-screen bg-[#0f1412] text-slate-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-[#111816] shadow-soft">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-stone-800 bg-[#111816]/95 px-4 py-3 backdrop-blur">
-          <Link to="/" className="flex items-center gap-2 font-black text-stone-50">
-            <span className="grid h-9 w-9 place-items-center rounded-full border border-amber-200 bg-quest-teal text-white">
+    <div className="min-h-screen bg-slate-900 text-slate-950 flex justify-center">
+      <div className="w-full max-w-md min-h-screen flex flex-col bg-slate-50 relative shadow-2xl">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur-md">
+          <Link to="/character-dashboard" className="flex items-center gap-2 font-black text-slate-900">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-xs shadow-md shadow-violet-500/20">
               RQ
             </span>
-            <span>RunQuest PH</span>
+            <span className="tracking-tight text-base font-extrabold">RunQuest PH</span>
           </Link>
           <Link
             to="/advanced-courses"
-            className="rounded-full border border-stone-700 bg-stone-900 px-3 py-2 text-sm font-black text-amber-100"
+            className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition-all"
           >
             Advanced
           </Link>
         </header>
 
-        <main className="flex-1">
+        <main className="flex-1 pb-16">
           {children}
         </main>
 
-        <nav className="sticky bottom-0 z-20 grid grid-cols-4 border-t border-stone-800 bg-[#111816] px-2 py-2">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `rounded-lg px-2 py-2 text-center text-xs font-semibold ${
-                  isActive ? 'bg-teal-950 text-quest-teal' : 'text-stone-500'
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
+        <BottomNav />
       </div>
     </div>
   );
