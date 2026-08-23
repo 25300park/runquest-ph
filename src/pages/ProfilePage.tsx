@@ -33,107 +33,113 @@ export default function ProfilePage() {
   }, []);
 
   return (
-    <section className="min-h-full space-y-5 bg-[#111816] px-4 py-6 text-stone-50">
-      <div className="rounded-[1.35rem] border border-amber-200/30 bg-stone-900 p-5 shadow-2xl">
-        <p className="text-sm font-black uppercase text-amber-200">Adventurer profile</p>
-        <div className="mt-4 flex items-center gap-4">
-          <div className="grid h-20 w-20 place-items-center rounded-2xl border border-amber-200/40 bg-[#19352d] text-lg font-black text-amber-200">
+    <section className="min-h-full space-y-4 bg-slate-50 px-4 py-5 text-slate-900 font-sans pb-12 select-none">
+      {/* 1. 프로필 카드 */}
+      <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+        <p className="text-[11px] font-extrabold uppercase tracking-wider text-violet-600">Adventurer profile</p>
+        <div className="mt-3 flex items-center gap-3.5">
+          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white text-xl font-black shadow-md shadow-violet-500/25">
             {selectedCharacter.icon}
           </div>
           <div>
-            <h1 className="text-3xl font-black text-stone-50">Demo Explorer</h1>
-            <p className="mt-1 text-sm text-stone-400">{selectedCharacter.name}</p>
+            <h1 className="text-2xl font-black text-slate-900">Demo Explorer</h1>
+            <p className="text-xs text-slate-500 font-bold">{selectedCharacter.name}</p>
           </div>
         </div>
 
-        <div className="mt-5 rounded-2xl bg-stone-950 p-4">
+        {/* 레벨 & EXP 게이지 */}
+        <div className="mt-4 rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-black uppercase text-stone-500">User level</span>
-            <span className="text-2xl font-black text-amber-200">Lv {currentLevel}</span>
+            <span className="text-xs font-black uppercase text-slate-400">User Level</span>
+            <span className="text-xl font-black text-violet-700">Lv {currentLevel}</span>
           </div>
-          <div className="mt-3 h-3 overflow-hidden rounded-full bg-stone-800">
+          <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-200">
             <div
-              className="h-full rounded-full bg-amber-300 transition-all duration-700"
+              className="h-full rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 transition-all duration-700"
               style={{ width: `${xpProgress}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-stone-500">
+          <p className="mt-1.5 text-[11px] text-slate-400 font-bold">
             {progress.totalXp} XP total · Next level at {nextLevelXp} XP
           </p>
         </div>
       </div>
 
+      {/* 2. 3열 스탯 그리드 */}
       <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-2xl bg-stone-900 p-3">
-          <p className="text-xs text-stone-500">XP</p>
-          <p className="font-black text-amber-200">{progress.totalXp}</p>
+        <div className="rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">XP</p>
+          <p className="font-black text-amber-600 text-base mt-0.5">{progress.totalXp}</p>
         </div>
-        <div className="rounded-2xl bg-stone-900 p-3">
-          <p className="text-xs text-stone-500">Distance</p>
-          <p className="font-black">{progress.totalDistanceKm.toFixed(2)} km</p>
+        <div className="rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Distance</p>
+          <p className="font-black text-slate-800 text-base mt-0.5">{progress.totalDistanceKm.toFixed(1)} km</p>
         </div>
-        <div className="rounded-2xl bg-stone-900 p-3">
-          <p className="text-xs text-stone-500">Quests</p>
-          <p className="font-black">{progress.completedActivities}</p>
+        <div className="rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Quests</p>
+          <p className="font-black text-violet-600 text-base mt-0.5">{progress.completedActivities}</p>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-teal-200/20 bg-teal-950/30 p-4">
-        <p className="text-xs font-black uppercase text-quest-teal">Character growth</p>
+      {/* 3. 캐릭터 성장 상태 카드 */}
+      <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+        <p className="text-[10px] font-black uppercase text-violet-600">Character Growth</p>
         <div className="mt-2 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-black">{selectedCharacter.name}</h2>
-            <p className="mt-1 text-sm text-stone-400">{selectedCharacter.rpgIdentity}</p>
+            <h2 className="text-base font-black text-slate-900">{selectedCharacter.name}</h2>
+            <p className="text-xs text-slate-500">{selectedCharacter.rpgIdentity}</p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-black text-amber-200">Lv {characterProgress.level}</p>
-            <p className="text-xs text-stone-500">{characterProgress.totalXp} XP</p>
+            <p className="text-lg font-black text-amber-600">Lv {characterProgress.level}</p>
+            <p className="text-xs text-slate-400 font-bold">{characterProgress.totalXp} XP</p>
           </div>
         </div>
       </div>
 
+      {/* 4. 보상 지갑 CTA */}
       <Link
         to="/rewards"
-        className="block rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 text-center font-black text-stone-950"
+        className="block w-full rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3.5 text-center font-bold text-sm text-white shadow-lg shadow-violet-500/25 active:scale-95 transition-all"
       >
-        Open Reward Wallet
+        🎁 Open Reward Wallet
       </Link>
 
       {isAdmin && (
         <Link
           to="/admin/dashboard"
-          className="block rounded-2xl border border-teal-200 bg-teal-400 px-4 py-4 text-center font-black text-stone-950"
+          className="block rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center font-bold text-xs text-slate-700 shadow-sm active:scale-95 transition-all"
         >
-          Admin Panel
+          ⚙️ Admin Panel
         </Link>
       )}
 
+      {/* 5. 지역 탐험 게이지 리스트 */}
       <div>
-        <h2 className="font-black text-stone-50">Area exploration</h2>
-        <div className="mt-3 grid gap-3">
+        <h2 className="font-black text-sm text-slate-900 mb-2.5">Area Exploration</h2>
+        <div className="grid gap-2.5">
           {mockAreas.map((area) => {
             const areaProgress = progress.areaProgress[area.id] ?? area.explorationProgress;
 
             return (
-            <article key={area.id} className="rounded-2xl border border-stone-700 bg-stone-900 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-black uppercase text-quest-teal">
-                    {area.worldZone}
-                  </p>
-                  <h3 className="mt-1 font-black">{area.name}</h3>
+              <article key={area.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-violet-600">
+                      {area.worldZone}
+                    </p>
+                    <h3 className="mt-0.5 font-black text-xs text-slate-900">{area.name}</h3>
+                  </div>
+                  <span className="text-xs font-black text-amber-600">
+                    {areaProgress}%
+                  </span>
                 </div>
-                <span className="text-sm font-black text-amber-200">
-                  {areaProgress}%
-                </span>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-950">
-                <div
-                  className="h-full rounded-full bg-quest-teal transition-all duration-700"
-                  style={{ width: `${areaProgress}%` }}
-                />
-              </div>
-            </article>
+                <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 transition-all duration-700"
+                    style={{ width: `${areaProgress}%` }}
+                  />
+                </div>
+              </article>
             );
           })}
         </div>
