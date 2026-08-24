@@ -349,5 +349,6 @@ export default function CourseDetailPage() {
           🛠️ 코스 경로 수정 & 편집 (Edit Course)
         </Link>
       </div>
+    </section>
   );
 }
