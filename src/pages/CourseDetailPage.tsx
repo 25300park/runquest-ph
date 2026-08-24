@@ -219,6 +219,18 @@ export default function CourseDetailPage() {
     });
   }
 
+  // 하단 중앙 네비게이션 버튼(⚔️) 클릭 시 즉시 현재 코스로 퀘스트 시작
+  useEffect(() => {
+    const handleStartEvent = () => {
+      startCourse();
+    };
+
+    window.addEventListener('runquest:start-current-course', handleStartEvent);
+    return () => {
+      window.removeEventListener('runquest:start-current-course', handleStartEvent);
+    };
+  });
+
   if (isLoading) {
     return (
       <section className="grid min-h-full place-items-center px-4 py-10 text-center">
@@ -320,22 +332,22 @@ export default function CourseDetailPage() {
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={startCourse}
-        className="block rounded-xl bg-quest-teal px-4 py-3 text-center font-bold text-white"
-      >
-        Start Course
-      </button>
+      <div className="pt-2 space-y-2.5 pb-20">
+        <button
+          type="button"
+          onClick={startCourse}
+          className="group relative w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 font-black text-base tracking-wider uppercase shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 border border-emerald-300/60"
+        >
+          <span className="text-xl">⚔️</span>
+          <span>QUEST START (퀘스트 시작)</span>
+        </button>
 
-      <Link
-        to={`/course-builder/${course.id}`}
-        className="block rounded-xl border border-quest-teal px-4 py-3 text-center font-bold text-quest-teal"
-      >
-        Edit Course
-      </Link>
-
-      <p className="text-center text-xs text-slate-500">Explore reward: +{explorationReward}%</p>
-    </section>
+        <Link
+          to={`/course-builder/${course.id}`}
+          className="block w-full py-3 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs text-center shadow-sm active:scale-[0.98] transition-all"
+        >
+          🛠️ 코스 경로 수정 & 편집 (Edit Course)
+        </Link>
+      </div>
   );
 }

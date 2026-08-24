@@ -1,4 +1,4 @@
-﻿import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 export default function BottomNav() {
   const location = useLocation();
@@ -51,15 +51,32 @@ export default function BottomNav() {
           <span className="text-[10px] mt-0.5">Map</span>
         </NavLink>
 
-        {/* 3. Run (중앙 대형 플로팅 탭) */}
+        {/* 3. Run (중앙 대형 플로팅 탭: 코스 상세에선 퀘스트 시작, 일반 화면에선 코스 제작) */}
         <div className="flex-1 flex justify-center -mt-6">
-          <NavLink
-            to="/course-builder"
-            className="w-14 h-14 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-xl shadow-violet-500/40 border-4 border-white flex items-center justify-center text-2xl active:scale-95 hover:scale-105 transition-all"
-            title="코스 기록 & 빌더"
-          >
-            🏃
-          </NavLink>
+          {location.pathname.startsWith('/courses/') ? (
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('runquest:start-current-course'));
+              }}
+              className="relative w-14 h-14 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-xl shadow-emerald-500/40 border-4 border-white flex items-center justify-center text-2xl active:scale-95 hover:scale-105 transition-all"
+              title="현재 코스 퀘스트 시작"
+            >
+              <span className="relative z-10">⚔️</span>
+              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500" />
+              </span>
+            </button>
+          ) : (
+            <NavLink
+              to="/course-builder"
+              className="w-14 h-14 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-xl shadow-violet-500/40 border-4 border-white flex items-center justify-center text-2xl active:scale-95 hover:scale-105 transition-all"
+              title="새 코스 만들기 & 기록 (Create Route)"
+            >
+              🏃
+            </NavLink>
+          )}
         </div>
 
         {/* 4. Crew 탭 */}

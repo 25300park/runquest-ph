@@ -176,7 +176,7 @@ export default function ExplorationMapPage() {
   return (
     <section className="min-h-full bg-slate-50 text-slate-900 font-sans pb-8 select-none">
       <div className="space-y-2.5 px-4 py-4">
-        {/* 1. 상단 레벨 & 타이틀 카드 */}
+        {/* 1. 상단 레벨 & 타이틀 카드 + Create Route 바로가기 */}
         <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -186,9 +186,14 @@ export default function ExplorationMapPage() {
               <h1 className="mt-0.5 text-2xl font-black text-slate-900">Exploration Map</h1>
               <p className="mt-0.5 text-xs text-slate-500">{mockUser.totalXp} XP earned</p>
             </div>
-            <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-700 border border-violet-200/60">
-              Live Routes
-            </span>
+            <Link
+              to="/course-builder"
+              className="rounded-full bg-violet-50 hover:bg-violet-100 px-3 py-1.5 text-xs font-black text-violet-700 border border-violet-200/60 flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+              title="새 코스 만들기"
+            >
+              <span>➕</span>
+              <span>Create Route</span>
+            </Link>
           </div>
         </div>
 
