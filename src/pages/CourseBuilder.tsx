@@ -370,7 +370,10 @@ export default function CourseBuilder() {
           },
           routePoints
         );
-        setSaveStatus(`✅ 수정 완료: ${id}`);
+        setSaveStatus(`✅ 수정 완료! 1초 후 코스 상세로 이동합니다...`);
+        setTimeout(() => {
+          navigate(`/courses/${id}`);
+        }, 1200);
       } else {
         const id = await saveRouteAsCourse(
           {
@@ -381,7 +384,10 @@ export default function CourseBuilder() {
           },
           routePoints
         );
-        setSaveStatus(`✅ 저장 완료: ${id}`);
+        setSaveStatus(`✅ 저장 완료! 1초 후 코스 상세로 이동합니다...`);
+        setTimeout(() => {
+          navigate(`/courses/${id}`);
+        }, 1200);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '저장 실패';

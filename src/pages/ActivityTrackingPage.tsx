@@ -275,21 +275,35 @@ export default function ActivityTrackingPage() {
       return;
     }
 
-    if (!isBrowserGpsAvailable()) {
-      setGpsStatus('GPS is required for verified real-world runs.');
-      return;
+    isStartingRef.current = true;
+    setGpsStatus('🛰️ GPS 위성 연결 및 위치 탐색 중...');
+    // 즉각 러닝 상태로 전환하여 화면 오버레이를 걷고 러닝 HUD를 표시
+    setActivityState('running');
+
+    // 1. 브라우저 GPS 즉각 첫 위치 획득
+    if (isBrowserGpsAvailable()) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const userCoord: LatLngTuple = [pos.coords.latitude, pos.coords.longitude];
+          setCurrentPosition(userCoord);
+          setTrackedPath((prev) => (prev.length <= 1 ? [userCoord] : prev));
+          setGpsStatus(`GPS Active +/-${Math.round(pos.coords.accuracy)}m`);
+        },
+        (err) => {
+          console.warn('GPS initial lock notice:', err.message);
+          setGpsStatus('GPS 연결 대기 중 (실외에서 신호가 더 잘 잡힙니다)');
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
     }
 
-    isStartingRef.current = true;
-    setGpsStatus('Acquiring satellite lock...');
-
+    // 2. 세션 초기화 (Supabase + Local Fallback)
     try {
       const session = await startGpsSession({ provider: 'browser_geolocation' });
       setGpsSessionId(session.id);
-      setActivityState('running');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not start GPS session.';
-      setGpsStatus(message);
+      console.warn('Using local GPS session:', error);
+      setGpsSessionId(`local-session-${Date.now()}`);
     } finally {
       isStartingRef.current = false;
     }
@@ -472,30 +486,32 @@ export default function ActivityTrackingPage() {
         </div>
       </header>
 
-      {/* 3. 중앙 캐릭터 영상 Placeholder 영역 (Step 1) */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-52 top-28 z-10 flex items-center justify-center">
-        <div className="relative">
-          {/* 캐릭터 아우라 효과 */}
-          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-32 h-8 bg-teal-500/20 rounded-full blur-xl animate-pulse" />
-          
-          {/* 캐릭터 Video/Canvas 컨테이너 Placeholder */}
-          <div className="relative w-44 h-52 rounded-3xl border border-teal-400/30 bg-slate-900/50 backdrop-blur-sm flex flex-col items-center justify-center p-3 text-center shadow-2xl overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
+      {/* 3. 중앙 캐릭터 영상 Placeholder 영역 (대기 중에만 표시하여 러닝 중 지도 시야 확보) */}
+      {activityState === 'idle' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-52 top-28 z-10 flex items-center justify-center">
+          <div className="relative">
+            {/* 캐릭터 아우라 효과 */}
+            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-32 h-8 bg-teal-500/20 rounded-full blur-xl animate-pulse" />
             
-            <div className="relative z-10 flex flex-col items-center gap-2">
-              <div className="w-16 h-16 rounded-2xl bg-teal-950/80 border border-teal-400/40 flex items-center justify-center text-2xl shadow-lg">
-                {isTracking ? '🏃‍♂️' : '🛡️'}
+            {/* 캐릭터 Video/Canvas 컨테이너 Placeholder */}
+            <div className="relative w-44 h-52 rounded-3xl border border-teal-400/30 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center p-3 text-center shadow-2xl overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
+              
+              <div className="relative z-10 flex flex-col items-center gap-2">
+                <div className="w-16 h-16 rounded-2xl bg-teal-950/80 border border-teal-400/40 flex items-center justify-center text-2xl shadow-lg">
+                  🛡️
+                </div>
+                <p className="text-xs font-bold text-teal-200">
+                  모험 준비 완료
+                </p>
+                <span className="text-[9px] text-slate-400">
+                  [캐릭터 Video/3D Canvas]
+                </span>
               </div>
-              <p className="text-xs font-bold text-teal-200">
-                {isTracking ? '⚔️ 퀘스트 진행 중' : '모험 준비 완료'}
-              </p>
-              <span className="text-[9px] text-slate-400">
-                [캐릭터 Video/3D Canvas]
-              </span>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 4. 하단 플로팅 액션바 & 대형 START 버튼 (Step 1) */}
       <footer className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-6 pt-2">

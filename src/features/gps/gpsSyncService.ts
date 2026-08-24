@@ -75,58 +75,127 @@ export async function startGpsSession(input: {
   characterId?: string | null;
   raceId?: string | null;
   provider?: GpsProvider;
-}) {
-  const client = requireSupabaseClient();
-  const { data, error } = await client
-    .from('gps_sessions')
-    .insert({
-      user_id: input.userId ?? null,
-      character_id: input.characterId ?? null,
-      race_id: input.raceId ?? null,
-      provider: input.provider ?? 'browser_geolocation',
-      status: 'active'
-    })
-    .select('*')
-    .single();
+}): Promise<GpsSession> {
+  const localFallbackSession: GpsSession = {
+    id: `local-session-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    user_id: input.userId ?? null,
+    character_id: input.characterId ?? null,
+    race_id: input.raceId ?? null,
+    provider: input.provider ?? 'browser_geolocation',
+    status: 'active',
+    started_at: new Date().toISOString(),
+    ended_at: null,
+    total_distance: 0,
+    average_pace: 0,
+    elevation_gain: 0
+  };
 
-  if (error) throw error;
-  return data;
+  try {
+    const client = requireSupabaseClient();
+    const { data, error } = await client
+      .from('gps_sessions')
+      .insert({
+        user_id: input.userId ?? null,
+        character_id: input.characterId ?? null,
+        race_id: input.raceId ?? null,
+        provider: input.provider ?? 'browser_geolocation',
+        status: 'active'
+      })
+      .select('*')
+      .single();
+
+    if (error || !data) {
+      console.warn('⚠️ Supabase GPS session start failed. Using local fallback session:', error);
+      return localFallbackSession;
+    }
+    return data;
+  } catch (error) {
+    console.warn('⚠️ Offline/Local mode: Using local fallback GPS session:', error);
+    return localFallbackSession;
+  }
 }
 
-export async function getGpsSession(sessionId: string) {
-  const client = requireSupabaseClient();
-  const { data, error } = await client
-    .from('gps_sessions')
-    .select('*')
-    .eq('id', sessionId)
-    .single();
+// 로컬 인메모리 세션 스토리지 (오프라인/게스트 지원)
+const localSessionsStore = new Map<string, GpsSession>();
+const localPointsStore = new Map<string, GpsPoint[]>();
 
-  if (error) throw error;
-  return data;
+export async function getGpsSession(sessionId: string): Promise<GpsSession> {
+  if (localSessionsStore.has(sessionId)) {
+    return localSessionsStore.get(sessionId)!;
+  }
+
+  try {
+    const client = requireSupabaseClient();
+    const { data, error } = await client
+      .from('gps_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+
+    if (error || !data) {
+      return (
+        localSessionsStore.get(sessionId) ?? {
+          id: sessionId,
+          user_id: null,
+          character_id: null,
+          race_id: null,
+          provider: 'browser_geolocation',
+          status: 'active',
+          started_at: new Date().toISOString(),
+          ended_at: null,
+          total_distance: 0,
+          average_pace: 0,
+          elevation_gain: 0
+        }
+      );
+    }
+    return data;
+  } catch {
+    return (
+      localSessionsStore.get(sessionId) ?? {
+        id: sessionId,
+        user_id: null,
+        character_id: null,
+        race_id: null,
+        provider: 'browser_geolocation',
+        status: 'active',
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        total_distance: 0,
+        average_pace: 0,
+        elevation_gain: 0
+      }
+    );
+  }
 }
 
-export async function getGpsPoints(sessionId: string) {
-  const client = requireSupabaseClient();
-  const { data, error } = await client
-    .from('gps_points')
-    .select('*')
-    .eq('session_id', sessionId)
-    .order('recorded_at', { ascending: true });
+export async function getGpsPoints(sessionId: string): Promise<GpsPoint[]> {
+  if (localPointsStore.has(sessionId)) {
+    return localPointsStore.get(sessionId) ?? [];
+  }
 
-  if (error) throw error;
-  return data ?? [];
+  try {
+    const client = requireSupabaseClient();
+    const { data, error } = await client
+      .from('gps_points')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('recorded_at', { ascending: true });
+
+    if (error) return localPointsStore.get(sessionId) ?? [];
+    return data ?? [];
+  } catch {
+    return localPointsStore.get(sessionId) ?? [];
+  }
 }
 
 export async function pushGpsPoint(input: {
   sessionId: string;
   point: NormalizedGpsPoint;
   raceParticipantId?: string;
-}) {
-  const client = requireSupabaseClient();
-  const [session, existingPoints] = await Promise.all([
-    getGpsSession(input.sessionId),
-    getGpsPoints(input.sessionId)
-  ]);
+}): Promise<{ point: GpsPoint; session: GpsSession }> {
+  const session = await getGpsSession(input.sessionId);
+  const existingPoints = await getGpsPoints(input.sessionId);
   const previousPoint = existingPoints[existingPoints.length - 1];
   const currentTuple: LatLngTuple = [input.point.lat, input.point.lng];
   const previousTuple: LatLngTuple | null = previousPoint
@@ -147,51 +216,84 @@ export async function pushGpsPoint(input: {
       ? Math.max(0, input.point.elevation - previousPoint.elevation)
       : 0;
 
-  const { data: gpsPoint, error: pointError } = await client
-    .from('gps_points')
-    .insert({
-      session_id: input.sessionId,
-      lat: input.point.lat,
-      lng: input.point.lng,
-      speed_kmh: Number(speedKmh.toFixed(2)),
-      pace,
-      elevation: input.point.elevation,
-      accuracy: input.point.accuracy,
-      recorded_at: input.point.recordedAt
-    })
-    .select('*')
-    .single();
-
-  if (pointError) throw pointError;
-
   const nextDistance = session.total_distance + segmentDistance;
-  const averagePace = nextDistance > 0
-    ? Math.round((new Date(input.point.recordedAt).getTime() - new Date(session.started_at).getTime()) / 1000 / nextDistance)
-    : 0;
-  const { data: updatedSession, error: sessionError } = await client
-    .from('gps_sessions')
-    .update({
-      total_distance: Number(nextDistance.toFixed(3)),
-      average_pace: averagePace,
-      elevation_gain: Number((session.elevation_gain + elevationGain).toFixed(1))
-    })
-    .eq('id', input.sessionId)
-    .select('*')
-    .single();
+  const averagePace =
+    nextDistance > 0
+      ? Math.round(
+          (new Date(input.point.recordedAt).getTime() - new Date(session.started_at).getTime()) /
+            1000 /
+            nextDistance
+        )
+      : 0;
 
-  if (sessionError) throw sessionError;
+  const localPoint: GpsPoint = {
+    id: `local-point-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    session_id: input.sessionId,
+    lat: input.point.lat,
+    lng: input.point.lng,
+    speed_kmh: Number(speedKmh.toFixed(2)),
+    pace,
+    elevation: input.point.elevation,
+    accuracy: input.point.accuracy,
+    recorded_at: input.point.recordedAt
+  };
+
+  const updatedSession: GpsSession = {
+    ...session,
+    total_distance: Number(nextDistance.toFixed(3)),
+    average_pace: averagePace,
+    elevation_gain: Number((session.elevation_gain + elevationGain).toFixed(1))
+  };
+
+  // 로컬 인메모리 스토리지 갱신
+  localSessionsStore.set(input.sessionId, updatedSession);
+  const currentSessionPoints = localPointsStore.get(input.sessionId) ?? [];
+  localPointsStore.set(input.sessionId, [...currentSessionPoints, localPoint]);
+
+  try {
+    const client = requireSupabaseClient();
+    const { data: gpsPoint, error: pointError } = await client
+      .from('gps_points')
+      .insert({
+        session_id: input.sessionId,
+        lat: input.point.lat,
+        lng: input.point.lng,
+        speed_kmh: Number(speedKmh.toFixed(2)),
+        pace,
+        elevation: input.point.elevation,
+        accuracy: input.point.accuracy,
+        recorded_at: input.point.recordedAt
+      })
+      .select('*')
+      .single();
+
+    if (!pointError && gpsPoint) {
+      await client
+        .from('gps_sessions')
+        .update({
+          total_distance: Number(nextDistance.toFixed(3)),
+          average_pace: averagePace,
+          elevation_gain: Number((session.elevation_gain + elevationGain).toFixed(1))
+        })
+        .eq('id', input.sessionId);
+
+      return { point: gpsPoint, session: updatedSession };
+    }
+  } catch (error) {
+    console.warn('⚠️ Supabase GPS push failed. Saved to local session cache:', error);
+  }
 
   if (input.raceParticipantId) {
-    await updateRacePosition({
+    void updateRacePosition({
       participantId: input.raceParticipantId,
       distance: updatedSession.total_distance,
       pace: updatedSession.average_pace,
       position: currentTuple
-    });
+    }).catch(() => undefined);
   }
 
   return {
-    point: gpsPoint,
+    point: localPoint,
     session: updatedSession
   };
 }
@@ -281,19 +383,32 @@ export function watchBrowserGpsSession(input: WatchGpsSessionInput) {
 }
 
 export async function completeGpsSession(sessionId: string, status: 'completed' | 'flagged' = 'completed') {
-  const client = requireSupabaseClient();
-  const { data, error } = await client
-    .from('gps_sessions')
-    .update({
-      status,
-      ended_at: new Date().toISOString()
-    })
-    .eq('id', sessionId)
-    .select('*')
-    .single();
+  const currentSession = await getGpsSession(sessionId);
+  const updated: GpsSession = {
+    ...currentSession,
+    status,
+    ended_at: new Date().toISOString()
+  };
+  localSessionsStore.set(sessionId, updated);
 
-  if (error) throw error;
-  return data;
+  try {
+    const client = requireSupabaseClient();
+    const { data, error } = await client
+      .from('gps_sessions')
+      .update({
+        status,
+        ended_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select('*')
+      .single();
+
+    if (!error && data) return data;
+  } catch (error) {
+    console.warn('⚠️ Supabase GPS complete failed. Saved to local session cache:', error);
+  }
+
+  return updated;
 }
 
 export function subscribeToGpsSession(sessionId: string, onChange: () => void) {
