@@ -117,13 +117,22 @@ export default function CharacterDashboardPage() {
           </div>
         </div>
 
-        {/* 우측 프로필 아바타 버튼 */}
-        <Link
-          to="/profile"
-          className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-sm flex items-center justify-center shadow-md shadow-violet-500/25 active:scale-95 transition-all border-2 border-white"
-        >
-          {runnerName.slice(0, 2).toUpperCase()}
-        </Link>
+        {/* 우측 랭킹 & 프로필 아바타 버튼 */}
+        <div className="flex items-center gap-2">
+          <Link
+            to="/leaderboard"
+            className="w-10 h-10 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-200/80 text-amber-700 flex items-center justify-center text-lg shadow-sm active:scale-95 transition-all"
+            title="월간 랭킹 (Leaderboard)"
+          >
+            🏆
+          </Link>
+          <Link
+            to="/profile"
+            className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-md shadow-violet-500/25 active:scale-95 transition-all border-2 border-white"
+          >
+            {runnerName.slice(0, 2).toUpperCase()}
+          </Link>
+        </div>
       </header>
 
       {/* 2. 주간 캘린더 스트립 (Mon ~ Sun) */}
