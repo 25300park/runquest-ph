@@ -1,8 +1,8 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { usePwaInstall } from '../../hooks/usePwaInstall';
 
 export default function PwaInstallBanner() {
-  const { isStandalone, isIos, showIosGuide, setShowIosGuide, promptInstall } = usePwaInstall();
+  const { isStandalone, showIosGuide, setShowIosGuide, promptInstall } = usePwaInstall();
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {

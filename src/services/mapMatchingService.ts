@@ -18,7 +18,7 @@ export interface MapMatchingResult {
  */
 export async function snapToRoad(
   points: LatLngTuple[],
-  options: MapMatchingOptions = { provider: 'osrm', interpolate: true }
+  _options: MapMatchingOptions = { provider: 'osrm', interpolate: true }
 ): Promise<MapMatchingResult> {
   if (points.length < 2) {
     return {

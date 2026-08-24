@@ -260,6 +260,8 @@ export async function updateCourse(input: UpdateCourseInput, routePoints: LatLng
     area: input.area,
     difficulty: input.difficulty,
     distance: input.distance,
+    status: 'approved',
+    verified: true,
     created_at: new Date().toISOString(),
     created_by: null,
     course_points: pointRows
@@ -306,6 +308,8 @@ export async function saveRouteAsCourse(input: CreateCourseInput, routePoints: L
     area: input.area,
     difficulty: input.difficulty,
     distance: input.distance,
+    status: 'approved',
+    verified: true,
     created_at: new Date().toISOString(),
     created_by: input.createdBy ?? null,
     course_points: pointRows
