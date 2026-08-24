@@ -16,7 +16,7 @@
     "passes:expire": "node scripts/expire-premium-passes.js",
     "executive:report": "node scripts/generate-executive-report.js",
     "auto:rollback": "node scripts/auto-rollback.js",
-    "vercel-build": "vite build",
+    "vercel-build": "npm run build",
     "release:version": "node scripts/release-version.js",
     "devops": "node scripts/devops-cli.js",
     "safe-push": "node scripts/safe-push.js",
