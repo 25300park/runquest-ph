@@ -6,19 +6,38 @@ import { subscribeToEquipmentEconomy } from '../services/equipmentEconomyService
 import type { CharacterProfile } from '../types/rpgCharacter';
 import { getLevelProgress, xpPerLevel } from '../utils/characterRpg';
 
-const weekdays = [
-  { day: 'Mon', date: '18' },
-  { day: 'Tue', date: '19' },
-  { day: 'Wed', date: '20' },
-  { day: 'Thu', date: '21' },
-  { day: 'Fri', date: '22' },
-  { day: 'Sat', date: '23', isToday: true },
-  { day: 'Sun', date: '24' },
-];
+function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: string; isToday: boolean }> {
+  const now = new Date();
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  // 이번 주 월요일 계산 (월요일 시작 기준)
+  const currentDay = now.getDay();
+  const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + distanceToMonday);
+
+  return Array.from({ length: 7 }).map((_, index) => {
+    const targetDate = new Date(monday);
+    targetDate.setDate(monday.getDate() + index);
+
+    const isToday =
+      targetDate.getFullYear() === now.getFullYear() &&
+      targetDate.getMonth() === now.getMonth() &&
+      targetDate.getDate() === now.getDate();
+
+    return {
+      day: dayNames[targetDate.getDay()],
+      date: targetDate.getDate(),
+      fullDate: targetDate.toISOString().split('T')[0],
+      isToday
+    };
+  });
+}
 
 export default function CharacterDashboardPage() {
   const [profile, setProfile] = useState<CharacterProfile | null>(null);
   const [status, setStatus] = useState('Loading hero...');
+  const weekdays = useMemo(() => getCurrentWeekdays(), []);
 
   useEffect(() => {
     const unsubscribers: Array<() => void> = [];
