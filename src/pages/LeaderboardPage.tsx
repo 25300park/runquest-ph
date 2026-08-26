@@ -161,8 +161,8 @@ export default function LeaderboardPage() {
           {top2 && (
             <div className="flex-1 flex flex-col items-center text-center">
               <div className="relative">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-slate-200 to-slate-100 border-2 border-slate-300 flex items-center justify-center text-2xl shadow-md">
-                  {top2.avatar}
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-slate-200 to-slate-100 border-2 border-slate-300 flex items-center justify-center shadow-md p-1 overflow-hidden">
+                  <img src={top2.avatar} alt={top2.runnerName} className="w-full h-full object-contain filter drop-shadow-xs" />
                 </div>
                 <span className="absolute -bottom-2 -right-1 bg-slate-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full border border-white">
                   🥈 #2
@@ -186,8 +186,8 @@ export default function LeaderboardPage() {
             <div className="flex-1 flex flex-col items-center text-center -translate-y-2">
               <span className="text-xl animate-bounce mb-1">👑</span>
               <div className="relative">
-                <div className="w-18 h-18 rounded-3xl bg-gradient-to-tr from-amber-300 via-amber-200 to-yellow-100 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-xl shadow-amber-400/30">
-                  {top1.avatar}
+                <div className="w-18 h-18 rounded-3xl bg-gradient-to-tr from-amber-300 via-amber-200 to-yellow-100 border-2 border-amber-400 flex items-center justify-center shadow-xl shadow-amber-400/30 p-1.5 overflow-hidden">
+                  <img src={top1.avatar} alt={top1.runnerName} className="w-full h-full object-contain filter drop-shadow-xs" />
                 </div>
                 <span className="absolute -bottom-2 -right-1 bg-amber-500 text-white text-[11px] font-black px-2 py-0.5 rounded-full border-2 border-white shadow-md">
                   🥇 #1
@@ -210,8 +210,8 @@ export default function LeaderboardPage() {
           {top3 && (
             <div className="flex-1 flex flex-col items-center text-center">
               <div className="relative">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-100 to-amber-50 border-2 border-amber-300/80 flex items-center justify-center text-2xl shadow-md">
-                  {top3.avatar}
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-100 to-amber-50 border-2 border-amber-300/80 flex items-center justify-center shadow-md p-1 overflow-hidden">
+                  <img src={top3.avatar} alt={top3.runnerName} className="w-full h-full object-contain filter drop-shadow-xs" />
                 </div>
                 <span className="absolute -bottom-2 -right-1 bg-amber-700 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full border border-white">
                   🥉 #3
@@ -237,12 +237,18 @@ export default function LeaderboardPage() {
         <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-600 via-indigo-600 to-teal-500 p-4 text-white shadow-lg shadow-violet-500/20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl font-black border border-white/30">
-                {currentUser.avatar}
+              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center p-1 border border-white/30 overflow-hidden">
+                <img
+                  src={typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') || currentUser.avatar : currentUser.avatar}
+                  alt={currentUser.runnerName}
+                  className="w-full h-full object-contain filter drop-shadow-xs"
+                />
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase text-violet-200">Your Standing</p>
-                <h3 className="text-sm font-black text-white">{currentUser.runnerName}</h3>
+                <h3 className="text-sm font-black text-white">
+                  {typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-name') || currentUser.runnerName : currentUser.runnerName}
+                </h3>
                 <p className="text-[11px] text-white/80">
                   {currentUser.monthlyDistanceKm.toFixed(1)} km · {currentUser.completedQuests} quests
                 </p>
@@ -279,12 +285,14 @@ export default function LeaderboardPage() {
                 <span className="w-7 text-center font-black text-xs text-slate-400">
                   #{runner.rank}
                 </span>
-                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0 border border-slate-200">
-                  {runner.avatar}
+                <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center p-1 shrink-0 border border-slate-200 overflow-hidden">
+                  <img src={runner.avatar} alt={runner.runnerName} className="w-full h-full object-contain filter drop-shadow-xs" />
                 </div>
                 <div className="min-w-0">
                   <p className="font-black text-xs text-slate-900 truncate">
-                    {runner.runnerName}
+                    {runner.isCurrentUser && typeof window !== 'undefined'
+                      ? window.localStorage.getItem('runquest-selected-name') || runner.runnerName
+                      : runner.runnerName}
                   </p>
                   <p className="text-[10px] text-slate-400 font-bold truncate">
                     {runner.characterTitle}

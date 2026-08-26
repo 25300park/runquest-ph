@@ -16,7 +16,7 @@ export function generateNearbyRunners(center: LatLngTuple): LiveNearbyRunner[] {
     {
       id: 'runner-live-1',
       name: 'BGC_Shadow_Apex',
-      avatar: '🐯',
+      avatar: '/images/avatars/2.png',
       currentPosition: [lat + 0.0012, lng + 0.0015],
       paceMinKm: '5:10',
       distanceKm: 4.8
@@ -24,7 +24,7 @@ export function generateNearbyRunners(center: LatLngTuple): LiveNearbyRunner[] {
     {
       id: 'runner-live-2',
       name: 'Manila_Flash',
-      avatar: '⚡',
+      avatar: '/images/avatars/5.png',
       currentPosition: [lat - 0.0018, lng + 0.0009],
       paceMinKm: '4:52',
       distanceKm: 3.2
@@ -32,7 +32,7 @@ export function generateNearbyRunners(center: LatLngTuple): LiveNearbyRunner[] {
     {
       id: 'runner-live-3',
       name: 'Makati_Pacer',
-      avatar: '🦊',
+      avatar: '/images/avatars/8.png',
       currentPosition: [lat + 0.0006, lng - 0.0014],
       paceMinKm: '5:28',
       distanceKm: 6.1

@@ -318,8 +318,12 @@ export default function ExplorationMapPage() {
             <div className="rounded-2xl bg-gradient-to-br from-amber-50/80 to-yellow-50/40 p-3.5 border border-amber-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-200 border-2 border-amber-500 flex items-center justify-center text-2xl shadow-md">
-                    {selectedTerritory.currentRulerAvatar}
+                  <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-200 border-2 border-amber-500 flex items-center justify-center shadow-md p-1 overflow-hidden">
+                    <img
+                      src={selectedTerritory.currentRulerAvatar}
+                      alt={selectedTerritory.currentRulerName}
+                      className="w-full h-full object-contain filter drop-shadow-xs"
+                    />
                   </div>
                   <span className="absolute -top-2 -right-1 text-xs">👑</span>
                 </div>

@@ -26,11 +26,11 @@ interface LiveStoryRunner {
 }
 
 const liveStoryRunners: LiveStoryRunner[] = [
-  { id: 'story-1', name: 'BGC_Shadow', avatar: '🐯', pace: '4:50/km', area: 'BGC High St', isLive: true },
-  { id: 'story-2', name: 'ManilaFlash', avatar: '⚡', pace: '4:35/km', area: 'Ayala Triangle', isLive: true },
-  { id: 'story-3', name: 'MakatiPacer', avatar: '🦊', pace: '5:15/km', area: 'Greenbelt Loop', isLive: true },
-  { id: 'story-4', name: 'AyalaKnight', avatar: '🐺', pace: '5:00/km', area: 'Legazpi Active', isLive: true },
-  { id: 'story-5', name: 'SkyHawk', avatar: '🦅', pace: '4:42/km', area: 'MOA Seaside', isLive: true }
+  { id: 'story-1', name: 'BGC_Shadow', avatar: '/images/avatars/4.png', pace: '4:50/km', area: 'BGC High St', isLive: true },
+  { id: 'story-2', name: 'ManilaFlash', avatar: '/images/avatars/6.png', pace: '4:35/km', area: 'Ayala Triangle', isLive: true },
+  { id: 'story-3', name: 'MakatiPacer', avatar: '/images/avatars/9.png', pace: '5:15/km', area: 'Greenbelt Loop', isLive: true },
+  { id: 'story-4', name: 'AyalaKnight', avatar: '/images/avatars/13.png', pace: '5:00/km', area: 'Legazpi Active', isLive: true },
+  { id: 'story-5', name: 'SkyHawk', avatar: '/images/avatars/17.png', pace: '4:42/km', area: 'MOA Seaside', isLive: true }
 ];
 
 export default function CommunityPage() {
@@ -169,8 +169,8 @@ export default function CommunityPage() {
             <div key={runner.id} className="flex flex-col items-center shrink-0 group cursor-pointer active:scale-95 transition-all">
               <div className="p-0.5 rounded-full bg-gradient-to-tr from-amber-400 via-pink-500 to-violet-600 shadow-md animate-pulse">
                 <div className="w-13 h-13 rounded-full bg-white p-0.5 flex items-center justify-center">
-                  <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-xl shadow-inner">
-                    {runner.avatar}
+                  <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden p-1 shadow-inner">
+                    <img src={runner.avatar} alt={runner.name} className="w-full h-full object-contain filter drop-shadow-xs" />
                   </div>
                 </div>
               </div>
@@ -224,8 +224,8 @@ export default function CommunityPage() {
               {/* 피드 헤더 */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md shadow-violet-500/20 border-2 border-white">
-                    {item.avatar}
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center p-1 shadow-md shadow-violet-500/20 border-2 border-white overflow-hidden">
+                    <img src={item.avatar} alt={item.userName} className="w-full h-full object-contain filter drop-shadow-xs" />
                   </div>
                   <div>
                     <h3 className="font-black text-sm text-slate-900">{item.userName}</h3>

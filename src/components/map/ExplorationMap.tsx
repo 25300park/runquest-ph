@@ -1,4 +1,4 @@
-﻿import { useEffect } from 'react';
+import { useEffect } from 'react';
 import L from 'leaflet';
 import {
   Circle,
@@ -46,14 +46,14 @@ function createLabelIcon(label: string, className: string) {
   });
 }
 
-function create3DFloatingRulerIcon(avatar: string, rulerName: string) {
+function create3DFloatingRulerIcon(avatarUrl: string, rulerName: string) {
   return L.divIcon({
     className: '',
     html: `
       <div class="relative flex flex-col items-center group cursor-pointer transition-transform hover:scale-110">
         <span class="absolute -top-4 text-base z-20 animate-bounce filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">👑</span>
-        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-300 via-yellow-200 to-white border-2 border-amber-400 shadow-[0_12px_24px_rgba(0,0,0,0.35)] flex items-center justify-center text-2xl relative z-10">
-          ${avatar}
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-300 via-yellow-200 to-white border-2 border-amber-400 shadow-[0_12px_24px_rgba(0,0,0,0.35)] flex items-center justify-center relative z-10 p-1 overflow-hidden">
+          <img src="${avatarUrl}" alt="${rulerName}" class="w-full h-full object-contain filter drop-shadow-xs" />
         </div>
         <div class="w-7 h-2 rounded-full bg-black/35 blur-[2px] mt-1 -mb-1"></div>
         <span class="mt-1 px-2.5 py-0.5 rounded-full bg-slate-900/95 text-white text-[9px] font-black tracking-tight whitespace-nowrap shadow-lg border border-slate-700">

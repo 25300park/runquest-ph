@@ -437,8 +437,8 @@ export default function ActivityTrackingPage() {
                   className: '',
                   html: `
                     <div class="flex flex-col items-center animate-pulse">
-                      <div class="w-8 h-8 rounded-full bg-violet-600 border-2 border-white shadow-lg flex items-center justify-center text-sm">
-                        ${runner.avatar}
+                      <div class="w-9 h-9 rounded-full bg-slate-900 border-2 border-white shadow-lg flex items-center justify-center overflow-hidden p-0.5">
+                        <img src="${runner.avatar}" alt="${runner.name}" class="w-full h-full object-contain filter drop-shadow-xs" />
                       </div>
                       <span class="mt-0.5 px-1.5 py-0.5 rounded-md bg-slate-950/90 text-white text-[8px] font-bold whitespace-nowrap">
                         ${runner.name.slice(0, 8)}
@@ -457,9 +457,11 @@ export default function ActivityTrackingPage() {
           <div className="absolute top-20 left-4 right-4 z-40 animate-in slide-in-from-top duration-300 pointer-events-none">
             <div className="bg-gradient-to-r from-amber-400 via-orange-500 to-violet-600 text-white rounded-2xl p-3.5 shadow-2xl border-2 border-white flex items-center justify-between pointer-events-auto">
               <div className="flex items-center gap-3">
-                <span className="text-3xl animate-bounce">✋</span>
+                <div className="w-11 h-11 rounded-2xl bg-slate-900/90 border-2 border-white shadow-md p-1 flex items-center justify-center shrink-0">
+                  <img src={highFiveEvent.runner.avatar} alt="Runner" className="w-full h-full object-contain" />
+                </div>
                 <div>
-                  <p className="font-black text-sm text-slate-950">High-Five Encounter!</p>
+                  <p className="font-black text-sm text-slate-950">✋ High-Five Encounter!</p>
                   <p className="text-xs text-white/90 font-bold">
                     Passed by <strong>{highFiveEvent.runner.name}</strong> · <span className="text-amber-200">+50 Bonus XP</span>
                   </p>
