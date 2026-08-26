@@ -15,18 +15,22 @@ const avatarList = Array.from({ length: 23 }, (_, i) => {
 
 export default function CharacterCreation() {
   const navigate = useNavigate();
-  const [name, setName] = useState('Runner');
-  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(avatarList[0].src);
+  const [name, setName] = useState(() => {
+    return (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-name')) || 'Runner';
+  });
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(() => {
+    return (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-avatar')) || avatarList[0].src;
+  });
   const [status, setStatus] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const activeAvatarObj = avatarList.find((a) => a.src === selectedAvatar) ?? avatarList[0];
 
-  async function handleStartAdventure() {
+  async function handleSaveCharacter() {
     if (!selectedAvatar || !name.trim()) return;
 
     setIsSaving(true);
-    setStatus('Creating your hero...');
+    setStatus('Saving your hero changes...');
 
     try {
       // 로컬 스토리지 즉시 동기화
@@ -39,31 +43,51 @@ export default function CharacterCreation() {
         name: name.trim(),
         avatarBaseUrl: selectedAvatar
       });
-      navigate('/character-dashboard');
+      navigate('/profile');
     } catch {
-      // Supabase 미설정 환경에서도 로컬 저장으로 즉시 이동 지원
-      navigate('/character-dashboard');
+      // 로컬 저장 후 즉시 프로필/홈으로 복귀
+      navigate('/profile');
     } finally {
       setIsSaving(false);
     }
   }
 
   return (
-    <section className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900 font-sans pb-32 select-none flex justify-center">
+    <section className="min-h-screen bg-slate-50 px-4 py-4 text-slate-900 font-sans pb-32 select-none flex justify-center">
       <div className="max-w-md w-full space-y-4">
+        {/* 상단 네비게이션 & 빠른 저장 바 */}
+        <div className="flex items-center justify-between pt-1">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-600 flex items-center justify-center text-sm shadow-sm active:scale-95 transition-all"
+          >
+            ✕
+          </button>
+          <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
+            Hero Customization
+          </span>
+          <button
+            type="button"
+            onClick={handleSaveCharacter}
+            disabled={!selectedAvatar || !name.trim() || isSaving}
+            className="px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-black text-xs shadow-md shadow-violet-500/25 active:scale-95 transition-all flex items-center gap-1 disabled:opacity-50"
+          >
+            <span>💾</span>
+            <span>{isSaving ? '저장 중' : '저장'}</span>
+          </button>
+        </div>
+
         {/* Step 2: 상단 타이틀 헤더 */}
-        <header className="text-center pt-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-sm mx-auto flex items-center justify-center shadow-md shadow-violet-500/25 mb-2.5">
-            RQ
+        <header className="text-center pt-1">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-sm mx-auto flex items-center justify-center shadow-md shadow-violet-500/25 mb-2">
+            🎨
           </div>
-          <p className="text-[11px] font-extrabold uppercase tracking-wider text-violet-600">
-            Character Creation
-          </p>
-          <h1 className="mt-0.5 text-2xl sm:text-3xl font-black text-slate-900">
-            Choose Your Runner
+          <h1 className="text-xl font-black text-slate-900 tracking-tight">
+            Select Your Avatar & Name
           </h1>
-          <p className="mt-1 text-xs text-slate-500">
-            Select your starting avatar to begin your RPG adventure across Metro Manila.
+          <p className="text-xs text-slate-500 font-medium mt-1">
+            23종 캐릭터 아바타와 닉네임을 변경하고 저장하세요.
           </p>
         </header>
 
@@ -171,7 +195,7 @@ export default function CharacterCreation() {
         <div className="max-w-md w-full">
           <button
             type="button"
-            onClick={handleStartAdventure}
+            onClick={handleSaveCharacter}
             disabled={!selectedAvatar || !name.trim() || isSaving}
             className={`w-full py-4 rounded-2xl font-black text-sm tracking-wider uppercase shadow-xl transition-all flex items-center justify-center gap-2 ${
               selectedAvatar && name.trim() && !isSaving
@@ -179,7 +203,7 @@ export default function CharacterCreation() {
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60 shadow-none'
             }`}
           >
-            <span>{isSaving ? 'Creating Hero...' : '✨ Start Adventure (선택 완료)'}</span>
+            <span>{isSaving ? '저장 중...' : '💾 변경사항 저장 완료 (Save Changes)'}</span>
           </button>
         </div>
       </div>
