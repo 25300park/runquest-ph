@@ -29,14 +29,20 @@ export default function CharacterCreation() {
     setStatus('Creating your hero...');
 
     try {
+      // 로컬 스토리지 즉시 동기화
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('runquest-selected-avatar', selectedAvatar);
+        window.localStorage.setItem('runquest-selected-name', name.trim());
+      }
+
       await createCharacter({
         name: name.trim(),
         avatarBaseUrl: selectedAvatar
       });
       navigate('/character-dashboard');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to create character.';
-      setStatus(message);
+    } catch {
+      // Supabase 미설정 환경에서도 로컬 저장으로 즉시 이동 지원
+      navigate('/character-dashboard');
     } finally {
       setIsSaving(false);
     }

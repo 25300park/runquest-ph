@@ -77,7 +77,10 @@ export default function CharacterDashboardPage() {
   );
   const xpProgress = profile ? getLevelProgress(profile.character.xp) : 0;
   const currentLevel = profile?.character.level ?? 1;
-  const runnerName = profile?.character.name ?? 'Adventurer';
+  const savedName = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-name') : null;
+  const runnerName = savedName || profile?.character.name || 'Adventurer';
+  const savedAvatar = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
+  const avatarUrl = savedAvatar || profile?.character.avatar_base_url || '/images/avatars/1.png';
 
   if (!profile) {
     return (
@@ -129,9 +132,9 @@ export default function CharacterDashboardPage() {
           </Link>
           <Link
             to="/profile"
-            className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-md shadow-violet-500/25 active:scale-95 transition-all border-2 border-white"
+            className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-md shadow-violet-500/25 active:scale-95 transition-all border-2 border-white overflow-hidden p-0.5"
           >
-            {runnerName.slice(0, 2).toUpperCase()}
+            <img src={avatarUrl} alt="Hero Avatar" className="w-full h-full object-contain filter drop-shadow-sm" />
           </Link>
         </div>
       </header>
@@ -157,28 +160,37 @@ export default function CharacterDashboardPage() {
         </div>
       </section>
 
-      {/* 3. 메인 RPG 카드 (핵심: 9:16 캐릭터 숏폼 영상 + HUD + Start CTA) */}
+      {/* 3. 메인 RPG 카드 (핵심: 9:16 캐릭터 숏폼 영상 + 3D 아바타 피규어 + HUD + Start CTA) */}
       <section className="px-5 py-2">
         <div className="bg-white rounded-3xl p-4 shadow-xl border border-slate-100 relative overflow-hidden flex flex-col gap-3">
           {/* 캐릭터 9:16 루프 영상 Placeholder 영역 */}
-          <div className="relative w-full aspect-[9/16] max-h-[380px] rounded-2xl overflow-hidden bg-slate-950 shadow-inner">
+          <div className="relative w-full aspect-[9/16] max-h-[380px] rounded-2xl overflow-hidden bg-slate-950 shadow-inner flex items-center justify-center">
             {/* 실제 캐릭터 루프 영상 태그 */}
             <video
               autoPlay
               loop
               muted
               playsInline
-              className="w-full h-full object-cover opacity-85"
+              className="absolute inset-0 w-full h-full object-cover opacity-60"
               poster="/characters/starter-preview.png"
             >
               <source src="/characters/tiger-runner-loop.mp4" type="video/mp4" />
             </video>
 
             {/* 비디오 위 가독성 그라데이션 오버레이 */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/40 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-slate-950/40 pointer-events-none" />
+
+            {/* 🔥 유저가 선택한 23종 캐릭터 아바타 3D 피규어 중앙 렌더링 */}
+            <div className="relative z-10 w-44 h-44 sm:w-52 sm:h-52 flex items-center justify-center pointer-events-none -mt-4 animate-in zoom-in duration-300">
+              <img
+                src={avatarUrl}
+                alt="Selected Hero Avatar"
+                className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(0,0,0,0.6)]"
+              />
+            </div>
 
             {/* 상단 오버레이: HP 및 상태 배지 */}
-            <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+            <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20">
               <span className="px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700 text-[10px] font-black text-rose-400 flex items-center gap-1 shadow-sm">
                 <span>❤️</span> HP 100/100
               </span>
@@ -188,7 +200,7 @@ export default function CharacterDashboardPage() {
             </div>
 
             {/* 하단 오버레이: 레벨 & EXP 프로그레스 바 */}
-            <div className="absolute bottom-3 left-3 right-3 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 text-white">
+            <div className="absolute bottom-3 left-3 right-3 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 text-white z-20">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-black text-amber-300">Level {currentLevel}</span>
                 <span className="text-[11px] text-slate-300 font-mono">

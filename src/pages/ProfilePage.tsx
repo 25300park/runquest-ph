@@ -21,6 +21,11 @@ export default function ProfilePage() {
           ((progress.totalXp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100
         );
 
+  const savedName = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-name') : null;
+  const runnerName = savedName || 'Shadow Tiger Ranger';
+  const savedAvatar = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
+  const avatarUrl = savedAvatar || '/images/avatars/1.png';
+
   useEffect(() => {
     getCurrentAdminProfile()
       .then((profile) => setIsAdmin(Boolean(profile && profile.role === 'admin')))
@@ -37,7 +42,7 @@ export default function ProfilePage() {
           loop
           muted
           playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-95"
+          className="absolute inset-0 w-full h-full object-cover opacity-50"
           poster="/characters/starter-preview.png"
         >
           <source src="/characters/tiger-runner-loop.mp4" type="video/mp4" />
@@ -46,8 +51,19 @@ export default function ProfilePage() {
         {/* 쇼룸 전시 조명 & 앰비언트 비네팅 그라데이션 */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-slate-950/40 pointer-events-none" />
 
+        {/* 🔥 유저가 선택한 23종 캐릭터 아바타 3D 피규어 중앙 렌더링 */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 -mt-6">
+          <div className="w-52 h-52 sm:w-60 sm:h-60 flex items-center justify-center animate-in zoom-in duration-300">
+            <img
+              src={avatarUrl}
+              alt="Hero Showcase"
+              className="w-full h-full object-contain filter drop-shadow-[0_20px_30px_rgba(0,0,0,0.7)]"
+            />
+          </div>
+        </div>
+
         {/* 쇼룸 상단 플로팅 헤더 (Lv 뱃지 & 캐릭터 이름 & 아바타 변경 버튼) */}
-        <div className="relative z-10 p-4 space-y-1.5">
+        <div className="relative z-20 p-4 space-y-1.5">
           {/* 1행: 서브 뱃지 & 우측 액션 버튼들 */}
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-violet-400 bg-violet-950/80 px-2.5 py-0.5 rounded-full border border-violet-700/60 backdrop-blur-md">
@@ -69,7 +85,7 @@ export default function ProfilePage() {
 
           {/* 2행: 메인 히어로 타이틀 (한 줄 꽉 채움) */}
           <h1 className="text-lg sm:text-xl font-black text-white drop-shadow-md truncate whitespace-nowrap">
-            Shadow Tiger Ranger
+            {runnerName}
           </h1>
         </div>
 
