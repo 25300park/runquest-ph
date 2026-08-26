@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { mockTrophies, type TrophyItem } from '../data/mockTrophies';
 import { getGameProgress } from '../utils/gameProgress';
 import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../utils/xp';
@@ -46,7 +46,7 @@ export default function ProfilePage() {
         {/* 쇼룸 전시 조명 & 앰비언트 비네팅 그라데이션 */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-slate-950/40 pointer-events-none" />
 
-        {/* 쇼룸 상단 플로팅 헤더 (Lv 뱃지 & 캐릭터 이름) */}
+        {/* 쇼룸 상단 플로팅 헤더 (Lv 뱃지 & 캐릭터 이름 & 아바타 변경 버튼) */}
         <div className="relative z-10 p-4 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-violet-400 bg-violet-950/80 px-2.5 py-0.5 rounded-full border border-violet-700/60 backdrop-blur-md">
@@ -54,9 +54,18 @@ export default function ProfilePage() {
             </span>
             <h1 className="text-xl font-black text-white mt-1 drop-shadow-md">Shadow Tiger Ranger</h1>
           </div>
-          <span className="rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 px-3 py-1 text-xs font-black shadow-lg border border-amber-200">
-            Lv {currentLevel}
-          </span>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/character/create"
+              className="rounded-full bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 text-[11px] font-black backdrop-blur-md border border-white/30 shadow-md active:scale-95 transition-all flex items-center gap-1"
+            >
+              <span>🔄</span>
+              <span>Change</span>
+            </Link>
+            <span className="rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 px-2.5 py-1 text-xs font-black shadow-lg border border-amber-200">
+              Lv {currentLevel}
+            </span>
+          </div>
         </div>
 
         {/* 쇼룸 하단 겹치는 글래스모피즘(Glassmorphism) 장비 슬롯 */}
@@ -255,7 +264,28 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* 5. 보상 지갑 CTA */}
+      {/* 5. 24종 아바타 변경 CTA 카드 */}
+      <Link
+        to="/character/create"
+        className="block rounded-2xl border border-violet-100 bg-white p-4 shadow-sm active:scale-98 transition-all"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center text-xl">
+              🎨
+            </div>
+            <div>
+              <h3 className="text-xs font-black text-slate-900">Change Runner Avatar</h3>
+              <p className="text-[10px] text-slate-400 font-bold mt-0.5">Choose from 24 unique runner styles</p>
+            </div>
+          </div>
+          <span className="text-xs font-black text-violet-600 bg-violet-50 px-2.5 py-1 rounded-full border border-violet-100">
+            24 Avatars →
+          </span>
+        </div>
+      </Link>
+
+      {/* 6. 보상 지갑 CTA */}
       <Link
         to="/rewards"
         className="block w-full rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3.5 text-center font-bold text-sm text-white shadow-lg shadow-violet-500/25 active:scale-95 transition-all"
