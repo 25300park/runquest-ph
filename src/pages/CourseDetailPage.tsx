@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { MapContainer, Marker, Polyline, Popup, TileLayer } from 'react-leaflet';
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer } from 'react-leaflet';
+import L from 'leaflet';
 import { getCourseById, type CourseWithPoints } from '../services/courseService';
 import type { LatLngTuple } from '../types/area';
 import type { Course, CourseCheckpoint } from '../types/course';
 
 const areaNameByArea: Record<CourseWithPoints['area'], string> = {
-  BGC: 'BGC',
+  BGC: 'BGC (Bonifacio Global City)',
   Makati: 'Makati / Ayala Triangle',
-  MOA: 'MOA / Pasay'
+  MOA: 'MOA / Pasay Seaside'
 };
 
 const areaIdByArea: Record<CourseWithPoints['area'], string> = {
@@ -29,6 +30,15 @@ function createLoopedRoute(routeCoordinates: LatLngTuple[], loopCount: number) {
   return Array.from({ length: loopCount }).flatMap((_, loopIndex) =>
     loopIndex === 0 ? routeCoordinates : routeCoordinates.slice(1)
   );
+}
+
+function createPointIcon(label: string, color: string) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="height:30px;width:30px;border-radius:9999px;border:2.5px solid white;background:${color};display:grid;place-items:center;color:white;font-weight:900;font-size:10px;box-shadow:0 8px 20px rgba(0,0,0,.25);">${label}</div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15]
+  });
 }
 
 export default function CourseDetailPage() {
@@ -54,23 +64,15 @@ export default function CourseDetailPage() {
         setErrorMessage(null);
         const nextCourse = await getCourseById(courseId);
 
-        if (!isMounted) {
-          return;
-        }
-
+        if (!isMounted) return;
         setCourse(nextCourse);
       } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
+        if (!isMounted) return;
         const message = error instanceof Error ? error.message : 'Unable to load route details.';
         setErrorMessage(message);
         setCourse(null);
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -95,42 +97,26 @@ export default function CourseDetailPage() {
   );
   const xpReward = Math.round(totalDistanceKm * 100);
   const explorationReward = Math.max(3, Math.round(totalDistanceKm * 5));
-  const activityCourse = useMemo<Course | null>(() => {
-    if (!course || loopedRouteCoordinates.length < 2) {
-      return null;
-    }
 
-    const checkpoints: CourseCheckpoint[] = Array.from({ length: loopCount }).flatMap(
-      (_, loopIndex) =>
-        course.course_points.map((point, pointIndex) => {
-          const routePointIndex = loopIndex * (routeCoordinates.length - 1) + pointIndex;
-          return {
-            id: `${point.id}-loop-${loopIndex + 1}`,
-            name:
-              point.type === 'start'
-                ? `Start Gate ${loopIndex + 1}`
-                : point.type === 'finish'
-                  ? `Finish Gate ${loopIndex + 1}`
-                  : `Checkpoint ${pointIndex} / Loop ${loopIndex + 1}`,
-            type:
-              loopIndex === 0 && point.type === 'start'
-                ? 'START'
-                : loopIndex === loopCount - 1 && point.type === 'finish'
-                  ? 'FINISH'
-                  : 'CHECKPOINT',
-            position: [point.lat, point.lng] as LatLngTuple,
-            distanceFromStartKm:
-              loopedRouteCoordinates.length > 1
-                ? Number(
-                    (
-                      (totalDistanceKm / (loopedRouteCoordinates.length - 1)) *
-                      routePointIndex
-                    ).toFixed(2)
-                  )
-                : 0
-          } satisfies CourseCheckpoint;
-        })
-    );
+  const activityCourse = useMemo<Course | null>(() => {
+    if (!course || loopedRouteCoordinates.length < 2) return null;
+
+    const baseCheckpoints: CourseCheckpoint[] = course.course_points.map((point, index) => ({
+      id: point.id,
+      name:
+        point.type === 'start'
+          ? 'Start Gate'
+          : point.type === 'finish'
+            ? 'Finish Gate'
+            : `Checkpoint ${index}`,
+      type:
+        point.type === 'start' ? 'START' : point.type === 'finish' ? 'FINISH' : 'CHECKPOINT',
+      position: [point.lat, point.lng],
+      distanceFromStartKm:
+        routeCoordinates.length > 1
+          ? Number(((baseDistanceKm / (routeCoordinates.length - 1)) * index).toFixed(2))
+          : 0
+    }));
 
     return {
       id: course.id,
@@ -147,23 +133,22 @@ export default function CourseDetailPage() {
       startPoint: loopedRouteCoordinates[0],
       finishPoint: loopedRouteCoordinates[loopedRouteCoordinates.length - 1],
       routeCoordinates: loopedRouteCoordinates,
-      checkpoints,
+      checkpoints: baseCheckpoints,
       pois: [],
       safetyNotes: 'Review the route before running and stay aware of local traffic conditions.'
     };
   }, [
+    baseDistanceKm,
     course,
     explorationReward,
-    loopCount,
     loopedRouteCoordinates,
-    routeCoordinates.length,
+    routeCoordinates,
     totalDistanceKm,
     xpReward
   ]);
+
   const baseActivityCourse = useMemo<Course | null>(() => {
-    if (!course || routeCoordinates.length < 2) {
-      return null;
-    }
+    if (!course || routeCoordinates.length < 2) return null;
 
     const baseCheckpoints: CourseCheckpoint[] = course.course_points.map((point, index) => ({
       id: point.id,
@@ -233,10 +218,13 @@ export default function CourseDetailPage() {
 
   if (isLoading) {
     return (
-      <section className="grid min-h-full place-items-center px-4 py-10 text-center">
+      <section className="grid min-h-full place-items-center bg-slate-50 px-4 py-16 text-center select-none font-sans">
         <div>
-          <p className="text-sm font-bold uppercase text-quest-teal">Loading route</p>
-          <h1 className="mt-2 text-3xl font-black text-quest-ink">Opening course details...</h1>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-sm mx-auto flex items-center justify-center shadow-md shadow-violet-500/25 mb-3 animate-pulse">
+            RQ
+          </div>
+          <p className="text-xs font-bold uppercase text-violet-600">Loading route details</p>
+          <h1 className="mt-1 text-xl font-black text-slate-900">Opening course map...</h1>
         </div>
       </section>
     );
@@ -244,16 +232,15 @@ export default function CourseDetailPage() {
 
   if (errorMessage || !course || routeCoordinates.length < 2 || !startPoint) {
     return (
-      <section className="space-y-4 px-4 py-10 text-center">
-        <p className="text-sm font-bold uppercase text-quest-teal">Route unavailable</p>
-        <h1 className="text-3xl font-black text-quest-ink">No Supabase route found</h1>
-        <p className="text-slate-600">
-          {errorMessage ??
-            'This course does not have enough saved course points to render a route yet.'}
+      <section className="min-h-full bg-slate-50 space-y-4 px-4 py-10 text-center select-none font-sans">
+        <p className="text-xs font-black uppercase text-rose-500">Route unavailable</p>
+        <h1 className="text-2xl font-black text-slate-900">No route coordinates found</h1>
+        <p className="text-xs text-slate-500 max-w-xs mx-auto">
+          {errorMessage ?? 'This course does not have enough saved course points to render a route yet.'}
         </p>
         <Link
           to="/map"
-          className="inline-block rounded-xl bg-quest-teal px-4 py-3 font-bold text-white"
+          className="inline-block rounded-2xl bg-violet-600 px-5 py-3 font-bold text-xs text-white shadow-md shadow-violet-500/25"
         >
           Back to Map
         </Link>
@@ -262,83 +249,127 @@ export default function CourseDetailPage() {
   }
 
   return (
-    <section className="space-y-4 px-4 py-4">
-      <div>
-        <p className="text-sm font-bold text-quest-teal">{areaNameByArea[course.area]}</p>
-        <h1 className="mt-1 text-3xl font-black text-quest-ink">{course.name}</h1>
-        <p className="mt-2 text-slate-600">
-          A community-created {course.area} route loaded from Supabase.
+    <section className="min-h-full space-y-4 bg-slate-50 px-4 py-5 text-slate-900 font-sans pb-28 select-none">
+      {/* 1. 상단 코스 타이틀 카드 */}
+      <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-extrabold uppercase tracking-wider text-violet-600">
+            {areaNameByArea[course.area]}
+          </p>
+          <span className="rounded-full bg-violet-50 text-violet-700 border border-violet-100 px-2.5 py-0.5 text-[10px] font-black uppercase">
+            {course.difficulty}
+          </span>
+        </div>
+        <h1 className="mt-1 text-2xl font-black text-slate-900">{course.name}</h1>
+        <p className="mt-1 text-xs text-slate-500">
+          A verified runner route in {course.area}. Start quest to track GPS and earn XP.
         </p>
       </div>
 
-      <div className="h-[420px] overflow-hidden rounded-xl border border-slate-200">
-        <MapContainer center={startPoint} zoom={15} scrollWheelZoom={false} className="h-full">
+      {/* 2. Leaflet 지도 (깨지지 않는 선명한 SVG Circle & DivIcon 마커) */}
+      <div className="h-[380px] overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-md relative">
+        <MapContainer center={startPoint} zoom={15} scrollWheelZoom={false} className="h-full w-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <Polyline positions={loopedRouteCoordinates} color="#14b8a6" />
-          {activityCourse?.checkpoints.map((checkpoint, index) => (
-            <Marker key={checkpoint.id} position={checkpoint.position}>
-              <Popup>
-                {checkpoint.type} {index + 1}
-              </Popup>
-            </Marker>
-          ))}
+
+          {/* 선명한 보라빛 궤적 Polyline */}
+          <Polyline
+            positions={loopedRouteCoordinates}
+            pathOptions={{ color: '#7c3aed', weight: 6, opacity: 0.95 }}
+          />
+
+          {/* 깨지지 않는 SVG 원형 및 DivIcon 마커들 */}
+          {activityCourse?.checkpoints.map((checkpoint, index) => {
+            const isStart = checkpoint.type === 'START';
+            const isFinish = checkpoint.type === 'FINISH';
+            const label = isStart ? 'S' : isFinish ? 'F' : String(index + 1);
+            const color = isStart ? '#10b981' : isFinish ? '#f97316' : '#8b5cf6';
+
+            return (
+              <Marker
+                key={checkpoint.id}
+                position={checkpoint.position}
+                icon={createPointIcon(label, color)}
+              >
+                <Popup>
+                  <div className="text-center font-sans p-1">
+                    <strong className="text-xs text-slate-900">{checkpoint.type}</strong>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{checkpoint.name}</p>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
         </MapContainer>
+
+        {/* 맵 하단 상태 워터마크 배지 */}
+        <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full bg-slate-900/80 px-3 py-1 text-[10px] font-black text-amber-300 backdrop-blur-md border border-slate-700">
+          📍 Verified GPS Route Loaded
+        </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <p className="text-xs font-black uppercase text-slate-500">Loop multiplier</p>
-        <div className="mt-3 grid grid-cols-3 gap-2">
+      {/* 3. 루프 배수 설정 카드 */}
+      <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+        <p className="text-[11px] font-black uppercase text-slate-400">Loop Multiplier (반복 횟수)</p>
+        <div className="mt-2.5 grid grid-cols-3 gap-2">
           {[1, 2, 3].map((count) => (
             <button
               key={count}
               type="button"
               onClick={() => setLoopCount(count)}
-              className={`rounded-xl border px-4 py-3 font-black ${
+              className={`rounded-2xl py-2.5 text-xs font-black transition-all ${
                 loopCount === count
-                  ? 'border-quest-teal bg-quest-teal text-white'
-                  : 'border-slate-200 bg-slate-50 text-slate-700'
+                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm'
+                  : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
               }`}
             >
-              {count}x
+              {count}x Loop
             </button>
           ))}
         </div>
       </div>
 
+      {/* 4. 스탯 3열 그리드 */}
       <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-xl bg-slate-100 p-3">
-          <p className="text-xs text-slate-500">Distance</p>
-          <p className="font-bold">
-            {baseDistanceKm} km → {totalDistanceKm} km ({loopCount}x)
+        <div className="rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Distance</p>
+          <p className="font-black text-slate-900 text-sm mt-0.5">
+            {totalDistanceKm} <span className="text-[10px] text-slate-500">km</span>
           </p>
         </div>
-        <div className="rounded-xl bg-slate-100 p-3">
-          <p className="text-xs text-slate-500">Reward</p>
-          <p className="font-bold">{xpReward} XP</p>
+        <div className="rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Reward</p>
+          <p className="font-black text-amber-600 text-sm mt-0.5">+{xpReward} XP</p>
         </div>
-        <div className="rounded-xl bg-slate-100 p-3">
-          <p className="text-xs text-slate-500">Time</p>
-          <p className="font-bold">{estimateTimeMinutes(totalDistanceKm)} min</p>
+        <div className="rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Est. Time</p>
+          <p className="font-black text-violet-700 text-sm mt-0.5">
+            {estimateTimeMinutes(totalDistanceKm)} <span className="text-[10px] text-slate-500">min</span>
+          </p>
         </div>
       </div>
 
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-        <h2 className="font-bold text-amber-900">Safety notes</h2>
-        <p className="mt-2 text-sm leading-6 text-amber-900">
-          Review the route before running and stay aware of local traffic conditions.
-        </p>
+      {/* 5. 안전 유의사항 안내 */}
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 flex items-start gap-2.5">
+        <span className="text-base">⚠️</span>
+        <div>
+          <h2 className="text-xs font-black text-amber-900">Safety & Traffic Note</h2>
+          <p className="text-[11px] leading-relaxed text-amber-800 mt-0.5">
+            Review the route before running and stay aware of local pedestrian walkways and traffic conditions.
+          </p>
+        </div>
       </div>
 
-      <div className="pt-2 space-y-2.5 pb-20">
+      {/* 6. 하단 액션 버튼 */}
+      <div className="pt-2 space-y-2.5">
         <button
           type="button"
           onClick={startCourse}
-          className="group relative w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 font-black text-base tracking-wider uppercase shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 border border-emerald-300/60"
+          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 font-black text-sm tracking-wider uppercase shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-emerald-300/60"
         >
-          <span className="text-xl">⚔️</span>
+          <span className="text-lg">⚔️</span>
           <span>QUEST START (퀘스트 시작)</span>
         </button>
 

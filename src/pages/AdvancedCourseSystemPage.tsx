@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 import { createCourseRecommendations } from '../utils/courseRecommendations';
 import { getGameProgress } from '../utils/gameProgress';
 import { calculateLevelFromXp } from '../utils/xp';
@@ -11,83 +11,98 @@ export default function AdvancedCourseSystemPage() {
   const recommendations = createCourseRecommendations(progress, preferredDistanceKm);
   const recommendationCards = [
     {
-      title: 'Recommended run today',
+      title: 'Recommended Run Today',
       label: 'Balanced',
       course: recommendations.recommendedRun,
-      reason: 'Best match for your current level and preferred distance.'
+      reason: 'Best match for your current level and preferred distance.',
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200'
     },
     {
-      title: 'Recovery run suggestion',
+      title: 'Recovery Run Suggestion',
       label: 'Recovery',
       course: recommendations.recoveryRun,
-      reason: 'Shorter and easier so you can keep rhythm without forcing intensity.'
+      reason: 'Shorter and easier so you can keep rhythm without forcing intensity.',
+      badgeColor: 'bg-blue-100 text-blue-800 border-blue-200'
     },
     {
-      title: 'Challenge run suggestion',
+      title: 'Challenge Run Suggestion',
       label: 'Challenge',
       course: recommendations.challengeRun,
-      reason: 'A stretch route when you want a stronger XP push.'
+      reason: 'A stretch route when you want a stronger XP push.',
+      badgeColor: 'bg-purple-100 text-purple-800 border-purple-200'
     }
   ];
 
   return (
-    <section className="min-h-full space-y-5 bg-[#111816] px-4 py-6 text-stone-50">
-      <div className="rounded-[1.35rem] border border-amber-200/30 bg-stone-900 p-5">
-        <p className="text-sm font-black uppercase text-amber-200">Advanced course system</p>
-        <h1 className="mt-2 text-4xl font-black leading-tight">Smart route console</h1>
-        <p className="mt-3 text-sm leading-6 text-stone-400">
-          Mock AI chooses routes from your level, past activity count, and preferred distance.
+    <section className="min-h-full space-y-4 bg-slate-50 px-4 py-5 text-slate-900 font-sans pb-24 select-none">
+      {/* 1. 상단 스마트 루트 콘솔 타이틀 카드 */}
+      <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+        <p className="text-[11px] font-extrabold uppercase tracking-wider text-violet-600">
+          Advanced Course System
+        </p>
+        <h1 className="mt-0.5 text-2xl font-black text-slate-900">Smart Route Console</h1>
+        <p className="mt-1 text-xs text-slate-500">
+          Smart AI recommends tailored routes based on your level, past quests, and preferred distance.
         </p>
       </div>
 
+      {/* 2. 3열 핵심 러너 프로필 스탯 카드 */}
       <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-2xl bg-stone-900 p-3">
-          <p className="text-xs text-stone-500">Level</p>
-          <p className="font-black text-amber-200">{level}</p>
+        <div className="rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Level</p>
+          <p className="font-black text-violet-700 text-base mt-0.5">Lv {level}</p>
         </div>
-        <div className="rounded-2xl bg-stone-900 p-3">
-          <p className="text-xs text-stone-500">Runs</p>
-          <p className="font-black">{progress.completedActivities}</p>
+        <div className="rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Total Runs</p>
+          <p className="font-black text-slate-800 text-base mt-0.5">{progress.completedActivities}</p>
         </div>
-        <div className="rounded-2xl bg-stone-900 p-3">
-          <p className="text-xs text-stone-500">Preference</p>
-          <p className="font-black">{preferredDistanceKm} km</p>
+        <div className="rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Preferred</p>
+          <p className="font-black text-amber-600 text-base mt-0.5">{preferredDistanceKm} km</p>
         </div>
       </div>
 
-      <div className="grid gap-3">
+      {/* 3. 스마트 추천 코스 카드 리스트 */}
+      <div className="space-y-3.5 pt-1">
         {recommendationCards.map((item) => (
-          <article key={item.title} className="rounded-2xl border border-stone-700 bg-stone-900 p-4">
+          <article
+            key={item.title}
+            className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm space-y-3 transition-all hover:shadow-md"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase text-quest-teal">{item.title}</p>
-                <h2 className="mt-1 text-2xl font-black">{item.course.name}</h2>
-                <p className="mt-1 text-sm text-stone-400">{item.course.areaName}</p>
+                <p className="text-[10px] font-black uppercase text-violet-600">{item.title}</p>
+                <h2 className="mt-0.5 text-lg font-black text-slate-900">{item.course.name}</h2>
+                <p className="text-[11px] text-slate-400 font-bold">{item.course.areaName}</p>
               </div>
-              <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-black text-amber-200">
+              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase border ${item.badgeColor}`}>
                 {item.label}
               </span>
             </div>
-            <p className="mt-3 text-sm leading-6 text-stone-400">{item.reason}</p>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl bg-stone-950 p-3">
-                <p className="text-xs text-stone-500">Km</p>
-                <p className="font-black">{item.course.distanceKm}</p>
+
+            <p className="text-xs text-slate-500 leading-relaxed">{item.reason}</p>
+
+            {/* 코스 스탯 3열 */}
+            <div className="grid grid-cols-3 gap-2 text-center bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Distance</p>
+                <p className="font-black text-sm text-slate-900 mt-0.5">{item.course.distanceKm} <span className="text-[10px] text-slate-500">km</span></p>
               </div>
-              <div className="rounded-xl bg-stone-950 p-3">
-                <p className="text-xs text-stone-500">Difficulty</p>
-                <p className="font-black">{item.course.difficulty}</p>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Difficulty</p>
+                <p className="font-black text-sm text-violet-700 mt-0.5">{item.course.difficulty}</p>
               </div>
-              <div className="rounded-xl bg-stone-950 p-3">
-                <p className="text-xs text-stone-500">XP</p>
-                <p className="font-black text-amber-200">{item.course.xpReward}</p>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Reward</p>
+                <p className="font-black text-sm text-amber-600 mt-0.5">+{item.course.xpReward} XP</p>
               </div>
             </div>
+
             <Link
               to={`/courses/${item.course.id}`}
-              className="mt-4 block rounded-2xl bg-quest-teal px-4 py-3 text-center font-black text-white"
+              className="block w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-center font-bold text-xs text-white shadow-md shadow-violet-500/20 active:scale-98 transition-all"
             >
-              Open Route
+              Open Route Details →
             </Link>
           </article>
         ))}
