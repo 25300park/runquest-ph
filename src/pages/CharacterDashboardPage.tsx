@@ -160,37 +160,17 @@ export default function CharacterDashboardPage() {
         </div>
       </section>
 
-      {/* 3. 메인 RPG 카드 (핵심: 9:16 캐릭터 숏폼 영상 + 3D 아바타 피규어 + HUD + Start CTA) */}
+      {/* 3. 메인 RPG 카드 (핵심: 네온 3D 사이버 포디움 + 캐릭터 피규어 + HUD + Start CTA) */}
       <section className="px-5 py-2">
         <div className="bg-white rounded-3xl p-4 shadow-xl border border-slate-100 relative overflow-hidden flex flex-col gap-3">
-          {/* 캐릭터 9:16 루프 영상 Placeholder 영역 */}
-          <div className="relative w-full aspect-[9/16] max-h-[380px] rounded-2xl overflow-hidden bg-slate-950 shadow-inner flex items-center justify-center">
-            {/* 실제 캐릭터 루프 영상 태그 */}
-            <video
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="absolute inset-0 w-full h-full object-cover opacity-60"
-              poster="/characters/starter-preview.png"
-            >
-              <source src="/characters/tiger-runner-loop.mp4" type="video/mp4" />
-            </video>
-
-            {/* 비디오 위 가독성 그라데이션 오버레이 */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-slate-950/40 pointer-events-none" />
-
-            {/* 🔥 유저가 선택한 23종 캐릭터 아바타 3D 피규어 중앙 렌더링 */}
-            <div className="relative z-10 w-44 h-44 sm:w-52 sm:h-52 flex items-center justify-center pointer-events-none -mt-4 animate-in zoom-in duration-300">
-              <img
-                src={avatarUrl}
-                alt="Selected Hero Avatar"
-                className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(0,0,0,0.6)]"
-              />
-            </div>
+          {/* 캐릭터 3D 피규어 쇼룸 뷰포트 */}
+          <div className="relative w-full aspect-[9/16] max-h-[380px] rounded-2xl overflow-hidden bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 shadow-inner flex flex-col justify-between p-4">
+            {/* 배경 네온 그리드 & 원형 앰비언트 광원 */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-violet-600/30 via-indigo-900/10 to-transparent pointer-events-none" />
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-48 bg-violet-500/20 rounded-full blur-3xl pointer-events-none" />
 
             {/* 상단 오버레이: HP 및 상태 배지 */}
-            <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20">
+            <div className="relative z-20 flex items-center justify-between">
               <span className="px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700 text-[10px] font-black text-rose-400 flex items-center gap-1 shadow-sm">
                 <span>❤️</span> HP 100/100
               </span>
@@ -199,8 +179,24 @@ export default function CharacterDashboardPage() {
               </span>
             </div>
 
+            {/* 🔥 유저가 선택한 23종 캐릭터 아바타 3D 피규어 & 네온 포디움 */}
+            <div className="relative z-10 my-auto flex flex-col items-center justify-center">
+              <div className="relative w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center animate-in zoom-in duration-300">
+                <img
+                  src={avatarUrl}
+                  alt="Selected Hero Avatar"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/images/avatars/1.png';
+                  }}
+                  className="w-full h-full object-contain filter drop-shadow-[0_20px_35px_rgba(139,92,246,0.6)]"
+                />
+              </div>
+              {/* 바닥 네온 포디움 원반 & 그림자 */}
+              <div className="w-36 h-4 bg-violet-600/30 rounded-full blur-[4px] -mt-3 animate-pulse border border-violet-400/40" />
+            </div>
+
             {/* 하단 오버레이: 레벨 & EXP 프로그레스 바 */}
-            <div className="absolute bottom-3 left-3 right-3 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 text-white z-20">
+            <div className="relative z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 text-white">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-black text-amber-300">Level {currentLevel}</span>
                 <span className="text-[11px] text-slate-300 font-mono">
