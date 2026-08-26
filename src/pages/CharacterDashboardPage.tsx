@@ -6,6 +6,7 @@ import { subscribeToEquipmentEconomy } from '../services/equipmentEconomyService
 import type { CharacterProfile } from '../types/rpgCharacter';
 import { getLevelProgress, xpPerLevel } from '../utils/characterRpg';
 import { defaultExplorationStats } from '../utils/fogOfWar';
+import { normalizeAvatarUrl } from '../utils/avatarUtils';
 
 function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: string; isToday: boolean }> {
   const now = new Date();
@@ -80,7 +81,7 @@ export default function CharacterDashboardPage() {
   const savedName = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-name') : null;
   const runnerName = savedName || profile?.character.name || 'Adventurer';
   const savedAvatar = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
-  const avatarUrl = savedAvatar || profile?.character.avatar_base_url || '/images/avatars/1.png';
+  const avatarUrl = normalizeAvatarUrl(savedAvatar || profile?.character.avatar_base_url);
 
   if (!profile) {
     return (
@@ -132,7 +133,7 @@ export default function CharacterDashboardPage() {
           </Link>
           <Link
             to="/profile"
-            className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-md shadow-violet-500/25 active:scale-95 transition-all border-2 border-white overflow-hidden p-0.5"
+            className="w-10 h-10 rounded-2xl bg-emerald-100 border-2 border-emerald-300 flex items-center justify-center shadow-md active:scale-95 transition-all overflow-hidden p-0.5"
           >
             <img src={avatarUrl} alt="Hero Avatar" className="w-full h-full object-contain filter drop-shadow-sm" />
           </Link>
@@ -160,27 +161,32 @@ export default function CharacterDashboardPage() {
         </div>
       </section>
 
-      {/* 3. 메인 RPG 카드 (핵심: 네온 3D 사이버 포디움 + 캐릭터 피규어 + HUD + Start CTA) */}
+      {/* 3. 메인 RPG 카드 (핵심: 동화풍 맑은 자연 모험 배경 + 3D 캐릭터 피규어 + HUD + Start CTA) */}
       <section className="px-5 py-2">
         <div className="bg-white rounded-3xl p-4 shadow-xl border border-slate-100 relative overflow-hidden flex flex-col gap-3">
-          {/* 캐릭터 3D 피규어 쇼룸 뷰포트 */}
-          <div className="relative w-full aspect-[9/16] max-h-[380px] rounded-2xl overflow-hidden bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 shadow-inner flex flex-col justify-between p-4">
-            {/* 배경 네온 그리드 & 원형 앰비언트 광원 */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-violet-600/30 via-indigo-900/10 to-transparent pointer-events-none" />
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-48 bg-violet-500/20 rounded-full blur-3xl pointer-events-none" />
+          {/* 캐릭터 3D 자연 모험 뷰포트 */}
+          <div className="relative w-full aspect-[9/16] max-h-[380px] rounded-2xl overflow-hidden bg-gradient-to-b from-sky-400 via-sky-200 to-emerald-400 shadow-inner flex flex-col justify-between p-4 border border-emerald-200/60">
+            {/* 햇살 광원 & 뭉게구름 자연 배경 레이어 */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-amber-100/70 via-transparent to-transparent pointer-events-none" />
+            <div className="absolute top-2 left-4 w-20 h-8 bg-white/40 rounded-full blur-md pointer-events-none" />
+            <div className="absolute top-6 right-6 w-28 h-10 bg-white/50 rounded-full blur-lg pointer-events-none" />
+            
+            {/* 싱그러운 푸른 언덕 실루엣 */}
+            <div className="absolute -bottom-6 -left-10 -right-10 h-36 bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 rounded-[50%] pointer-events-none opacity-90 shadow-lg" />
+            <div className="absolute -bottom-10 -left-6 -right-6 h-28 bg-emerald-700 rounded-[50%] pointer-events-none" />
 
             {/* 상단 오버레이: HP 및 상태 배지 */}
             <div className="relative z-20 flex items-center justify-between">
-              <span className="px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700 text-[10px] font-black text-rose-400 flex items-center gap-1 shadow-sm">
+              <span className="px-2.5 py-1 rounded-full bg-white/85 backdrop-blur-md border border-white/80 text-[10px] font-black text-rose-500 flex items-center gap-1 shadow-sm">
                 <span>❤️</span> HP 100/100
               </span>
-              <span className="px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700 text-[10px] font-black text-emerald-400 flex items-center gap-1 shadow-sm">
+              <span className="px-2.5 py-1 rounded-full bg-white/85 backdrop-blur-md border border-white/80 text-[10px] font-black text-emerald-600 flex items-center gap-1 shadow-sm">
                 <span>⚡</span> Stamina 92%
               </span>
             </div>
 
-            {/* 🔥 유저가 선택한 23종 캐릭터 아바타 3D 피규어 & 네온 포디움 */}
-            <div className="relative z-10 my-auto flex flex-col items-center justify-center">
+            {/* 🔥 유저가 선택한 23종 캐릭터 아바타 & 자연 잔디 포디움 */}
+            <div className="relative z-10 my-auto flex flex-col items-center justify-center pt-2">
               <div className="relative w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center animate-in zoom-in duration-300">
                 <img
                   src={avatarUrl}
@@ -188,15 +194,15 @@ export default function CharacterDashboardPage() {
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = '/images/avatars/1.png';
                   }}
-                  className="w-full h-full object-contain filter drop-shadow-[0_20px_35px_rgba(139,92,246,0.6)]"
+                  className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(6,78,59,0.45)]"
                 />
               </div>
-              {/* 바닥 네온 포디움 원반 & 그림자 */}
-              <div className="w-36 h-4 bg-violet-600/30 rounded-full blur-[4px] -mt-3 animate-pulse border border-violet-400/40" />
+              {/* 잔디 그림자 & 자연스러운 받침대 */}
+              <div className="w-36 h-3.5 bg-emerald-950/30 rounded-full blur-[3px] -mt-3.5 border border-emerald-400/20" />
             </div>
 
             {/* 하단 오버레이: 레벨 & EXP 프로그레스 바 */}
-            <div className="relative z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 text-white">
+            <div className="relative z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 text-white shadow-md">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-black text-amber-300">Level {currentLevel}</span>
                 <span className="text-[11px] text-slate-300 font-mono">

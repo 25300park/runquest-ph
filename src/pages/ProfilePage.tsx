@@ -5,6 +5,7 @@ import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../
 import { Link } from 'react-router-dom';
 import { getCurrentAdminProfile } from '../admin/adminService';
 import { usePwaInstall } from '../hooks/usePwaInstall';
+import { normalizeAvatarUrl } from '../utils/avatarUtils';
 
 export default function ProfilePage() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -24,7 +25,7 @@ export default function ProfilePage() {
   const savedName = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-name') : null;
   const runnerName = savedName || 'Shadow Tiger Ranger';
   const savedAvatar = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
-  const avatarUrl = savedAvatar || '/images/avatars/1.png';
+  const avatarUrl = normalizeAvatarUrl(savedAvatar);
 
   useEffect(() => {
     getCurrentAdminProfile()
@@ -34,14 +35,19 @@ export default function ProfilePage() {
 
   return (
     <section className="min-h-full space-y-4 bg-slate-50 px-4 py-4 text-slate-900 font-sans pb-28 select-none">
-      {/* 1. 상단 60% 몰입형 피규어 쇼룸 뷰포트 (Glassmorphism & Figure Showcase) */}
-      <div className="relative w-full aspect-[9/15] min-h-[460px] max-h-[540px] rounded-3xl overflow-hidden bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 shadow-2xl border border-slate-800 flex flex-col justify-between p-4">
-        {/* 쇼룸 전시 조명 & 앰비언트 비네팅 그라데이션 */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-violet-600/35 via-indigo-900/15 to-transparent pointer-events-none" />
-        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-56 h-56 bg-violet-500/25 rounded-full blur-3xl pointer-events-none" />
+      {/* 1. 상단 60% 몰입형 자연 피규어 쇼룸 뷰포트 (Nature Showcase) */}
+      <div className="relative w-full aspect-[9/15] min-h-[460px] max-h-[540px] rounded-3xl overflow-hidden bg-gradient-to-b from-sky-400 via-sky-200 to-emerald-400 shadow-2xl border border-emerald-200/80 flex flex-col justify-between p-4">
+        {/* 햇살 광원 & 뭉게구름 자연 배경 레이어 */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-amber-100/75 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute top-2 left-6 w-24 h-10 bg-white/40 rounded-full blur-md pointer-events-none" />
+        <div className="absolute top-8 right-6 w-32 h-12 bg-white/50 rounded-full blur-lg pointer-events-none" />
 
-        {/* 🔥 유저가 선택한 23종 캐릭터 아바타 3D 피규어 & 네온 포디움 */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 -mt-2">
+        {/* 싱그러운 푸른 언덕 실루엣 */}
+        <div className="absolute -bottom-8 -left-12 -right-12 h-44 bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 rounded-[50%] pointer-events-none opacity-95 shadow-xl" />
+        <div className="absolute -bottom-14 -left-8 -right-8 h-36 bg-emerald-700 rounded-[50%] pointer-events-none" />
+
+        {/* 🔥 유저가 선택한 23종 캐릭터 아바타 & 자연 잔디 포디움 */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 pt-2">
           <div className="w-56 h-56 sm:w-64 sm:h-64 flex items-center justify-center animate-in zoom-in duration-300">
             <img
               src={avatarUrl}
@@ -49,11 +55,11 @@ export default function ProfilePage() {
               onError={(e) => {
                 (e.target as HTMLImageElement).src = '/images/avatars/1.png';
               }}
-              className="w-full h-full object-contain filter drop-shadow-[0_24px_40px_rgba(139,92,246,0.65)]"
+              className="w-full h-full object-contain filter drop-shadow-[0_20px_30px_rgba(6,78,59,0.5)]"
             />
           </div>
-          {/* 바닥 네온 포디움 원반 & 그림자 */}
-          <div className="w-44 h-4 bg-violet-600/35 rounded-full blur-[4px] -mt-4 animate-pulse border border-violet-400/50" />
+          {/* 바닥 잔디 그림자 & 자연스러운 받침대 */}
+          <div className="w-44 h-4 bg-emerald-950/35 rounded-full blur-[3px] -mt-4 border border-emerald-400/30" />
         </div>
 
         {/* 쇼룸 상단 플로팅 헤더 (Lv 뱃지 & 캐릭터 이름 & 아바타 변경 버튼) */}
