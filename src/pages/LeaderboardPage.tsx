@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
   currentMonthRunners,
-  pastMonthRunners,
-  type MonthlyRunnerRank
+  pastMonthRunners
 } from '../data/mockLeaderboard';
 import { getGameProgress } from '../utils/gameProgress';
 

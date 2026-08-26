@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ensureUserProfile } from '../services/authService';
 import { getCharacterProfile } from '../services/characterService';
 import {
@@ -358,6 +358,11 @@ export default function CommunityPage() {
           </form>
 
           <div className="grid gap-3">
+            {loading && (
+              <div className="rounded-2xl bg-white p-6 text-center text-xs font-bold text-slate-400 border border-slate-100">
+                Loading live guilds...
+              </div>
+            )}
             {guilds.map((guild) => (
               <article
                 key={guild.id}

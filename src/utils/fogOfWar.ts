@@ -1,5 +1,3 @@
-﻿import type { LatLngTuple } from '../types/area';
-
 export interface AreaExplorationStats {
   areaId: string;
   areaName: string;
