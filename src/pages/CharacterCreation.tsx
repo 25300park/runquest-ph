@@ -30,22 +30,36 @@ export default function CharacterCreation() {
     if (!selectedAvatar || !name.trim()) return;
 
     setIsSaving(true);
-    setStatus('Saving your hero changes...');
+    setStatus('저장 중입니다...');
 
     try {
+      const cleanName = name.trim();
+      const cleanAvatar = selectedAvatar;
+
       // 로컬 스토리지 즉시 동기화
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem('runquest-selected-avatar', selectedAvatar);
-        window.localStorage.setItem('runquest-selected-name', name.trim());
+        window.localStorage.setItem('runquest-selected-avatar', cleanAvatar);
+        window.localStorage.setItem('runquest-selected-name', cleanName);
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new CustomEvent('runquest-avatar-updated', {
+          detail: { avatarUrl: cleanAvatar, name: cleanName }
+        }));
       }
 
-      await createCharacter({
-        name: name.trim(),
-        avatarBaseUrl: selectedAvatar
-      });
-      navigate('/profile');
+      try {
+        await createCharacter({
+          name: cleanName,
+          avatarBaseUrl: cleanAvatar
+        });
+      } catch {
+        // Supabase 오프라인/미연결 상태에서도 로컬 데이터로 동작 보장
+      }
+
+      setStatus('✅ 성공적으로 저장되었습니다! 이동합니다...');
+      setTimeout(() => {
+        navigate('/profile');
+      }, 300);
     } catch {
-      // 로컬 저장 후 즉시 프로필/홈으로 복귀
       navigate('/profile');
     } finally {
       setIsSaving(false);

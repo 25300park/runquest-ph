@@ -67,10 +67,33 @@ export default function CharacterDashboardPage() {
 
     loadProfile();
 
+    function syncAvatarState() {
+      if (typeof window !== 'undefined') {
+        const latestName = window.localStorage.getItem('runquest-selected-name');
+        const latestAvatar = window.localStorage.getItem('runquest-selected-avatar');
+        if (latestName) setCustomRunnerName(latestName);
+        if (latestAvatar) setCustomAvatarUrl(normalizeAvatarUrl(latestAvatar));
+      }
+    }
+
+    syncAvatarState();
+    window.addEventListener('storage', syncAvatarState);
+    window.addEventListener('runquest-avatar-updated', syncAvatarState);
+
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
+      window.removeEventListener('storage', syncAvatarState);
+      window.removeEventListener('runquest-avatar-updated', syncAvatarState);
     };
   }, []);
+
+  const [customRunnerName, setCustomRunnerName] = useState(() => {
+    return (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-name')) || '';
+  });
+  const [customAvatarUrl, setCustomAvatarUrl] = useState(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
+    return saved ? normalizeAvatarUrl(saved) : '';
+  });
 
   const equippedItems = useMemo(
     () => profile?.equipment.filter((equipment) => equipment.equipped) ?? [],
@@ -78,10 +101,8 @@ export default function CharacterDashboardPage() {
   );
   const xpProgress = profile ? getLevelProgress(profile.character.xp) : 0;
   const currentLevel = profile?.character.level ?? 1;
-  const savedName = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-name') : null;
-  const runnerName = savedName || profile?.character.name || 'Adventurer';
-  const savedAvatar = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
-  const avatarUrl = normalizeAvatarUrl(savedAvatar || profile?.character.avatar_base_url);
+  const runnerName = customRunnerName || profile?.character.name || 'Adventurer';
+  const avatarUrl = customAvatarUrl || normalizeAvatarUrl(profile?.character.avatar_base_url);
 
   if (!profile) {
     return (

@@ -22,15 +22,36 @@ export default function ProfilePage() {
           ((progress.totalXp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100
         );
 
-  const savedName = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-name') : null;
-  const runnerName = savedName || 'Shadow Tiger Ranger';
-  const savedAvatar = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
-  const avatarUrl = normalizeAvatarUrl(savedAvatar);
+  const [runnerName, setRunnerName] = useState(() => {
+    return (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-name')) || 'Shadow Tiger Ranger';
+  });
+  const [avatarUrl, setAvatarUrl] = useState(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
+    return normalizeAvatarUrl(saved);
+  });
 
   useEffect(() => {
     getCurrentAdminProfile()
       .then((profile) => setIsAdmin(Boolean(profile && profile.role === 'admin')))
       .catch(() => setIsAdmin(false));
+
+    function syncAvatarState() {
+      if (typeof window !== 'undefined') {
+        const latestName = window.localStorage.getItem('runquest-selected-name');
+        const latestAvatar = window.localStorage.getItem('runquest-selected-avatar');
+        if (latestName) setRunnerName(latestName);
+        if (latestAvatar) setAvatarUrl(normalizeAvatarUrl(latestAvatar));
+      }
+    }
+
+    syncAvatarState();
+    window.addEventListener('storage', syncAvatarState);
+    window.addEventListener('runquest-avatar-updated', syncAvatarState);
+
+    return () => {
+      window.removeEventListener('storage', syncAvatarState);
+      window.removeEventListener('runquest-avatar-updated', syncAvatarState);
+    };
   }, []);
 
   return (
