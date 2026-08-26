@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ExplorationMap from '../components/map/ExplorationMap';
 import { mockAreas } from '../data/mockAreas';
 import { mockUser } from '../data/mockUser';
+import { mockTerritories, type TerritoryZone } from '../data/mockLandmarks';
 import { getCourses, type CourseWithPoints } from '../services/courseService';
 import type { LatLngTuple } from '../types/area';
 import type { Course, CourseCheckpoint, Difficulty } from '../types/course';
@@ -95,8 +96,10 @@ function toMapCourse(course: CourseWithPoints): Course | null {
 }
 
 export default function ExplorationMapPage() {
-  const [selectedAreaId, setSelectedAreaId] = useState(mockAreas[0].id);
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null); // Step 1: null이면 '전체 보기'
+  const navigate = useNavigate();
+  const [selectedAreaId, setSelectedAreaId] = useState('area-bgc');
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedTerritory, setSelectedTerritory] = useState<TerritoryZone | null>(null);
   const [loopCount, setLoopCount] = useState(1);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
@@ -264,6 +267,8 @@ export default function ExplorationMapPage() {
             selectedCourse={activeCourse}
             userPosition={previewUserPosition}
             onSelectCourse={selectCourse}
+            territories={mockTerritories}
+            onSelectTerritory={(territory) => setSelectedTerritory(territory)}
           />
         ) : (
           <div className="grid h-full place-items-center bg-slate-100 px-6 text-center">
@@ -288,7 +293,72 @@ export default function ExplorationMapPage() {
         </div>
       </div>
 
-      {/* 5. 하단 선택된 코스 상세 정보 카드 */}
+      {/* 5. 👑 로컬 랜드마크 점령전 도전 바텀 시트 (Territory Control Modal) */}
+      {selectedTerritory && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center p-3 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-5 max-w-md w-full shadow-2xl border border-slate-100 space-y-3.5 animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                  ⚔️ Landmark Territory Siege
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-1">{selectedTerritory.name}</h3>
+                <p className="text-xs text-slate-500">{selectedTerritory.description}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTerritory(null)}
+                className="p-1 text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 현재 지배자 정보 박스 */}
+            <div className="rounded-2xl bg-gradient-to-br from-amber-50/80 to-yellow-50/40 p-3.5 border border-amber-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-200 border-2 border-amber-500 flex items-center justify-center text-2xl shadow-md">
+                    {selectedTerritory.currentRulerAvatar}
+                  </div>
+                  <span className="absolute -top-2 -right-1 text-xs">👑</span>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-amber-800">Current Territory Ruler</p>
+                  <p className="font-black text-sm text-slate-900">{selectedTerritory.currentRulerName}</p>
+                  <p className="text-[11px] text-amber-700 font-bold">Weekly Mileage: {selectedTerritory.weeklyMileageKm} km</p>
+                </div>
+              </div>
+              <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                {selectedTerritory.rewardBuff}
+              </span>
+            </div>
+
+            {/* 점령전 도전 CTA 버튼 */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTerritory(null);
+                  navigate('/run', {
+                    state: {
+                      courseId: activeCourse?.id ?? 'course-bgc-5k',
+                      territoryName: selectedTerritory.name,
+                      targetDistanceKm: selectedTerritory.requiredMileageKm
+                    }
+                  });
+                }}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-violet-600 text-slate-950 font-black text-sm tracking-wider uppercase shadow-xl shadow-amber-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 border border-amber-300/80"
+              >
+                <span>⚔️</span>
+                <span>왕좌 도전하기 ({selectedTerritory.requiredMileageKm}km 퀘스트 시작)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. 하단 선택된 코스 상세 정보 카드 */}
       <div className="space-y-3 px-4 py-4">
         {activeCourse && (
           <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-xl">

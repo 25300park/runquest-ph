@@ -13,6 +13,11 @@ import {
   startGpsSession,
   watchBrowserGpsSession
 } from '../features/gps/gpsSyncService';
+import {
+  generateNearbyRunners,
+  checkHighFiveProximity,
+  type LiveNearbyRunner
+} from '../services/liveEncounterService';
 
 type RunNavigationState = {
   course: Course;
@@ -154,6 +159,32 @@ export default function ActivityTrackingPage() {
   const [trackedPath, setTrackedPath] = useState<LatLngTuple[]>([]);
   const [gpsStatus, setGpsStatus] = useState('GPS ready');
   const isStartingRef = useRef(false);
+
+  // Phase 4: 주변 라이브 러너 및 High-Five 이벤트
+  const [nearbyRunners, setNearbyRunners] = useState<LiveNearbyRunner[]>([]);
+  const [highFiveEvent, setHighFiveEvent] = useState<{ runner: LiveNearbyRunner; timestamp: number } | null>(null);
+
+  useEffect(() => {
+    if (activityState === 'running') {
+      const runners = generateNearbyRunners(currentPosition);
+      setNearbyRunners(runners);
+
+      // 근접 시 하이파이브 체크
+      const closeRunner = checkHighFiveProximity(currentPosition, runners);
+      if (closeRunner && (!highFiveEvent || Date.now() - highFiveEvent.timestamp > 15000)) {
+        setHighFiveEvent({ runner: closeRunner, timestamp: Date.now() });
+        // 햅틱 진동 피드백
+        try {
+          if ('vibrate' in navigator) {
+            navigator.vibrate([100, 50, 100]);
+          }
+        } catch {
+          // ignore
+        }
+        setTimeout(() => setHighFiveEvent(null), 4000);
+      }
+    }
+  }, [currentPosition, activityState]);
 
   // 캐릭터 기본 스탯
   const progressSnapshot = getGameProgress();
@@ -395,7 +426,62 @@ export default function ActivityTrackingPage() {
 
           {/* 유저 실시간 GPS 위치 마커 */}
           <Marker position={currentPosition} icon={userGpsIcon} />
+
+          {/* Phase 4: 주변 라이브 러너 미니 핀 렌더링 */}
+          {isTracking &&
+            nearbyRunners.map((runner) => (
+              <Marker
+                key={runner.id}
+                position={runner.currentPosition}
+                icon={L.divIcon({
+                  className: '',
+                  html: `
+                    <div class="flex flex-col items-center animate-pulse">
+                      <div class="w-8 h-8 rounded-full bg-violet-600 border-2 border-white shadow-lg flex items-center justify-center text-sm">
+                        ${runner.avatar}
+                      </div>
+                      <span class="mt-0.5 px-1.5 py-0.5 rounded-md bg-slate-950/90 text-white text-[8px] font-bold whitespace-nowrap">
+                        ${runner.name.slice(0, 8)}
+                      </span>
+                    </div>
+                  `,
+                  iconSize: [36, 42],
+                  iconAnchor: [18, 21]
+                })}
+              />
+            ))}
         </MapContainer>
+
+        {/* Phase 4: ✋ High-Five 실시간 인카운터 팝업 모달 */}
+        {highFiveEvent && (
+          <div className="absolute top-20 left-4 right-4 z-40 animate-in slide-in-from-top duration-300 pointer-events-none">
+            <div className="bg-gradient-to-r from-amber-400 via-orange-500 to-violet-600 text-white rounded-2xl p-3.5 shadow-2xl border-2 border-white flex items-center justify-between pointer-events-auto">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl animate-bounce">✋</span>
+                <div>
+                  <p className="font-black text-sm text-slate-950">High-Five Encounter!</p>
+                  <p className="text-xs text-white/90 font-bold">
+                    Passed by <strong>{highFiveEvent.runner.name}</strong> · <span className="text-amber-200">+50 Bonus XP</span>
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-black bg-white/20 px-2 py-1 rounded-full">Nice Pace!</span>
+            </div>
+          </div>
+        )}
+
+        {/* Phase 4: 주변 실시간 러너 감지 배지 (우측 상단) */}
+        {isTracking && nearbyRunners.length > 0 && (
+          <div className="absolute top-16 right-4 z-20 pointer-events-none">
+            <div className="px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700 text-[10px] font-black text-violet-300 shadow-md flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span>{nearbyRunners.length} nearby runners</span>
+            </div>
+          </div>
+        )}
 
         {/* 맵 가장자리 비네팅 및 HUD 가독성 오버레이 */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/80 via-transparent to-slate-950/90" />

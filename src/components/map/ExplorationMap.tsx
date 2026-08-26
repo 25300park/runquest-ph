@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import L from 'leaflet';
 import {
+  Circle,
   CircleMarker,
   MapContainer,
   Marker,
@@ -11,6 +12,7 @@ import {
 } from 'react-leaflet';
 import type { Area } from '../../types/area';
 import type { Course, CourseCheckpoint } from '../../types/course';
+import type { TerritoryZone } from '../../data/mockLandmarks';
 
 type ExplorationMapProps = {
   areas: Area[];
@@ -18,6 +20,8 @@ type ExplorationMapProps = {
   selectedCourse: Course;
   userPosition: [number, number];
   onSelectCourse: (courseId: string) => void;
+  territories?: TerritoryZone[];
+  onSelectTerritory?: (territory: TerritoryZone) => void;
 };
 
 const checkpointColors: Record<CourseCheckpoint['type'], string> = {
@@ -42,14 +46,33 @@ function createLabelIcon(label: string, className: string) {
   });
 }
 
+function createRulerIcon(avatar: string, rulerName: string) {
+  return L.divIcon({
+    className: '',
+    html: `
+      <div class="relative flex flex-col items-center group cursor-pointer animate-bounce">
+        <span class="absolute -top-3 text-sm z-10 filter drop-shadow">👑</span>
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-400 via-amber-200 to-yellow-100 border-2 border-amber-500 shadow-xl flex items-center justify-center text-xl">
+          ${avatar}
+        </div>
+        <span class="mt-1 px-2 py-0.5 rounded-full bg-slate-900/90 text-white text-[9px] font-black tracking-tight whitespace-nowrap shadow-md">
+          ${rulerName.slice(0, 10)}
+        </span>
+      </div>
+    `,
+    iconSize: [48, 56],
+    iconAnchor: [24, 28]
+  });
+}
+
 const areaIcon = createLabelIcon(
   'ZONE',
-  'grid h-10 w-10 place-items-center rounded-full border-2 border-teal-200 bg-stone-950 text-[9px] font-black text-teal-200 shadow-lg'
+  'grid h-10 w-10 place-items-center rounded-full border-2 border-violet-500 bg-white text-[10px] font-black text-violet-700 shadow-lg'
 );
 
 const userIcon = createLabelIcon(
   'YOU',
-  'grid h-10 w-10 place-items-center rounded-full border-2 border-amber-200 bg-quest-teal text-[10px] font-black text-white shadow-[0_0_24px_rgba(20,184,166,0.7)]'
+  'grid h-10 w-10 place-items-center rounded-full border-2 border-amber-400 bg-gradient-to-tr from-violet-600 to-indigo-600 text-[10px] font-black text-white shadow-xl'
 );
 
 function FitSelectedRoute({ course }: { course: Course }) {
@@ -68,7 +91,9 @@ export default function ExplorationMap({
   courses,
   selectedCourse,
   userPosition,
-  onSelectCourse
+  onSelectCourse,
+  territories = [],
+  onSelectTerritory
 }: ExplorationMapProps) {
   return (
     <MapContainer
@@ -82,6 +107,33 @@ export default function ExplorationMap({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+
+      {/* 랜드마크 점령 구역 (Territory Zones) 하이라이트 & 👑 지배자 마커 */}
+      {territories.map((territory) => (
+        <div key={territory.id}>
+          <Circle
+            center={territory.center}
+            radius={territory.radiusMeters}
+            pathOptions={{
+              color: '#8b5cf6',
+              fillColor: '#8b5cf6',
+              fillOpacity: 0.18,
+              weight: 2,
+              dashArray: '6, 6'
+            }}
+            eventHandlers={{
+              click: () => onSelectTerritory?.(territory)
+            }}
+          />
+          <Marker
+            position={territory.center}
+            icon={createRulerIcon(territory.currentRulerAvatar, territory.currentRulerName)}
+            eventHandlers={{
+              click: () => onSelectTerritory?.(territory)
+            }}
+          />
+        </div>
+      ))}
 
       {areas.map((area) => (
         <Marker key={area.id} position={area.mapCenter} icon={areaIcon}>
@@ -101,8 +153,8 @@ export default function ExplorationMap({
             key={course.id}
             positions={course.routeCoordinates}
             pathOptions={{
-              color: isSelected ? '#facc15' : '#14b8a6',
-              weight: isSelected ? 8 : 4,
+              color: isSelected ? '#7c3aed' : '#94a3b8',
+              weight: isSelected ? 7 : 4,
               opacity: isSelected ? 0.95 : 0.55
             }}
             eventHandlers={{
@@ -130,7 +182,7 @@ export default function ExplorationMap({
                     : 5
               }
               pathOptions={{
-                color: '#111816',
+                color: '#1e293b',
                 fillColor: checkpointColors[checkpoint.type],
                 fillOpacity: isSelected ? 1 : 0.72,
                 weight: isSelected ? 3 : 2

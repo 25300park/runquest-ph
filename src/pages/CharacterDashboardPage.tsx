@@ -5,6 +5,7 @@ import { subscribeToAvatarRealtime } from '../services/aiAvatarService';
 import { subscribeToEquipmentEconomy } from '../services/equipmentEconomyService';
 import type { CharacterProfile } from '../types/rpgCharacter';
 import { getLevelProgress, xpPerLevel } from '../utils/characterRpg';
+import { defaultExplorationStats } from '../utils/fogOfWar';
 
 function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: string; isToday: boolean }> {
   const now = new Date();
@@ -284,6 +285,42 @@ export default function CharacterDashboardPage() {
               Join Crew
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* 5. 🗺️ 전장의 안개 & 도시 탐험도 섹션 (Fog of War & City Exploration) */}
+      <section className="px-5 pt-3 pb-1">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+            <span>🗺️</span> City Exploration & Fog of War
+          </h2>
+          <span className="text-[10px] font-black text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+            Live Scout
+          </span>
+        </div>
+
+        <div className="grid gap-2.5">
+          {defaultExplorationStats.map((stat) => (
+            <div
+              key={stat.areaId}
+              className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm"
+            >
+              <div className="flex items-center justify-between text-xs font-black">
+                <span className="text-slate-800">{stat.areaName}</span>
+                <span className="text-violet-700 font-extrabold">{stat.revealedPercentage}% Revealed</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 transition-all duration-500"
+                  style={{ width: `${stat.revealedPercentage}%` }}
+                />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400 font-bold">
+                <span>{stat.totalKmCovered} km explored</span>
+                <span>{stat.unlockedSectors}/{stat.totalSectors} sectors cleared</span>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
