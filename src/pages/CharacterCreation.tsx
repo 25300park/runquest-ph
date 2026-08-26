@@ -1,13 +1,14 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createCharacter } from '../services/characterService';
 
-// Step 1: 1번부터 24번까지의 아바타 데이터 배열 동적 생성
-const avatarList = Array.from({ length: 24 }, (_, i) => {
-  const paddedIndex = String(i + 1).padStart(2, '0');
+// 1번부터 23번까지의 실제 아바타 이미지 파일(/images/avatars/1.png ~ 23.png) 목록
+const avatarList = Array.from({ length: 23 }, (_, i) => {
+  const num = i + 1;
+  const paddedIndex = String(num).padStart(2, '0');
   return {
-    id: `avatar-${paddedIndex}`,
-    src: `/images/avatars/avatar-${paddedIndex}.png`,
+    id: `avatar-${num}`,
+    src: `/images/avatars/${num}.png`,
     name: `Runner #${paddedIndex}`
   };
 });
