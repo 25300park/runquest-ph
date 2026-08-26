@@ -3,11 +3,19 @@
     return '/images/avatars/1.png';
   }
 
+  // 0. mp4 확장자 처리
+  if (url.includes('8.mp4')) {
+    return '/images/avatars/8.mp4';
+  }
+
   // 1. 이미 정상적인 /images/avatars/X.png 형식인 경우
-  const directMatch = url.match(/\/images\/avatars\/(\d+)\.png$/);
+  const directMatch = url.match(/\/images\/avatars\/(\d+)\.(png|mp4)$/);
   if (directMatch) {
     const num = parseInt(directMatch[1], 10);
     if (num >= 1 && num <= 23) {
+      if (num === 8 && directMatch[2] === 'mp4') {
+        return '/images/avatars/8.mp4';
+      }
       return `/images/avatars/${num}.png`;
     }
   }
@@ -30,4 +38,17 @@
 
   // 기본 안전 경로
   return '/images/avatars/1.png';
+}
+
+export function isVideoAvatar(url?: string | null): boolean {
+  if (!url) return false;
+  return url.endsWith('.mp4') || url.includes('/8.') || url === '/images/avatars/8.png';
+}
+
+export function getAvatarThumbnail(url?: string | null): string {
+  const normalized = normalizeAvatarUrl(url);
+  if (normalized.endsWith('.mp4')) {
+    return '/images/avatars/8.png';
+  }
+  return normalized;
 }

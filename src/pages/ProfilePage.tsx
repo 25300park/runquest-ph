@@ -5,7 +5,7 @@ import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../
 import { Link } from 'react-router-dom';
 import { getCurrentAdminProfile } from '../admin/adminService';
 import { usePwaInstall } from '../hooks/usePwaInstall';
-import { normalizeAvatarUrl } from '../utils/avatarUtils';
+import { isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
 
 export default function ProfilePage() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -46,17 +46,28 @@ export default function ProfilePage() {
         <div className="absolute -bottom-8 -left-12 -right-12 h-44 bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 rounded-[50%] pointer-events-none opacity-95 shadow-xl" />
         <div className="absolute -bottom-14 -left-8 -right-8 h-36 bg-emerald-700 rounded-[50%] pointer-events-none" />
 
-        {/* 🔥 유저가 선택한 23종 캐릭터 아바타 & 자연 잔디 포디움 */}
+        {/* 🔥 유저가 선택한 23종 캐릭터 아바타 (8번 캐릭터는 8.mp4 비디오) & 자연 잔디 포디움 */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 pt-2">
           <div className="w-56 h-56 sm:w-64 sm:h-64 flex items-center justify-center animate-in zoom-in duration-300">
-            <img
-              src={avatarUrl}
-              alt="Hero Showcase"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = '/images/avatars/1.png';
-              }}
-              className="w-full h-full object-contain filter drop-shadow-[0_20px_30px_rgba(6,78,59,0.5)]"
-            />
+            {isVideoAvatar(avatarUrl) ? (
+              <video
+                src="/images/avatars/8.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-contain filter drop-shadow-[0_20px_30px_rgba(6,78,59,0.5)] rounded-3xl"
+              />
+            ) : (
+              <img
+                src={avatarUrl}
+                alt="Hero Showcase"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/images/avatars/1.png';
+                }}
+                className="w-full h-full object-contain filter drop-shadow-[0_20px_30px_rgba(6,78,59,0.5)]"
+              />
+            )}
           </div>
           {/* 바닥 잔디 그림자 & 자연스러운 받침대 */}
           <div className="w-44 h-4 bg-emerald-950/35 rounded-full blur-[3px] -mt-4 border border-emerald-400/30" />

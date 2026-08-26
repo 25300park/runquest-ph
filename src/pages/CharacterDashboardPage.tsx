@@ -6,7 +6,7 @@ import { subscribeToEquipmentEconomy } from '../services/equipmentEconomyService
 import type { CharacterProfile } from '../types/rpgCharacter';
 import { getLevelProgress, xpPerLevel } from '../utils/characterRpg';
 import { defaultExplorationStats } from '../utils/fogOfWar';
-import { normalizeAvatarUrl } from '../utils/avatarUtils';
+import { getAvatarThumbnail, isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
 
 function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: string; isToday: boolean }> {
   const now = new Date();
@@ -135,7 +135,14 @@ export default function CharacterDashboardPage() {
             to="/profile"
             className="w-10 h-10 rounded-2xl bg-emerald-100 border-2 border-emerald-300 flex items-center justify-center shadow-md active:scale-95 transition-all overflow-hidden p-0.5"
           >
-            <img src={avatarUrl} alt="Hero Avatar" className="w-full h-full object-contain filter drop-shadow-sm" />
+            <img
+              src={getAvatarThumbnail(avatarUrl)}
+              alt={runnerName}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/images/avatars/1.png';
+              }}
+              className="w-full h-full object-contain filter drop-shadow-sm"
+            />
           </Link>
         </div>
       </header>
@@ -161,7 +168,7 @@ export default function CharacterDashboardPage() {
         </div>
       </section>
 
-      {/* 3. 메인 RPG 카드 (핵심: 동화풍 맑은 자연 모험 배경 + 3D 캐릭터 피규어 + HUD + Start CTA) */}
+      {/* 3. 메인 RPG 카드 (핵심: 동화풍 맑은 자연 모험 배경 + 3D 캐릭터/비디오 피규어 + HUD + Start CTA) */}
       <section className="px-5 py-2">
         <div className="bg-white rounded-3xl p-4 shadow-xl border border-slate-100 relative overflow-hidden flex flex-col gap-3">
           {/* 캐릭터 3D 자연 모험 뷰포트 */}
@@ -185,17 +192,28 @@ export default function CharacterDashboardPage() {
               </span>
             </div>
 
-            {/* 🔥 유저가 선택한 23종 캐릭터 아바타 & 자연 잔디 포디움 */}
+            {/* 🔥 유저가 선택한 23종 캐릭터 아바타 (8번 캐릭터는 8.mp4 비디오) & 자연 잔디 포디움 */}
             <div className="relative z-10 my-auto flex flex-col items-center justify-center pt-2">
               <div className="relative w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center animate-in zoom-in duration-300">
-                <img
-                  src={avatarUrl}
-                  alt="Selected Hero Avatar"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/images/avatars/1.png';
-                  }}
-                  className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(6,78,59,0.45)]"
-                />
+                {isVideoAvatar(avatarUrl) ? (
+                  <video
+                    src="/images/avatars/8.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(6,78,59,0.45)] rounded-2xl"
+                  />
+                ) : (
+                  <img
+                    src={avatarUrl}
+                    alt="Selected Hero Avatar"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/images/avatars/1.png';
+                    }}
+                    className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(6,78,59,0.45)]"
+                  />
+                )}
               </div>
               {/* 잔디 그림자 & 자연스러운 받침대 */}
               <div className="w-36 h-3.5 bg-emerald-950/30 rounded-full blur-[3px] -mt-3.5 border border-emerald-400/20" />

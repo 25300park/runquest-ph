@@ -94,15 +94,31 @@ export default function CharacterCreation() {
         {/* 메인 캐릭터 대형 프리뷰 및 닉네임 입력 카드 */}
         <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-xl text-center relative overflow-hidden">
           {/* 캐릭터 아바타 대형 프리뷰 */}
-          <div className="mx-auto w-32 h-32 rounded-3xl bg-gradient-to-br from-violet-50 via-slate-50 to-indigo-50/50 p-2.5 shadow-md border-2 border-violet-100 flex items-center justify-center relative">
+          <div className="w-28 h-28 rounded-full bg-gradient-to-b from-sky-400 via-sky-200 to-emerald-400 p-2 shadow-inner border-2 border-emerald-300 mx-auto flex items-center justify-center relative overflow-hidden">
             {selectedAvatar ? (
-              <img
-                src={selectedAvatar}
-                alt="Selected Runner"
-                className="w-full h-full object-contain filter drop-shadow-md animate-in zoom-in-95 duration-200"
-              />
+              selectedAvatar.includes('/8.') ? (
+                <video
+                  src="/images/avatars/8.mp4"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-contain filter drop-shadow-md rounded-full"
+                />
+              ) : (
+                <img
+                  src={selectedAvatar}
+                  alt="Selected Runner"
+                  className="w-full h-full object-contain filter drop-shadow-md animate-in zoom-in-95 duration-200"
+                />
+              )
             ) : (
               <span className="text-3xl font-black text-slate-300">?</span>
+            )}
+            {selectedAvatar && selectedAvatar.includes('/8.') && (
+              <span className="absolute bottom-1 bg-violet-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white">
+                🎬 Motion
+              </span>
             )}
           </div>
 
@@ -136,7 +152,7 @@ export default function CharacterCreation() {
           </div>
         </div>
 
-        {/* Step 2 & 3: 24개 아바타 3열 그리드 (Light Theme & Micro-interaction) */}
+        {/* Step 2 & 3: 23개 아바타 3열 그리드 (Light Theme & Micro-interaction) */}
         <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between px-1">
             <p className="text-xs font-black uppercase text-slate-500">
@@ -150,6 +166,7 @@ export default function CharacterCreation() {
           <div className="grid grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto pr-1 no-scrollbar">
             {avatarList.map((avatar) => {
               const isSelected = selectedAvatar === avatar.src;
+              const isVideo = avatar.id === 'avatar-8';
               return (
                 <button
                   key={avatar.id}
@@ -161,13 +178,29 @@ export default function CharacterCreation() {
                       : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200 opacity-75'
                   }`}
                 >
+                  {isVideo && (
+                    <span className="absolute top-1.5 right-1.5 bg-violet-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full border border-white shadow-xs">
+                      🎬 MP4
+                    </span>
+                  )}
                   <div className="w-full aspect-square flex items-center justify-center p-1">
-                    <img
-                      src={avatar.src}
-                      alt={avatar.name}
-                      className="w-full h-full object-contain filter drop-shadow-xs"
-                      loading="lazy"
-                    />
+                    {isVideo ? (
+                      <video
+                        src="/images/avatars/8.mp4"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="w-full h-full object-contain filter drop-shadow-xs rounded-xl"
+                      />
+                    ) : (
+                      <img
+                        src={avatar.src}
+                        alt={avatar.name}
+                        className="w-full h-full object-contain filter drop-shadow-xs"
+                        loading="lazy"
+                      />
+                    )}
                   </div>
                   <span
                     className={`mt-1.5 text-[10px] font-black truncate max-w-[80px] ${
