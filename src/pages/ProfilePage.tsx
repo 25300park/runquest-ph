@@ -1,6 +1,4 @@
 ﻿import { useEffect, useState } from 'react';
-import { mockAreas } from '../data/mockAreas';
-import { mockCharacters } from '../data/mockCharacters';
 import { mockTrophies, type TrophyItem } from '../data/mockTrophies';
 import { getGameProgress } from '../utils/gameProgress';
 import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../utils/xp';
@@ -13,13 +11,6 @@ export default function ProfilePage() {
   const [selectedTrophy, setSelectedTrophy] = useState<TrophyItem | null>(null);
   const { isStandalone, showIosGuide, setShowIosGuide, promptInstall } = usePwaInstall();
   const progress = getGameProgress();
-  const selectedCharacter =
-    mockCharacters.find((character) => character.id === progress.selectedCharacterId) ??
-    mockCharacters[0];
-  const characterProgress = progress.characterProgress[selectedCharacter.id] ?? {
-    totalXp: 0,
-    level: 1
-  };
   const currentLevel = calculateLevelFromXp(progress.totalXp);
   const nextLevelXp = getNextLevelXp(progress.totalXp);
   const currentLevelBaseXp = getCurrentLevelBaseXp(progress.totalXp);
@@ -37,50 +28,80 @@ export default function ProfilePage() {
   }, []);
 
   return (
-    <section className="min-h-full space-y-4 bg-slate-50 px-4 py-5 text-slate-900 font-sans pb-24 select-none">
-      {/* 1. 상단 9:16 캐릭터 쇼케이스 카드 */}
-      <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm relative overflow-hidden">
-        <div className="flex items-center justify-between mb-3">
+    <section className="min-h-full space-y-4 bg-slate-50 px-4 py-4 text-slate-900 font-sans pb-28 select-none">
+      {/* 1. 상단 60% 몰입형 피규어 쇼룸 뷰포트 (Glassmorphism & Figure Showcase) */}
+      <div className="relative w-full aspect-[9/15] min-h-[460px] max-h-[540px] rounded-3xl overflow-hidden bg-slate-950 shadow-2xl border border-slate-800 flex flex-col justify-between">
+        {/* 9:16 캐릭터 비디오 */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-95"
+          poster="/characters/starter-preview.png"
+        >
+          <source src="/characters/tiger-runner-loop.mp4" type="video/mp4" />
+        </video>
+
+        {/* 쇼룸 전시 조명 & 앰비언트 비네팅 그라데이션 */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-slate-950/40 pointer-events-none" />
+
+        {/* 쇼룸 상단 플로팅 헤더 (Lv 뱃지 & 캐릭터 이름) */}
+        <div className="relative z-10 p-4 flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-violet-600">
-              Hero Showcase
-            </p>
-            <h1 className="text-xl font-black text-slate-900">{selectedCharacter.name}</h1>
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-violet-400 bg-violet-950/80 px-2.5 py-0.5 rounded-full border border-violet-700/60 backdrop-blur-md">
+              Hero Showroom
+            </span>
+            <h1 className="text-xl font-black text-white mt-1 drop-shadow-md">Shadow Tiger Ranger</h1>
           </div>
-          <span className="rounded-full bg-amber-100 text-amber-800 px-2.5 py-1 text-xs font-black">
+          <span className="rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 px-3 py-1 text-xs font-black shadow-lg border border-amber-200">
             Lv {currentLevel}
           </span>
         </div>
 
-        {/* 9:16 비디오 뷰어 */}
-        <div className="relative w-full aspect-[9/14] max-h-[340px] rounded-2xl overflow-hidden bg-slate-950 shadow-inner">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full h-full object-cover opacity-90"
-            poster="/characters/starter-preview.png"
-          >
-            <source src="/characters/tiger-runner-loop.mp4" type="video/mp4" />
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/30 pointer-events-none" />
-
-          {/* 비디오 위 오버레이 스탯 */}
-          <div className="absolute bottom-3 left-3 right-3 text-white">
-            <div className="flex items-center justify-between text-xs font-black">
-              <span>EXP Progress</span>
+        {/* 쇼룸 하단 겹치는 글래스모피즘(Glassmorphism) 장비 슬롯 */}
+        <div className="relative z-10 p-4 space-y-2.5">
+          {/* 레벨 EXP 바 */}
+          <div className="bg-slate-900/70 backdrop-blur-md p-2.5 rounded-2xl border border-slate-700/80 text-white">
+            <div className="flex items-center justify-between text-[11px] font-black">
+              <span>EXP Gauge</span>
               <span className="text-amber-300">{xpProgress}%</span>
             </div>
-            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-800">
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-300"
                 style={{ width: `${xpProgress}%` }}
               />
             </div>
-            <p className="mt-1 text-[10px] text-slate-300">
-              {progress.totalXp} XP total · Next level at {nextLevelXp} XP
-            </p>
+          </div>
+
+          {/* 글래스모피즘 착용 장비 가로 슬롯 */}
+          <div className="rounded-2xl bg-white/85 backdrop-blur-xl border border-white/60 p-3 shadow-2xl space-y-2">
+            <div className="flex items-center justify-between text-xs font-black text-slate-900 px-0.5">
+              <span className="flex items-center gap-1">
+                <span>🛡️</span> Equipped Relics
+              </span>
+              <span className="text-violet-700 font-extrabold text-[10px]">
+                {mockTrophies.filter((t) => t.unlocked).length} Active Buffs
+              </span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+              {mockTrophies.map((trophy) => (
+                <button
+                  key={trophy.id}
+                  type="button"
+                  onClick={() => setSelectedTrophy(trophy)}
+                  className={`min-w-[84px] p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
+                    trophy.unlocked
+                      ? 'bg-white/95 border-slate-200 shadow-sm hover:scale-105'
+                      : 'bg-slate-200/60 border-slate-300 opacity-50 grayscale'
+                  }`}
+                >
+                  <span className="text-xl">{trophy.icon}</span>
+                  <p className="text-[9px] font-black text-slate-800 mt-1 truncate max-w-[70px]">{trophy.name}</p>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -101,7 +122,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* 3. 🏆 Phase 5: 트로피 룸 & 특별 스킨 진열장 (Trophy Room) */}
+      {/* 3. 🏆 트로피 룸 & 특별 스킨 진열장 그리드 */}
       <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <div>
@@ -115,7 +136,6 @@ export default function ProfilePage() {
           </span>
         </div>
 
-        {/* 트로피 2열 그리드 */}
         <div className="grid grid-cols-2 gap-2.5 pt-1">
           {mockTrophies.map((trophy) => (
             <button

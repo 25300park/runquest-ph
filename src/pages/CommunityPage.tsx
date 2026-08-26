@@ -16,10 +16,27 @@ type GuildWithMembers = GuildRow & {
   members: GuildMemberRow[];
 };
 
+interface LiveStoryRunner {
+  id: string;
+  name: string;
+  avatar: string;
+  pace: string;
+  area: string;
+  isLive: boolean;
+}
+
+const liveStoryRunners: LiveStoryRunner[] = [
+  { id: 'story-1', name: 'BGC_Shadow', avatar: '🐯', pace: '4:50/km', area: 'BGC High St', isLive: true },
+  { id: 'story-2', name: 'ManilaFlash', avatar: '⚡', pace: '4:35/km', area: 'Ayala Triangle', isLive: true },
+  { id: 'story-3', name: 'MakatiPacer', avatar: '🦊', pace: '5:15/km', area: 'Greenbelt Loop', isLive: true },
+  { id: 'story-4', name: 'AyalaKnight', avatar: '🐺', pace: '5:00/km', area: 'Legazpi Active', isLive: true },
+  { id: 'story-5', name: 'SkyHawk', avatar: '🦅', pace: '4:42/km', area: 'MOA Seaside', isLive: true }
+];
+
 export default function CommunityPage() {
   const [activeTab, setActiveTab] = useState<'feed' | 'guilds'>('feed');
   const [feedItems, setFeedItems] = useState<ActivityFeedItem[]>(initialFeedItems);
-  const [activeBuffEffect, setActiveBuffEffect] = useState<{ id: string; type: 'energy' | 'potion' } | null>(null);
+  const [floatingParticles, setFloatingParticles] = useState<{ id: number; feedId: string; icon: string; x: number }[]>([]);
 
   // 길드 관련 상태
   const [guilds, setGuilds] = useState<GuildWithMembers[]>([]);
@@ -60,9 +77,17 @@ export default function CommunityPage() {
   );
 
   function handleSendBuff(feedId: string, buffType: 'energy' | 'potion') {
-    // 1. 파티클 애니메이션 트리거
-    setActiveBuffEffect({ id: feedId, type: buffType });
-    setTimeout(() => setActiveBuffEffect(null), 1000);
+    // 1. 플로팅 파티클 마이크로 인터랙션 생성 (화면 위로 튀어오르는 아이콘 4개)
+    const icon = buffType === 'energy' ? '⚡' : '🧪';
+    const newParticles = [
+      { id: Date.now() + 1, feedId, icon, x: -20 },
+      { id: Date.now() + 2, feedId, icon: '✨', x: 0 },
+      { id: Date.now() + 3, feedId, icon: buffType === 'energy' ? '💖' : '🌟', x: 20 }
+    ];
+    setFloatingParticles((prev) => [...prev, ...newParticles]);
+    setTimeout(() => {
+      setFloatingParticles((prev) => prev.filter((p) => !newParticles.some((np) => np.id === p.id)));
+    }, 1200);
 
     // 2. 낙관적 UI 업데이트
     setFeedItems((current) =>
@@ -123,15 +148,41 @@ export default function CommunityPage() {
 
   return (
     <section className="min-h-full space-y-4 bg-slate-50 px-4 py-5 text-slate-900 font-sans pb-24 select-none">
-      {/* 1. 상단 타이틀 카드 */}
-      <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-        <p className="text-[11px] font-extrabold uppercase tracking-wider text-violet-600">
-          City Community & Feed
-        </p>
-        <h1 className="mt-0.5 text-2xl font-black text-slate-900">Run with your city crew</h1>
-        <p className="mt-1 text-xs text-slate-500">
-          Share your quests, cheer fellow runners with RPG buffs, and build crew glory.
-        </p>
+      {/* 1. 상단 인스타그램 스토리형 라이브 러너 링 */}
+      <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-pink-500" />
+            </span>
+            Live Runners in Metro Manila
+          </h2>
+          <span className="text-[10px] font-extrabold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+            {liveStoryRunners.length} Active
+          </span>
+        </div>
+
+        {/* 가로 스크롤 스토리 아바타 */}
+        <div className="flex gap-3.5 overflow-x-auto pb-1 no-scrollbar pt-1">
+          {liveStoryRunners.map((runner) => (
+            <div key={runner.id} className="flex flex-col items-center shrink-0 group cursor-pointer active:scale-95 transition-all">
+              <div className="p-0.5 rounded-full bg-gradient-to-tr from-amber-400 via-pink-500 to-violet-600 shadow-md animate-pulse">
+                <div className="w-13 h-13 rounded-full bg-white p-0.5 flex items-center justify-center">
+                  <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-xl shadow-inner">
+                    {runner.avatar}
+                  </div>
+                </div>
+              </div>
+              <span className="mt-1.5 text-[11px] font-black text-slate-900 truncate max-w-[66px]">
+                {runner.name}
+              </span>
+              <span className="text-[9px] font-black text-violet-600">
+                {runner.pace}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* 2. 탭 전환 버튼 (Feed vs Guilds) */}
@@ -170,16 +221,7 @@ export default function CommunityPage() {
               key={item.id}
               className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm relative overflow-hidden transition-all hover:shadow-md"
             >
-              {/* 파티클 애니메이션 오버레이 */}
-              {activeBuffEffect?.id === item.id && (
-                <div className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center bg-violet-600/10 backdrop-blur-[1px] animate-in fade-in zoom-in duration-300">
-                  <span className="text-4xl animate-bounce">
-                    {activeBuffEffect.type === 'energy' ? '⚡ +50 ENERGY!' : '🧪 +100 EXP BUFF!'}
-                  </span>
-                </div>
-              )}
-
-              {/* 피드 헤더: 아바타 + 이름 + 시간 */}
+              {/* 피드 헤더 */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md shadow-violet-500/20 border-2 border-white">
@@ -216,7 +258,7 @@ export default function CommunityPage() {
                 </div>
               </div>
 
-              {/* 미니 궤적 프리뷰 박스 (SVG 렌더링) */}
+              {/* 미니 궤적 프리뷰 박스 */}
               <div className="mt-2.5 h-16 w-full rounded-xl bg-slate-900/5 border border-slate-200/60 flex items-center justify-center relative overflow-hidden">
                 <svg className="w-full h-full p-2 text-violet-600 stroke-current fill-none stroke-[3] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 100 40">
                   <path d="M 10 30 Q 30 5 50 20 T 90 10" />
@@ -226,8 +268,21 @@ export default function CommunityPage() {
                 </span>
               </div>
 
-              {/* 하단 RPG 상호 버프 액션 버튼 */}
-              <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+              {/* 하단 RPG 상호 버프 액션 버튼 & 플로팅 파티클 */}
+              <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2 relative">
+                {/* 플로팅 파티클 렌더링 */}
+                {floatingParticles
+                  .filter((p) => p.feedId === item.id)
+                  .map((particle) => (
+                    <span
+                      key={particle.id}
+                      style={{ transform: `translateX(${particle.x}px)` }}
+                      className="absolute -top-6 left-1/2 text-2xl pointer-events-none animate-bounce"
+                    >
+                      {particle.icon}
+                    </span>
+                  ))}
+
                 <button
                   type="button"
                   onClick={() => handleSendBuff(item.id, 'energy')}
@@ -262,7 +317,6 @@ export default function CommunityPage() {
       {/* 4. [TAB 2] 길드 & 크루 뷰 */}
       {activeTab === 'guilds' && (
         <div className="space-y-4">
-          {/* 상위 챔피언 길드 카드 */}
           {topGuild && (
             <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-orange-50/40 p-4 shadow-sm">
               <div className="flex items-center justify-between">
@@ -280,7 +334,6 @@ export default function CommunityPage() {
             </div>
           )}
 
-          {/* 새 길드 창설 폼 */}
           <form
             onSubmit={handleCreateGuild}
             className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm space-y-3"
@@ -304,13 +357,7 @@ export default function CommunityPage() {
             <p className="text-[11px] text-slate-400 font-medium">{status}</p>
           </form>
 
-          {/* 길드 목록 */}
           <div className="grid gap-3">
-            {loading && (
-              <div className="rounded-2xl bg-white p-6 text-center text-xs font-bold text-slate-400 border border-slate-100">
-                Loading live guilds...
-              </div>
-            )}
             {guilds.map((guild) => (
               <article
                 key={guild.id}
