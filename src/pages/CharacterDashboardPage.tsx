@@ -8,6 +8,7 @@ import { getGameProgress } from '../utils/gameProgress';
 import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../utils/xp';
 import { defaultExplorationStats } from '../utils/fogOfWar';
 import { getAvatarThumbnail, isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
+import VideoAdInterstitial from '../components/ads/VideoAdInterstitial';
 
 function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: string; isToday: boolean }> {
   const now = new Date();
@@ -137,8 +138,21 @@ export default function CharacterDashboardPage() {
     );
   }
 
+  const [showAd, setShowAd] = useState(true);
+
   return (
-    <div className="min-h-full bg-slate-50 text-slate-900 font-sans pb-12 select-none">
+    <div className="min-h-full bg-slate-50 text-slate-900 font-sans pb-12 select-none relative">
+      {/* 0. 홈 진입 전 전면 동영상 광고 시스템 */}
+      {showAd && (
+        <VideoAdInterstitial
+          onClose={() => setShowAd(false)}
+          videoSrc="/videos/ads/ad.mp4"
+          sponsorName="BGC Urban Sports & Nike Manila"
+          sponsorUrl="https://runquest-ph.vercel.app"
+          skipDelaySeconds={5}
+        />
+      )}
+
       {/* 1. 상단 프로필 헤더 */}
       <header className="pt-4 px-5 flex items-center justify-between">
         <div>
@@ -155,8 +169,18 @@ export default function CharacterDashboardPage() {
           </div>
         </div>
 
-        {/* 우측 랭킹 & 프로필 아바타 버튼 */}
+        {/* 우측 광고 테스트 & 랭킹 & 프로필 아바타 버튼 */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAd(true)}
+            className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-[10px] font-black shadow-xs active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+            title="동영상 광고 테스트 열기"
+          >
+            <span>📢</span>
+            <span>Ad Test</span>
+          </button>
+
           <Link
             to="/leaderboard"
             className="w-10 h-10 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-200/80 text-amber-700 flex items-center justify-center text-lg shadow-sm active:scale-95 transition-all"
