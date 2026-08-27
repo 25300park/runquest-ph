@@ -22,21 +22,24 @@ interface LiveStoryRunner {
   avatar: string;
   pace: string;
   area: string;
+  distance: string;
   isLive: boolean;
 }
 
 const liveStoryRunners: LiveStoryRunner[] = [
-  { id: 'story-1', name: 'BGC_Shadow', avatar: '/images/avatars/4.png', pace: '4:50/km', area: 'BGC High St', isLive: true },
-  { id: 'story-2', name: 'ManilaFlash', avatar: '/images/avatars/6.png', pace: '4:35/km', area: 'Ayala Triangle', isLive: true },
-  { id: 'story-3', name: 'MakatiPacer', avatar: '/images/avatars/9.png', pace: '5:15/km', area: 'Greenbelt Loop', isLive: true },
-  { id: 'story-4', name: 'AyalaKnight', avatar: '/images/avatars/13.png', pace: '5:00/km', area: 'Legazpi Active', isLive: true },
-  { id: 'story-5', name: 'SkyHawk', avatar: '/images/avatars/17.png', pace: '4:42/km', area: 'MOA Seaside', isLive: true }
+  { id: 'story-1', name: 'ShadowTiger', avatar: '/images/avatars/4.png', pace: '4:45/km', area: 'BGC Greenway', distance: '4.2 km', isLive: true },
+  { id: 'story-2', name: 'CyberRabbit', avatar: '/images/avatars/8.webm', pace: '4:20/km', area: 'High Street Loop', distance: '5.8 km', isLive: true },
+  { id: 'story-3', name: 'MakatiWolf', avatar: '/images/avatars/11.png', pace: '5:10/km', area: 'Ayala Triangle', distance: '3.5 km', isLive: true },
+  { id: 'story-4', name: 'GoldenFox', avatar: '/images/avatars/15.png', pace: '4:55/km', area: 'Terra 28th Park', distance: '2.9 km', isLive: true },
+  { id: 'story-5', name: 'NeonPanther', avatar: '/images/avatars/19.png', pace: '4:30/km', area: 'Legazpi Active', distance: '6.1 km', isLive: true },
+  { id: 'story-6', name: 'SkyFalcon', avatar: '/images/avatars/22.png', pace: '4:15/km', area: 'MOA Seaside', distance: '7.4 km', isLive: true }
 ];
 
 export default function CommunityPage() {
   const [activeTab, setActiveTab] = useState<'feed' | 'guilds'>('feed');
   const [feedItems, setFeedItems] = useState<ActivityFeedItem[]>(initialFeedItems);
-  const [floatingParticles, setFloatingParticles] = useState<{ id: number; feedId: string; icon: string; x: number }[]>([]);
+  const [floatingParticles, setFloatingParticles] = useState<{ id: number; feedId: string; icon: string; x: number; y: number }[]>([]);
+  const [selectedStory, setSelectedStory] = useState<LiveStoryRunner | null>(null);
 
   // 길드 관련 상태
   const [guilds, setGuilds] = useState<GuildWithMembers[]>([]);
@@ -77,19 +80,26 @@ export default function CommunityPage() {
   );
 
   function handleSendBuff(feedId: string, buffType: 'energy' | 'potion') {
-    // 1. 플로팅 파티클 마이크로 인터랙션 생성 (화면 위로 튀어오르는 아이콘 4개)
-    const icon = buffType === 'energy' ? '⚡' : '🧪';
+    // 1. 화려한 플로팅 파티클 마이크로 인터랙션 생성 (⚡/🥕/🧪/✨)
+    const iconPrimary = buffType === 'energy' ? '🥕' : '🧪';
+    const iconSecondary = buffType === 'energy' ? '⚡' : '✨';
     const newParticles = [
-      { id: Date.now() + 1, feedId, icon, x: -20 },
-      { id: Date.now() + 2, feedId, icon: '✨', x: 0 },
-      { id: Date.now() + 3, feedId, icon: buffType === 'energy' ? '💖' : '🌟', x: 20 }
+      { id: Date.now() + 1, feedId, icon: iconPrimary, x: -30, y: -40 },
+      { id: Date.now() + 2, feedId, icon: iconSecondary, x: -10, y: -65 },
+      { id: Date.now() + 3, feedId, icon: '💥', x: 10, y: -50 },
+      { id: Date.now() + 4, feedId, icon: buffType === 'energy' ? '⚡' : '🌟', x: 30, y: -45 }
     ];
     setFloatingParticles((prev) => [...prev, ...newParticles]);
     setTimeout(() => {
       setFloatingParticles((prev) => prev.filter((p) => !newParticles.some((np) => np.id === p.id)));
-    }, 1200);
+    }, 1400);
 
-    // 2. 낙관적 UI 업데이트
+    // 2. 진동 햅틱 피드백 (모바일 지원 시)
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      try { navigator.vibrate(40); } catch { /* ignore */ }
+    }
+
+    // 3. 낙관적 UI 업데이트
     setFeedItems((current) =>
       current.map((item) => {
         if (item.id !== feedId) return item;
@@ -153,8 +163,8 @@ export default function CommunityPage() {
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
             <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-pink-500" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
             </span>
             Live Runners in Metro Manila
           </h2>
@@ -166,24 +176,76 @@ export default function CommunityPage() {
         {/* 가로 스크롤 스토리 아바타 */}
         <div className="flex gap-3.5 overflow-x-auto pb-1 no-scrollbar pt-1">
           {liveStoryRunners.map((runner) => (
-            <div key={runner.id} className="flex flex-col items-center shrink-0 group cursor-pointer active:scale-95 transition-all">
+            <button
+              key={runner.id}
+              type="button"
+              onClick={() => setSelectedStory(runner)}
+              className="flex flex-col items-center shrink-0 group cursor-pointer active:scale-95 transition-all text-left"
+            >
               <div className="p-0.5 rounded-full bg-gradient-to-tr from-amber-400 via-pink-500 to-violet-600 shadow-md animate-pulse">
                 <div className="w-13 h-13 rounded-full bg-white p-0.5 flex items-center justify-center">
-                  <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden p-1 shadow-inner">
-                    <img src={runner.avatar} alt={runner.name} className="w-full h-full object-contain filter drop-shadow-xs" />
+                  <div className="w-full h-full rounded-full bg-gradient-to-b from-sky-300 to-emerald-300 flex items-center justify-center overflow-hidden p-1 shadow-inner">
+                    {runner.avatar.endsWith('.webm') ? (
+                      <video src={runner.avatar} autoPlay loop muted playsInline className="w-full h-full object-contain" />
+                    ) : (
+                      <img src={runner.avatar} alt={runner.name} className="w-full h-full object-contain filter drop-shadow-xs" />
+                    )}
                   </div>
                 </div>
               </div>
               <span className="mt-1.5 text-[11px] font-black text-slate-900 truncate max-w-[66px]">
                 {runner.name}
               </span>
-              <span className="text-[9px] font-black text-violet-600">
+              <span className="text-[9px] font-black text-emerald-600">
                 {runner.pace}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       </div>
+
+      {/* 라이브 러너 스토리 팝업 모달 */}
+      {selectedStory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-5 max-w-xs w-full shadow-2xl border border-slate-100 text-center relative overflow-hidden animate-in zoom-in-95 duration-200">
+            <button
+              type="button"
+              onClick={() => setSelectedStory(null)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-black active:scale-95"
+            >
+              ✕
+            </button>
+            <div className="w-20 h-20 rounded-full bg-gradient-to-b from-sky-400 via-sky-200 to-emerald-400 p-1 mx-auto flex items-center justify-center shadow-md border-2 border-emerald-300">
+              {selectedStory.avatar.endsWith('.webm') ? (
+                <video src={selectedStory.avatar} autoPlay loop muted playsInline className="w-full h-full object-contain" />
+              ) : (
+                <img src={selectedStory.avatar} alt={selectedStory.name} className="w-full h-full object-contain" />
+              )}
+            </div>
+            <h3 className="mt-3 text-base font-black text-slate-900">{selectedStory.name}</h3>
+            <span className="inline-block mt-0.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">
+              🔥 Live Running Now
+            </span>
+            <div className="mt-4 grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-2xl text-left text-xs">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400">Current Zone</p>
+                <p className="font-black text-slate-800 truncate">{selectedStory.area}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400">Live Pace</p>
+                <p className="font-black text-violet-600">{selectedStory.pace}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedStory(null)}
+              className="mt-4 w-full py-2.5 rounded-xl bg-violet-600 text-white font-black text-xs shadow-md shadow-violet-500/20 active:scale-95"
+            >
+              Send High-Five 👋
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. 탭 전환 버튼 (Feed vs Guilds) */}
       <div className="flex gap-2 p-1 bg-slate-200/70 rounded-2xl">
@@ -268,45 +330,50 @@ export default function CommunityPage() {
                 </span>
               </div>
 
-              {/* 하단 RPG 상호 버프 액션 버튼 & 플로팅 파티클 */}
+              {/* 하단 RPG 상호 버프 액션 버튼 (⚡ 당근 & 🧪 물약) */}
               <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2 relative">
-                {/* 플로팅 파티클 렌더링 */}
+                {/* 솟구치는 플로팅 파티클 렌더링 */}
                 {floatingParticles
                   .filter((p) => p.feedId === item.id)
                   .map((particle) => (
                     <span
                       key={particle.id}
-                      style={{ transform: `translateX(${particle.x}px)` }}
-                      className="absolute -top-6 left-1/2 text-2xl pointer-events-none animate-bounce"
+                      style={{
+                        transform: `translate(${particle.x}px, ${particle.y}px)`,
+                        transition: 'all 0.8s ease-out'
+                      }}
+                      className="absolute left-1/2 text-2xl pointer-events-none animate-bounce z-20"
                     >
                       {particle.icon}
                     </span>
                   ))}
 
+                {/* [⚡ 당근(에너지)] 버프 버튼 */}
                 <button
                   type="button"
                   onClick={() => handleSendBuff(item.id, 'energy')}
-                  className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 active:scale-95 ${
+                  className={`flex-1 py-2.5 px-3 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 active:scale-95 border ${
                     item.hasEnergized
-                      ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-sm'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      ? 'bg-amber-100 text-amber-900 border-amber-300 shadow-sm'
+                      : 'bg-amber-50/70 hover:bg-amber-100 text-amber-800 border-amber-200/70'
                   }`}
                 >
-                  <span className="text-sm">⚡</span>
-                  <span>Send Energy ({item.energyCount})</span>
+                  <span className="text-base">🥕</span>
+                  <span>⚡ 당근 ({item.energyCount})</span>
                 </button>
 
+                {/* [🧪 물약(XP)] 버프 버튼 */}
                 <button
                   type="button"
                   onClick={() => handleSendBuff(item.id, 'potion')}
-                  className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 active:scale-95 ${
+                  className={`flex-1 py-2.5 px-3 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 active:scale-95 border ${
                     item.hasPotioned
-                      ? 'bg-violet-100 text-violet-900 border border-violet-300 shadow-sm'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      ? 'bg-violet-100 text-violet-900 border-violet-300 shadow-sm'
+                      : 'bg-violet-50/70 hover:bg-violet-100 text-violet-800 border-violet-200/70'
                   }`}
                 >
-                  <span className="text-sm">🧪</span>
-                  <span>Drop Potion ({item.potionCount})</span>
+                  <span className="text-base">🧪</span>
+                  <span>물약 ({item.potionCount})</span>
                 </button>
               </div>
             </article>

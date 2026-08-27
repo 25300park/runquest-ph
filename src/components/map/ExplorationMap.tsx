@@ -202,6 +202,42 @@ export default function ExplorationMap({
           })
         )}
 
+        {/* 로컬 랜드마크 점령전 파스텔 구역 및 3D 플로팅 영주 핀 */}
+        {territories?.map((territory) => (
+          <div key={territory.id}>
+            <Circle
+              center={territory.center}
+              radius={territory.radiusMeters}
+              pathOptions={{
+                color: territory.status === 'occupied' ? '#f59e0b' : '#ec4899',
+                fillColor: territory.status === 'occupied' ? '#fef3c7' : '#fce7f3',
+                fillOpacity: 0.35,
+                weight: 2,
+                dashArray: '6, 6'
+              }}
+              eventHandlers={{
+                click: () => onSelectTerritory?.(territory)
+              }}
+            />
+            <Marker
+              position={territory.center}
+              icon={create3DFloatingRulerIcon(territory.currentRulerAvatar, territory.currentRulerName)}
+              eventHandlers={{
+                click: () => onSelectTerritory?.(territory)
+              }}
+            >
+              <Popup>
+                <div className="text-center p-1 font-sans">
+                  <span className="text-[10px] font-black text-amber-600 uppercase">👑 Territory Dominator</span>
+                  <p className="font-black text-sm text-slate-900 mt-0.5">{territory.name}</p>
+                  <p className="text-xs text-slate-600 mt-0.5">Ruler: <strong>{territory.currentRulerName}</strong></p>
+                  <p className="text-[11px] text-emerald-600 font-bold mt-1">{territory.rewardBuff}</p>
+                </div>
+              </Popup>
+            </Marker>
+          </div>
+        ))}
+
         <Marker position={userPosition} icon={userIcon}>
           <Popup>Route preview position</Popup>
         </Marker>
