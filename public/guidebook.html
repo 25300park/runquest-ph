@@ -1,0 +1,325 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RunQuest PH - 공식 사용자 가이드북 (User Guidebook)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      body {
+        background-color: white !important;
+        color: black !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+      .card {
+        box-shadow: none !important;
+        border: 1px solid #e2e8f0 !important;
+      }
+    }
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;900&display=swap');
+    body {
+      font-family: 'Pretendard', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen py-10 px-4 sm:px-8">
+  <div class="max-w-4xl mx-auto space-y-8">
+    
+    <!-- 상단 PDF 다운로드 및 액션 바 (인쇄 시 숨김) -->
+    <div class="no-print bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4 sticky top-4 z-50">
+      <div class="flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-violet-600 text-white flex items-center justify-center text-sm font-black">RQ</span>
+        <div>
+          <h2 class="font-black text-sm text-slate-900">RunQuest PH 사용자 가이드북</h2>
+          <p class="text-[11px] text-slate-500 font-medium">BGC & 마카티 모던 RPG 러닝 앱 완전 정복</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          onclick="window.print()"
+          class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-black shadow-md shadow-violet-500/20 hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+        >
+          <span>📄</span>
+          <span>PDF 다운로드 / 인쇄 (Ctrl+P)</span>
+        </button>
+        <a
+          href="/"
+          class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all"
+        >
+          앱으로 돌아가기
+        </a>
+      </div>
+    </div>
+
+    <!-- 표지 (Cover Page) -->
+    <header class="bg-gradient-to-br from-violet-600 via-indigo-700 to-slate-900 text-white rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden text-center sm:text-left">
+      <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-xs font-black text-amber-300 uppercase tracking-wider mb-4">
+        ✨ Official Consumer Guidebook v1.0
+      </div>
+      <h1 class="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
+        RunQuest PH<br />
+        <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-emerald-300 to-sky-300">
+          모던 RPG 러닝 플레이 가이드
+        </span>
+      </h1>
+      <p class="mt-4 text-sm sm:text-base text-slate-200 max-w-xl leading-relaxed">
+        BGC(Bonifacio Global City)와 마카티 도심을 달리는 23종 동물 영웅들의 모험! 
+        Strava의 핵심 기능과 RPG 세계관이 결합된 RunQuest PH의 모든 기능과 연결 구조를 소개합니다.
+      </p>
+      <div class="mt-8 pt-6 border-t border-white/15 flex flex-wrap gap-4 text-xs font-bold text-slate-300">
+        <div>📍 주요 무대: BGC, Makati, MOA</div>
+        <div>👥 23종 동물 아바타 & 모션 비디오</div>
+        <div>👑 실시간 영토 점령전</div>
+      </div>
+    </header>
+
+    <!-- 0. 한눈에 보는 앱 구조도 (System Architecture) -->
+    <section class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 card">
+      <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
+        <span class="text-violet-600">🧭</span> 0. 한눈에 보는 앱 메뉴 구조 및 러닝 사이클
+      </h2>
+      <p class="mt-2 text-xs sm:text-sm text-slate-600">
+        RunQuest PH는 4개의 핵심 탭(Home, Map, Crew, Profile)과 1개의 즉시 러닝 CTA 버튼으로 구성되어 있습니다.
+      </p>
+
+      <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-center">
+        <div class="p-4 rounded-2xl bg-violet-50 border border-violet-100">
+          <div class="text-2xl mb-1">🏠</div>
+          <h3 class="font-black text-sm text-violet-900">1. Home 대시보드</h3>
+          <p class="text-[11px] text-slate-600 mt-1">
+            내 캐릭터 모션 뷰포트, 주간 러닝 캘린더, 실시간 레벨 & 스태미너 HUD
+          </p>
+        </div>
+        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
+          <div class="text-2xl mb-1">🗺️</div>
+          <h3 class="font-black text-sm text-emerald-900">2. Map 탐험 지도</h3>
+          <p class="text-[11px] text-slate-600 mt-1">
+            BGC 코스 목록, 랜드마크 점령전 3D 왕관 핀, 새 코스 제작(Builder)
+          </p>
+        </div>
+        <div class="p-4 rounded-2xl bg-amber-50 border border-amber-100">
+          <div class="text-2xl mb-1">👥</div>
+          <h3 class="font-black text-sm text-amber-900">3. Crew 커뮤니티</h3>
+          <p class="text-[11px] text-slate-600 mt-1">
+            실시간 러너 라이브 링, 활동 피드, ⚡당근 / 🧪물약 상호 버프, 길드
+          </p>
+        </div>
+        <div class="p-4 rounded-2xl bg-sky-50 border border-sky-100">
+          <div class="text-2xl mb-1">👤</div>
+          <h3 class="font-black text-sm text-sky-900">4. Profile 쇼룸</h3>
+          <p class="text-[11px] text-slate-600 mt-1">
+            9:16 자연 피규어 쇼룸, 23종 캐릭터 변경, 착용 장비 슬롯, 트로피 룸
+          </p>
+        </div>
+      </div>
+
+      <!-- 플로우 다이어그램 -->
+      <div class="mt-6 p-4 rounded-2xl bg-slate-900 text-white text-xs space-y-2">
+        <div class="font-black text-amber-300">🔄 [소비자 핵심 플레이 루프]</div>
+        <div class="flex flex-wrap items-center gap-2 font-mono">
+          <span class="bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">1. 캐릭터 선택 & 코스 탐색</span>
+          <span>➔</span>
+          <span class="bg-violet-600 px-2.5 py-1 rounded-lg">2. GPS 실시간 러닝 & 몬스터/체크포인트 돌파</span>
+          <span>➔</span>
+          <span class="bg-emerald-600 px-2.5 py-1 rounded-lg">3. 경험치(XP) 획득 & 레벨업</span>
+          <span>➔</span>
+          <span class="bg-amber-600 px-2.5 py-1 rounded-lg">4. 랜드마크 점령 & 크루 버프 교환</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 1. Home 화면 가이드 -->
+    <section class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 card">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
+          <span class="text-violet-600">🏠</span> 1. Home 화면 : 나의 러닝 영웅 대시보드
+        </h2>
+        <span class="px-2.5 py-1 rounded-full bg-violet-100 text-violet-800 text-xs font-black">메인 화면</span>
+      </div>
+
+      <div class="mt-4 space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+        <p>앱에 접속하면 가장 먼저 마주하는 화면으로, 유저의 상태와 오늘의 러닝 준비 상태를 한눈에 점검합니다.</p>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <h4 class="font-black text-slate-900 mb-1.5 flex items-center gap-1">
+              <span>🌟</span> 푸른 자연 모험 뷰포트 (Hero Card)
+            </h4>
+            <ul class="space-y-1 text-slate-600 list-disc list-inside text-xs">
+              <li>유저가 선택한 <strong>23종 동물 캐릭터(8번은 투명 모션 비디오)</strong>가 푸른 잔디 언덕 위에 서서 역동적으로 움직입니다.</li>
+              <li><strong>HP 100/100 및 Stamina 92%</strong> 상태 뱃지가 실시간 표시됩니다.</li>
+              <li>하단 HUD에 <strong>통합 레벨(Lv.3)과 실시간 EXP 게이지(%)</strong>가 정확히 연동됩니다.</li>
+            </ul>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <h4 class="font-black text-slate-900 mb-1.5 flex items-center gap-1">
+              <span>📅</span> 주간 캘린더 스트릭 & 퀵 스타트
+            </h4>
+            <ul class="space-y-1 text-slate-600 list-disc list-inside text-xs">
+              <li>월요일부터 일요일까지 이번 주의 요일과 날짜가 표시되며, 오늘 날짜는 보라색으로 하이라이트됩니다.</li>
+              <li><strong>[⚡ Start Quest Run]</strong> 버튼을 누르면 추천 코스로 즉시 실시간 GPS 러닝 트래킹이 시작됩니다.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Map & 점령전 가이드 -->
+    <section class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 card">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
+          <span class="text-emerald-600">🗺️</span> 2. Map 탐험 지도 & 랜드마크 점령전
+        </h2>
+        <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black">Strava Segments 진화형</span>
+      </div>
+
+      <div class="mt-4 space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+        <p>
+          BGC Greenway, Ayala Triangle, Bonifacio High Street 등 실제 메트로 마닐라의 명소를 달리고 땅을 점령하는 핵심 콘텐츠입니다.
+        </p>
+
+        <div class="space-y-3">
+          <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200">
+            <h4 class="font-black text-amber-900 flex items-center gap-1.5">
+              <span>👑</span> 로컬 랜드마크 점령전 (Territory Siege) 작동 방식
+            </h4>
+            <ol class="mt-2 space-y-1.5 text-xs text-amber-800 list-decimal list-inside">
+              <li>지도 상에 <strong>파스텔 톤 점령 원(Circle)</strong>과 <strong>1위 지배자 아바타의 3D 플로팅 왕관 핀</strong>이 표시됩니다.</li>
+              <li>왕관 핀을 터치하면 <strong>[점령 도전 바텀 시트]</strong>가 올라오며, 현재 1위의 주간 기록(예: 42.5km)과 보상 버프를 확인합니다.</li>
+              <li><strong>[⚔️ 왕좌 도전하기]</strong>를 클릭하면 해당 구역 코스 트래킹이 활성화되어 1위 탈환을 위한 퀘스트가 시작됩니다.</li>
+            </ol>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <h4 class="font-black text-slate-900 flex items-center gap-1.5">
+              <span>➕</span> 코스 빌더 (Course Builder)
+            </h4>
+            <p class="text-xs text-slate-600 mt-1">
+              지도를 직접 터치하여 출발지, 체크포인트, 도착지를 찍고 나만의 러닝 루트를 생성하여 커뮤니티에 공유할 수 있습니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 실시간 트래킹 & MMO 인카운터 -->
+    <section class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 card">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
+          <span class="text-rose-600">🏃‍♂️</span> 3. 실시간 GPS 러닝 & 라이브 유저 인카운터
+        </h2>
+        <span class="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-black">Strava Beacon 진화형</span>
+      </div>
+
+      <div class="mt-4 space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+        <p>실제 러닝 중 GPS 신호를 실시간 추적하여 페이스, 거리, 심박수(Kcal)를 기록하며 주변 러너들과 마주칩니다.</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <h4 class="font-black text-slate-900 mb-1 flex items-center gap-1">
+              <span>📡</span> 2km 주변 러너 실시간 레이더
+            </h4>
+            <p class="text-xs text-slate-600">
+              내 주변 2km 반경에서 함께 달리고 있는 실제 유저들의 동물 아바타가 미니맵에 실시간 핀으로 표시되어 MMO 러닝의 생동감을 제공합니다.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <h4 class="font-black text-slate-900 mb-1 flex items-center gap-1">
+              <span>👋</span> 20m 근접 스침 "High-Five!" 이벤트
+            </h4>
+            <p class="text-xs text-slate-600">
+              다른 러너와 반경 20m 이내로 스쳐 지나가면 햅틱 진동과 함께 <strong>"High-Five! 👋" 팝업</strong>이 발동하여 보너스 XP를 획득합니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Community & RPG 버프 -->
+    <section class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 card">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
+          <span class="text-amber-600">👥</span> 4. Crew 피드 & 당근/물약 상호 버프
+        </h2>
+        <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-black">Strava Kudos 진화형</span>
+      </div>
+
+      <div class="mt-4 space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+        <p>단순한 좋아요 대신 러너의 실제 능력치(에너지 & 경험치)를 올려주는 게임형 소셜 피드입니다.</p>
+
+        <div class="space-y-3">
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <h4 class="font-black text-slate-900 flex items-center gap-1.5">
+              <span>🔴</span> 인스타그램 스토리형 'Live Runners' 링
+            </h4>
+            <p class="text-xs text-slate-600 mt-1">
+              화면 상단에 실시간으로 달리고 있는 유저들의 아바타 링이 펄스 애니메이션으로 깜빡입니다. 터치 시 현재 달리는 구역과 라이브 페이스가 팝업됩니다.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-violet-50 border border-amber-200">
+            <h4 class="font-black text-slate-900 flex items-center gap-1.5">
+              <span>🥕⚡ / 🧪</span> [당근] & [물약] 파티클 상호 버프
+            </h4>
+            <p class="text-xs text-slate-700 mt-1">
+              피드 카드의 <strong>[⚡ 당근]</strong>을 누르면 상대방에게 +10 에너지를 선물하고, <strong>[🧪 물약]</strong>을 누르면 +25 XP를 지급합니다. 
+              클릭 시 화면 위로 화려한 파티클 이펙트와 함께 햅틱 진동이 울립니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Profile & 캐릭터 쇼룸 -->
+    <section class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 card">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
+          <span class="text-sky-600">👤</span> 5. Profile 쇼룸 & 23종 캐릭터 커스터마이징
+        </h2>
+        <span class="px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 text-xs font-black">내 영웅 쇼룸</span>
+      </div>
+
+      <div class="mt-4 space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+        <p>내 캐릭터의 9:16 피규어 쇼룸과 획득한 장비, 23종 아바타 변경을 지원합니다.</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <h4 class="font-black text-slate-900 mb-1 flex items-center gap-1">
+              <span>🔄</span> 아바타 변경 & 레벨 영구 보존
+            </h4>
+            <p class="text-xs text-slate-600">
+              `[🔄 Change]` 버튼을 눌러 23종 동물 캐릭터와 8번 투명 모션 비디오 캐릭터를 언제든 변경할 수 있습니다. <strong>캐릭터를 변경해도 누적 레벨과 경험치는 100% 안전하게 유지</strong>됩니다.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <h4 class="font-black text-slate-900 mb-1 flex items-center gap-1">
+              <span>🛡️</span> 착용 장비 슬롯 & 트로피 룸
+            </h4>
+            <p class="text-xs text-slate-600">
+              Starter Striders(신발), Neon Tiger Gloves(장갑), BGC Pioneer Cap(모자) 등 글래스모피즘 장비 카드와 달성한 퀘스트 트로피를 전시합니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 푸터 -->
+    <footer class="text-center py-6 text-xs text-slate-400 font-bold border-t border-slate-200">
+      <p>© 2026 RunQuest PH. All rights reserved.</p>
+      <p class="mt-1">Designed & Developed by Antigravity (Google DeepMind Paired Assistant)</p>
+    </footer>
+
+  </div>
+</body>
+</html>
