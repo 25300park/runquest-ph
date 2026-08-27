@@ -2,14 +2,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createCharacter } from '../services/characterService';
 
-// 1번부터 23번까지의 실제 아바타 이미지 파일(/images/avatars/1.png ~ 23.png) 목록
+// 1번부터 23번까지의 아바타 에셋 (8번은 8.mp4 모션 비디오 에셋 적용)
 const avatarList = Array.from({ length: 23 }, (_, i) => {
   const num = i + 1;
   const paddedIndex = String(num).padStart(2, '0');
+  const isVideo = num === 8;
   return {
     id: `avatar-${num}`,
-    src: `/images/avatars/${num}.png`,
-    name: `Runner #${paddedIndex}`
+    src: isVideo ? `/images/avatars/8.mp4` : `/images/avatars/${num}.png`,
+    thumbSrc: `/images/avatars/${num}.png`,
+    name: isVideo ? `Runner #${paddedIndex} 🎬` : `Runner #${paddedIndex}`,
+    isVideo
   };
 });
 
