@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createCharacter } from '../services/characterService';
 
-// 1번부터 23번까지의 아바타 에셋 (8번은 8.mp4 모션 비디오 에셋 적용)
+// 1번부터 23번까지의 아바타 에셋 (8번은 8.webm 투명 모션 비디오 에셋 적용)
 const avatarList = Array.from({ length: 23 }, (_, i) => {
   const num = i + 1;
   const paddedIndex = String(num).padStart(2, '0');
   const isVideo = num === 8;
   return {
     id: `avatar-${num}`,
-    src: isVideo ? `/images/avatars/8.mp4` : `/images/avatars/${num}.png`,
+    src: isVideo ? `/images/avatars/8.webm` : `/images/avatars/${num}.png`,
     thumbSrc: `/images/avatars/${num}.png`,
     name: isVideo ? `Runner #${paddedIndex} 🎬` : `Runner #${paddedIndex}`,
     isVideo
@@ -115,13 +115,15 @@ export default function CharacterCreation() {
             {selectedAvatar ? (
               selectedAvatar.includes('/8.') ? (
                 <video
-                  src="/images/avatars/8.mp4"
                   autoPlay
                   loop
                   muted
                   playsInline
                   className="w-full h-full object-contain filter drop-shadow-md rounded-full"
-                />
+                >
+                  <source src="/images/avatars/8.webm" type="video/webm" />
+                  <source src="/images/avatars/8.mp4" type="video/mp4" />
+                </video>
               ) : (
                 <img
                   src={selectedAvatar}
@@ -197,19 +199,21 @@ export default function CharacterCreation() {
                 >
                   {isVideo && (
                     <span className="absolute top-1.5 right-1.5 bg-violet-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full border border-white shadow-xs">
-                      🎬 MP4
+                      🎬 Motion
                     </span>
                   )}
                   <div className="w-full aspect-square flex items-center justify-center p-1">
                     {isVideo ? (
                       <video
-                        src="/images/avatars/8.mp4"
                         autoPlay
                         loop
                         muted
                         playsInline
                         className="w-full h-full object-contain filter drop-shadow-xs rounded-xl"
-                      />
+                      >
+                        <source src="/images/avatars/8.webm" type="video/webm" />
+                        <source src="/images/avatars/8.mp4" type="video/mp4" />
+                      </video>
                     ) : (
                       <img
                         src={avatar.src}
