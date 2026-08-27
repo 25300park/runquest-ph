@@ -218,13 +218,15 @@ export default function CharacterDashboardPage() {
               <div className="relative w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center animate-in zoom-in duration-300">
                 {isVideoAvatar(avatarUrl) ? (
                   <video
-                    src="/images/avatars/8.mp4"
                     autoPlay
                     loop
                     muted
                     playsInline
                     className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(6,78,59,0.45)] rounded-2xl"
-                  />
+                  >
+                    <source src="/images/avatars/8.webm" type="video/webm" />
+                    <source src="/images/avatars/8.mp4" type="video/mp4" />
+                  </video>
                 ) : (
                   <img
                     src={avatarUrl}

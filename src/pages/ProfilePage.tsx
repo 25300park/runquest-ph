@@ -72,13 +72,15 @@ export default function ProfilePage() {
           <div className="w-56 h-56 sm:w-64 sm:h-64 flex items-center justify-center animate-in zoom-in duration-300">
             {isVideoAvatar(avatarUrl) ? (
               <video
-                src="/images/avatars/8.mp4"
                 autoPlay
                 loop
                 muted
                 playsInline
                 className="w-full h-full object-contain filter drop-shadow-[0_20px_30px_rgba(6,78,59,0.5)] rounded-3xl"
-              />
+              >
+                <source src="/images/avatars/8.webm" type="video/webm" />
+                <source src="/images/avatars/8.mp4" type="video/mp4" />
+              </video>
             ) : (
               <img
                 src={avatarUrl}
