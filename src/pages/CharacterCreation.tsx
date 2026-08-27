@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createCharacter } from '../services/characterService';
+import { getGameProgress } from '../utils/gameProgress';
+import { calculateLevelFromXp } from '../utils/xp';
 
 // 1번부터 23번까지의 아바타 에셋 (8번은 8.webm 투명 모션 비디오 에셋 적용)
 const avatarList = Array.from({ length: 23 }, (_, i) => {
@@ -18,6 +20,8 @@ const avatarList = Array.from({ length: 23 }, (_, i) => {
 
 export default function CharacterCreation() {
   const navigate = useNavigate();
+  const progress = getGameProgress();
+  const currentLevel = calculateLevelFromXp(progress.totalXp);
   const [name, setName] = useState(() => {
     return (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-name')) || 'Runner';
   });
@@ -149,7 +153,7 @@ export default function CharacterCreation() {
               {activeAvatarObj.name}
             </span>
             <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-tight">
-              Novice Runner • Lv.1
+              Novice Runner • Lv.{currentLevel}
             </span>
           </div>
 

@@ -4,7 +4,8 @@ import { getCharacterProfile, subscribeToCharacterUpdates } from '../services/ch
 import { subscribeToAvatarRealtime } from '../services/aiAvatarService';
 import { subscribeToEquipmentEconomy } from '../services/equipmentEconomyService';
 import type { CharacterProfile } from '../types/rpgCharacter';
-import { getLevelProgress, xpPerLevel } from '../utils/characterRpg';
+import { getGameProgress } from '../utils/gameProgress';
+import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../utils/xp';
 import { defaultExplorationStats } from '../utils/fogOfWar';
 import { getAvatarThumbnail, isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
 
@@ -95,13 +96,24 @@ export default function CharacterDashboardPage() {
     return saved ? normalizeAvatarUrl(saved) : '';
   });
 
+  const progress = getGameProgress();
+  const currentLevel = calculateLevelFromXp(progress.totalXp);
+  const nextLevelXp = getNextLevelXp(progress.totalXp);
+  const currentLevelBaseXp = getCurrentLevelBaseXp(progress.totalXp);
+  const xpProgressPercent =
+    nextLevelXp <= progress.totalXp
+      ? 100
+      : Math.round(
+          ((progress.totalXp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100
+        );
+  const currentLevelCurrentXp = progress.totalXp - currentLevelBaseXp;
+  const currentLevelRequiredXp = nextLevelXp - currentLevelBaseXp;
+
   const equippedItems = useMemo(
     () => profile?.equipment.filter((equipment) => equipment.equipped) ?? [],
     [profile]
   );
-  const xpProgress = profile ? getLevelProgress(profile.character.xp) : 0;
-  const currentLevel = profile?.character.level ?? 1;
-  const runnerName = customRunnerName || profile?.character.name || 'Adventurer';
+  const runnerName = customRunnerName || profile?.character.name || 'Runner';
   const avatarUrl = customAvatarUrl || normalizeAvatarUrl(profile?.character.avatar_base_url);
 
   if (!profile) {
@@ -242,18 +254,18 @@ export default function CharacterDashboardPage() {
               <div className="w-36 h-3.5 bg-emerald-950/30 rounded-full blur-[3px] -mt-3.5 border border-emerald-400/20" />
             </div>
 
-            {/* 하단 오버레이: 레벨 & EXP 프로그레스 바 */}
+            {/* 하단 오버레이: 레벨 & EXP 프로그레스 바 (Profile과 100% 동일) */}
             <div className="relative z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 text-white shadow-md">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-black text-amber-300">Level {currentLevel}</span>
-                <span className="text-[11px] text-slate-300 font-mono">
-                  {xpProgress}/{xpPerLevel} XP
+                <span className="text-[11px] text-slate-300 font-mono font-bold">
+                  {xpProgressPercent}% ({currentLevelCurrentXp}/{currentLevelRequiredXp} XP)
                 </span>
               </div>
               <div className="mt-1.5 h-2 w-full bg-slate-800 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-300 transition-all duration-500"
-                  style={{ width: `${Math.min(100, (xpProgress / xpPerLevel) * 100)}%` }}
+                  style={{ width: `${xpProgressPercent}%` }}
                 />
               </div>
             </div>
