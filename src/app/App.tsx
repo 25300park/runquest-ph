@@ -4,7 +4,6 @@ import { appRoutes } from './routes';
 import BottomNav from '../components/layout/BottomNav';
 import PwaInstallBanner from '../components/pwa/PwaInstallBanner';
 import ErrorBoundary from '../components/common/ErrorBoundary';
-import UiInspector from '../components/dev/UiInspector';
 
 function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -23,19 +22,13 @@ function AppShell({ children }: { children: ReactNode }) {
   }
 
   if (isFullScreenRoute) {
-    return (
-      <>
-        {children}
-        <UiInspector />
-      </>
-    );
+    return <>{children}</>;
   }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-950 flex justify-center">
       <div className="w-full max-w-md min-h-screen flex flex-col bg-slate-50 relative shadow-2xl">
         <PwaInstallBanner />
-        <UiInspector />
 
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur-md">
           <Link to="/character-dashboard" className="flex items-center gap-2 font-black text-slate-900">
