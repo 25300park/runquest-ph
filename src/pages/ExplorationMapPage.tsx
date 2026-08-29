@@ -105,6 +105,58 @@ export default function ExplorationMapPage() {
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [courseLoadError, setCourseLoadError] = useState<string | null>(null);
 
+  // 🔥 실시간 고정밀 GPS 연속 추적 & 이동 궤적(Breadcrumbs) 상태
+  const [liveUserPosition, setLiveUserPosition] = useState<LatLngTuple | null>(null);
+  const [userBreadcrumbs, setUserBreadcrumbs] = useState<LatLngTuple[]>([]);
+  const [isFollowingUser, setIsFollowingUser] = useState(true);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+
+  // 실시간 기기 GPS 연속 추적 (watchPosition)
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      setGpsError('기기에서 GPS를 지원하지 않습니다.');
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const newCoord: LatLngTuple = [position.coords.latitude, position.coords.longitude];
+        setLiveUserPosition(newCoord);
+        setGpsAccuracy(Math.round(position.coords.accuracy));
+        setGpsError(null);
+
+        // 궤적 추가: 이전 좌표와 2m 이상 차이날 때 누적
+        setUserBreadcrumbs((prev) => {
+          if (prev.length === 0) return [newCoord];
+          const last = prev[prev.length - 1];
+          const distMeters =
+            Math.sqrt(
+              Math.pow((newCoord[0] - last[0]) * 111000, 2) +
+              Math.pow((newCoord[1] - last[1]) * 111000, 2)
+            );
+          if (distMeters >= 2) {
+            return [...prev, newCoord];
+          }
+          return prev;
+        });
+      },
+      (error) => {
+        console.warn('Exploration Map GPS notice:', error.message);
+        setGpsError('GPS 신호 수신 중 (실외 권장)');
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 10000
+      }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -160,7 +212,7 @@ export default function ExplorationMapPage() {
     return areaCourses[0];
   }, [areaCourses, selectedCourseId]);
 
-  const previewUserPosition = activeCourse?.routeCoordinates[1] ?? activeCourse?.startPoint;
+  const previewUserPosition = liveUserPosition ?? (activeCourse?.routeCoordinates[1] ?? activeCourse?.startPoint);
   const selectedBaseDistanceKm = activeCourse?.distanceKm ?? 0;
   const selectedTotalDistanceKm = Number((selectedBaseDistanceKm * loopCount).toFixed(2));
 
@@ -269,6 +321,12 @@ export default function ExplorationMapPage() {
             onSelectCourse={selectCourse}
             territories={mockTerritories}
             onSelectTerritory={(territory) => setSelectedTerritory(territory)}
+            userPath={userBreadcrumbs}
+            isFollowingUser={isFollowingUser}
+            userAvatarUrl={
+              (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-avatar')) ||
+              '/images/avatars/1.png'
+            }
           />
         ) : (
           <div className="grid h-full place-items-center bg-slate-100 px-6 text-center">
@@ -285,11 +343,37 @@ export default function ExplorationMapPage() {
             </div>
           </div>
         )}
-        <div className="pointer-events-none absolute left-4 top-4 rounded-2xl border border-slate-200/80 bg-white/90 px-3.5 py-2.5 backdrop-blur-md shadow-md">
+
+        {/* 상단 좌측: 지역/코스 이름 */}
+        <div className="pointer-events-none absolute left-4 top-4 rounded-2xl border border-slate-200/80 bg-white/90 px-3.5 py-2.5 backdrop-blur-md shadow-md z-20">
           <p className="text-[10px] font-black uppercase text-violet-600">{selectedArea.worldZone}</p>
           <p className="mt-0.5 text-xs font-black text-slate-800">
             {selectedCourseId ? activeCourse?.name : selectedArea.name}
           </p>
+        </div>
+
+        {/* 상단 우측: 실시간 GPS 상태 및 내 위치 팔로우 버튼 */}
+        <div className="absolute right-4 top-4 flex flex-col items-end gap-2 z-20">
+          {/* GPS 상태 뱃지 */}
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-900/90 text-white px-3 py-1.5 backdrop-blur-md shadow-md flex items-center gap-1.5 text-[10px] font-mono font-bold">
+            <span className={`w-2 h-2 rounded-full ${liveUserPosition ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`}></span>
+            <span>{liveUserPosition ? `🛰️ GPS Active (±${gpsAccuracy ?? 3}m)` : gpsError || 'GPS Searching...'}</span>
+          </div>
+
+          {/* 내 위치 자동 추적 토글 버튼 */}
+          <button
+            type="button"
+            onClick={() => setIsFollowingUser(!isFollowingUser)}
+            className={`px-3 py-1.5 rounded-2xl text-xs font-black shadow-lg flex items-center gap-1.5 transition-all cursor-pointer border ${
+              isFollowingUser
+                ? 'bg-blue-600 text-white border-blue-400 ring-2 ring-blue-300'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+            title="지도를 내 위치에 고정하여 따라오기"
+          >
+            <span>📍</span>
+            <span>{isFollowingUser ? 'Following Me ON' : 'Follow Me'}</span>
+          </button>
         </div>
       </div>
 

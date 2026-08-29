@@ -10,7 +10,7 @@ import {
   TileLayer,
   useMap
 } from 'react-leaflet';
-import type { Area } from '../../types/area';
+import type { Area, LatLngTuple } from '../../types/area';
 import type { Course, CourseCheckpoint } from '../../types/course';
 import type { TerritoryZone } from '../../data/mockLandmarks';
 
@@ -22,6 +22,9 @@ type ExplorationMapProps = {
   onSelectCourse: (courseId: string) => void;
   territories?: TerritoryZone[];
   onSelectTerritory?: (territory: TerritoryZone) => void;
+  userPath?: LatLngTuple[];
+  isFollowingUser?: boolean;
+  userAvatarUrl?: string;
 };
 
 const checkpointColors: Record<CourseCheckpoint['type'], string> = {
@@ -43,6 +46,31 @@ function createLabelIcon(label: string, className: string) {
     html: `<div class="${className}">${label}</div>`,
     iconSize: [40, 40],
     iconAnchor: [20, 20]
+  });
+}
+
+function createLiveUserRadarIcon(avatarUrl: string = '/images/avatars/1.png') {
+  return L.divIcon({
+    className: '',
+    html: `
+      <div class="relative flex items-center justify-center">
+        <!-- 1. 실시간 펄스 레이더 원 -->
+        <div class="absolute w-12 h-12 rounded-full bg-blue-500/30 animate-ping"></div>
+        <div class="absolute w-8 h-8 rounded-full bg-blue-500/40 animate-pulse"></div>
+        
+        <!-- 2. 유저 아바타 핀 -->
+        <div class="w-10 h-10 rounded-full border-2 border-white bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 p-0.5 shadow-xl flex items-center justify-center overflow-hidden z-10">
+          <img src="${avatarUrl}" alt="You" class="w-full h-full object-contain filter drop-shadow-xs" />
+        </div>
+        
+        <!-- 3. YOU 뱃지 -->
+        <span class="absolute -bottom-4 px-2 py-0.2 rounded-full bg-blue-600 text-white text-[8px] font-black uppercase tracking-tight shadow-md border border-white z-20">
+          YOU 📍
+        </span>
+      </div>
+    `,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24]
   });
 }
 
@@ -71,11 +99,6 @@ const areaIcon = createLabelIcon(
   'grid h-10 w-10 place-items-center rounded-full border-2 border-violet-500 bg-white text-[10px] font-black text-violet-700 shadow-lg'
 );
 
-const userIcon = createLabelIcon(
-  'YOU',
-  'grid h-10 w-10 place-items-center rounded-full border-2 border-amber-400 bg-gradient-to-tr from-violet-600 to-indigo-600 text-[10px] font-black text-white shadow-xl'
-);
-
 function FitSelectedRoute({ course }: { course: Course }) {
   const map = useMap();
 
@@ -87,6 +110,24 @@ function FitSelectedRoute({ course }: { course: Course }) {
   return null;
 }
 
+function FollowUserLiveLocation({
+  userPosition,
+  isFollowing
+}: {
+  userPosition: [number, number];
+  isFollowing: boolean;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (isFollowing && userPosition[0] !== 0 && userPosition[1] !== 0) {
+      map.panTo(userPosition, { animate: true, duration: 0.8 });
+    }
+  }, [userPosition, isFollowing, map]);
+
+  return null;
+}
+
 export default function ExplorationMap({
   areas,
   courses,
@@ -94,7 +135,10 @@ export default function ExplorationMap({
   userPosition,
   onSelectCourse,
   territories = [],
-  onSelectTerritory
+  onSelectTerritory,
+  userPath = [],
+  isFollowingUser = false,
+  userAvatarUrl = '/images/avatars/1.png'
 }: ExplorationMapProps) {
   return (
     <div className="relative h-full w-full">
@@ -105,6 +149,8 @@ export default function ExplorationMap({
         className="h-full min-h-[520px] w-full"
       >
         <FitSelectedRoute course={selectedCourse} />
+        <FollowUserLiveLocation userPosition={userPosition} isFollowing={isFollowingUser} />
+        
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -238,8 +284,31 @@ export default function ExplorationMap({
           </div>
         ))}
 
-        <Marker position={userPosition} icon={userIcon}>
-          <Popup>Route preview position</Popup>
+        {/* 실시간 유저 이동 궤적 라인 (Breadcrumb Polyline) */}
+        {userPath.length >= 2 && (
+          <Polyline
+            positions={userPath}
+            pathOptions={{
+              color: '#3b82f6',
+              weight: 5,
+              opacity: 0.85,
+              dashArray: '4, 8',
+              lineCap: 'round'
+            }}
+          />
+        )}
+
+        {/* 실시간 유저 위치 펄스 레이더 마커 */}
+        <Marker position={userPosition} icon={createLiveUserRadarIcon(userAvatarUrl)}>
+          <Popup>
+            <div className="text-center p-1 font-sans">
+              <span className="text-[10px] font-black text-blue-600 uppercase">📍 My Live Location</span>
+              <p className="font-bold text-xs text-slate-800 mt-0.5">실시간 GPS 추적 중</p>
+              <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                {userPosition[0].toFixed(5)}, {userPosition[1].toFixed(5)}
+              </p>
+            </div>
+          </Popup>
         </Marker>
       </MapContainer>
     </div>

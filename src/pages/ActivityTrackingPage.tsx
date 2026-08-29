@@ -278,14 +278,27 @@ export default function ActivityTrackingPage() {
       fallbackTimeIntervalMs: 10_000, // 10초 경과 보완
       minJitterMeters: 3, // 3m 미만 떨림 필터링
       onRawPoint: (rawPoint) => {
-        // 실시간 지도 마커 위치 업데이트
-        setCurrentPosition([rawPoint.lat, rawPoint.lng]);
+        // 실시간 지도 마커 위치 즉각 업데이트 및 궤적 연결
+        const newCoord: LatLngTuple = [rawPoint.lat, rawPoint.lng];
+        setCurrentPosition(newCoord);
+        setTrackedPath((prev) => {
+          if (prev.length === 0) return [newCoord];
+          const last = prev[prev.length - 1];
+          const distMeters =
+            Math.sqrt(
+              Math.pow((newCoord[0] - last[0]) * 111000, 2) +
+              Math.pow((newCoord[1] - last[1]) * 111000, 2)
+            );
+          if (distMeters >= 2) {
+            return [...prev, newCoord];
+          }
+          return prev;
+        });
       },
       onPoint: (point, session) => {
-        // 하이브리드 조건 충족 시 Polyline 궤적 배열에 추가
-        setTrackedPath((prev) => [...prev, [point.lat, point.lng]]);
-        setDistanceKm(Math.min(session.total_distance, course.distanceKm));
-        setGpsStatus(`GPS Active +/-${Math.round(point.accuracy ?? 0)}m (Hybrid)`);
+        // 누적 거리 및 페이스 갱신
+        setDistanceKm(session.total_distance);
+        setGpsStatus(`GPS Active +/-${Math.round(point.accuracy ?? 0)}m (High Accuracy)`);
       },
       onError: (error) => {
         const message = error instanceof Error ? error.message : 'GPS tracking failed.';
