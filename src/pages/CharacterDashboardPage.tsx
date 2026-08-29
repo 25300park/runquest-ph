@@ -42,6 +42,14 @@ export default function CharacterDashboardPage() {
   const [profile, setProfile] = useState<CharacterProfile | null>(null);
   const [status, setStatus] = useState('Loading hero...');
   const [showAd, setShowAd] = useState(false);
+  const [customRunnerName, setCustomRunnerName] = useState(() => {
+    return (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-name')) || '';
+  });
+  const [customAvatarUrl, setCustomAvatarUrl] = useState(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
+    return saved ? normalizeAvatarUrl(saved) : '';
+  });
+
   const weekdays = useMemo(() => getCurrentWeekdays(), []);
 
   useEffect(() => {
@@ -53,14 +61,20 @@ export default function CharacterDashboardPage() {
         setProfile(nextProfile);
         setStatus(nextProfile ? '' : 'No character found.');
 
-        if (nextProfile) {
+        if (nextProfile && nextProfile.character && nextProfile.character.id) {
+          const charId = nextProfile.character.id;
           const refresh = async () => {
-            const refreshedProfile = await getCharacterProfile(nextProfile.character.id);
-            setProfile(refreshedProfile);
+            try {
+              const refreshedProfile = await getCharacterProfile(charId);
+              if (refreshedProfile) setProfile(refreshedProfile);
+            } catch {
+              // Ignore background refresh errors
+            }
           };
-          unsubscribers.push(subscribeToCharacterUpdates(nextProfile.character.id, refresh));
-          unsubscribers.push(subscribeToAvatarRealtime(nextProfile.character.id, refresh));
-          unsubscribers.push(subscribeToEquipmentEconomy(nextProfile.character.id, refresh));
+
+          try { unsubscribers.push(subscribeToCharacterUpdates(charId, refresh)); } catch { /* ignore */ }
+          try { unsubscribers.push(subscribeToAvatarRealtime(charId, refresh)); } catch { /* ignore */ }
+          try { unsubscribers.push(subscribeToEquipmentEconomy(charId, refresh)); } catch { /* ignore */ }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unable to load character.';
@@ -68,7 +82,7 @@ export default function CharacterDashboardPage() {
       }
     }
 
-    loadProfile();
+    void loadProfile();
 
     function syncAvatarState() {
       if (typeof window !== 'undefined') {
@@ -84,19 +98,13 @@ export default function CharacterDashboardPage() {
     window.addEventListener('runquest-avatar-updated', syncAvatarState);
 
     return () => {
-      unsubscribers.forEach((unsubscribe) => unsubscribe());
+      unsubscribers.forEach((unsubscribe) => {
+        try { unsubscribe(); } catch { /* ignore */ }
+      });
       window.removeEventListener('storage', syncAvatarState);
       window.removeEventListener('runquest-avatar-updated', syncAvatarState);
     };
   }, []);
-
-  const [customRunnerName, setCustomRunnerName] = useState(() => {
-    return (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-name')) || '';
-  });
-  const [customAvatarUrl, setCustomAvatarUrl] = useState(() => {
-    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
-    return saved ? normalizeAvatarUrl(saved) : '';
-  });
 
   const progress = getGameProgress();
   const currentLevel = calculateLevelFromXp(progress.totalXp);

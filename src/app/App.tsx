@@ -3,6 +3,7 @@ import { BrowserRouter, Link, useLocation } from 'react-router-dom';
 import { appRoutes } from './routes';
 import BottomNav from '../components/layout/BottomNav';
 import PwaInstallBanner from '../components/pwa/PwaInstallBanner';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 
 function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -56,8 +57,10 @@ function AppShell({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AppShell>{appRoutes}</AppShell>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AppShell>{appRoutes}</AppShell>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
