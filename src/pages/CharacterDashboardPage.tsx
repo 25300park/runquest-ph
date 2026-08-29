@@ -41,6 +41,7 @@ function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: stri
 export default function CharacterDashboardPage() {
   const [profile, setProfile] = useState<CharacterProfile | null>(null);
   const [status, setStatus] = useState('Loading hero...');
+  const [showAd, setShowAd] = useState(false);
   const weekdays = useMemo(() => getCurrentWeekdays(), []);
 
   useEffect(() => {
@@ -117,7 +118,9 @@ export default function CharacterDashboardPage() {
   const runnerName = customRunnerName || profile?.character.name || 'Runner';
   const avatarUrl = customAvatarUrl || normalizeAvatarUrl(profile?.character.avatar_base_url);
 
-  if (!profile) {
+  const isCompletelyNewUser = !profile && !customRunnerName && !customAvatarUrl;
+
+  if (isCompletelyNewUser && status === 'No character found.') {
     return (
       <section className="grid min-h-screen place-items-center bg-slate-900 px-4 py-8 text-center text-white font-sans">
         <div className="rounded-3xl border border-slate-700 bg-slate-800/90 p-6 max-w-sm w-full shadow-2xl">
@@ -137,9 +140,6 @@ export default function CharacterDashboardPage() {
       </section>
     );
   }
-
-  // 초기 접속 속도 최적화: 강제 자동 광고 비활성화 (테스트 버튼 클릭 시에만 로드)
-  const [showAd, setShowAd] = useState(false);
 
   return (
     <div className="min-h-full bg-slate-50 text-slate-900 font-sans pb-12 select-none relative">
