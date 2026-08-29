@@ -99,12 +99,20 @@ export default function LandingPage() {
 
         {/* 하단 메인 액션 버튼 그룹 */}
         <div className="my-8 flex flex-col gap-3">
+          {/* 🏠 메인 캐릭터 대시보드 바로 진입 버튼 */}
+          <Link
+            to="/character-dashboard"
+            className="block rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-teal-500 px-5 py-4 text-center text-base font-black text-white shadow-xl shadow-violet-600/30 active:scale-[0.98] transition-all border border-white/20"
+          >
+            🏠 Enter Dashboard (홈 대시보드 바로가기)
+          </Link>
+
           {/* 📍 필드 테스트용 코스 빌더 즉시 진입 버튼 */}
           <Link
             to="/course-builder"
-            className="group relative flex items-center justify-center gap-2.5 rounded-2xl border border-emerald-300/70 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-5 py-4 text-center text-base font-black text-slate-950 shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition-all"
+            className="group relative flex items-center justify-center gap-2.5 rounded-2xl border border-emerald-300/70 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-5 py-3.5 text-center text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/25 active:scale-[0.98] transition-all"
           >
-            <span className="text-xl">📍</span>
+            <span className="text-lg">📍</span>
             <span className="tracking-wide">새로운 코스 기록하기 (테스트용)</span>
             <span className="absolute -top-1 -right-1 flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75" />
@@ -115,9 +123,9 @@ export default function LandingPage() {
           {/* ⚔️ 시작 / 로그인 버튼 */}
           <Link
             to="/login"
-            className="block rounded-2xl border border-amber-200 bg-amber-300 px-5 py-4 text-center text-base font-black text-stone-950 shadow-[0_8px_0_rgba(120,53,15,0.5)] transition active:translate-y-1 active:shadow-[0_4px_0_rgba(120,53,15,0.5)]"
+            className="block rounded-2xl border border-amber-200 bg-amber-300 px-5 py-3 text-center text-sm font-black text-stone-950 shadow-[0_4px_0_rgba(120,53,15,0.5)] transition active:translate-y-0.5"
           >
-            ⚔️ Start Adventure (시작하기)
+            ⚔️ Login / Account (로그인)
           </Link>
         </div>
 
