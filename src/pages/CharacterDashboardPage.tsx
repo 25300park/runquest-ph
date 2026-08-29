@@ -138,11 +138,12 @@ export default function CharacterDashboardPage() {
     );
   }
 
-  const [showAd, setShowAd] = useState(true);
+  // 초기 접속 속도 최적화: 강제 자동 광고 비활성화 (테스트 버튼 클릭 시에만 로드)
+  const [showAd, setShowAd] = useState(false);
 
   return (
     <div className="min-h-full bg-slate-50 text-slate-900 font-sans pb-12 select-none relative">
-      {/* 0. 홈 진입 전 전면 동영상 광고 시스템 */}
+      {/* 0. 동영상 광고 모달 (사용자가 Ad Test 버튼을 누르거나 보상형으로 요청 시에만 로드) */}
       {showAd && (
         <VideoAdInterstitial
           onClose={() => setShowAd(false)}
