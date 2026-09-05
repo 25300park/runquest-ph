@@ -6,10 +6,12 @@ import { Link } from 'react-router-dom';
 import { getCurrentAdminProfile } from '../admin/adminService';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
+import TrophyRoomModal from '../components/profile/TrophyRoomModal';
 
 export default function ProfilePage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [selectedTrophy, setSelectedTrophy] = useState<TrophyItem | null>(null);
+  const [showTrophyRoom, setShowTrophyRoom] = useState(false);
   const { isStandalone, showIosGuide, setShowIosGuide, promptInstall } = usePwaInstall();
   const progress = getGameProgress();
   const currentLevel = calculateLevelFromXp(progress.totalXp);
@@ -195,9 +197,14 @@ export default function ProfilePage() {
             </h2>
             <p className="text-xs text-slate-400">Unlock gear by achieving running milestones.</p>
           </div>
-          <span className="text-[10px] font-black text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-100">
-            {mockTrophies.filter((t) => t.unlocked).length}/{mockTrophies.length} Unlocked
-          </span>
+          <button
+            type="button"
+            onClick={() => setShowTrophyRoom(true)}
+            className="text-[10px] font-black text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1 rounded-full border border-violet-100 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+          >
+            <span>{mockTrophies.filter((t) => t.unlocked).length}/{mockTrophies.length}</span>
+            <span>전체보기 →</span>
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2.5 pt-1">
@@ -283,6 +290,11 @@ export default function ProfilePage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* 🏆 트로피 룸 전체보기 모달 */}
+      {showTrophyRoom && (
+        <TrophyRoomModal onClose={() => setShowTrophyRoom(false)} />
       )}
 
       {/* 4. RunQuest 앱 다운로드 / 설치 상태 카드 */}

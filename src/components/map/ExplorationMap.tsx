@@ -284,6 +284,19 @@ export default function ExplorationMap({
           </div>
         ))}
 
+        {/* 실시간 전장의 안개(Fog of War) 50m 탐험 해제 오라 */}
+        <Circle
+          center={userPosition}
+          radius={50}
+          pathOptions={{
+            color: '#10b981',
+            fillColor: '#34d399',
+            fillOpacity: 0.18,
+            weight: 1.5,
+            dashArray: '4, 4'
+          }}
+        />
+
         {/* 실시간 유저 이동 궤적 라인 (Breadcrumb Polyline) */}
         {userPath.length >= 2 && (
           <Polyline

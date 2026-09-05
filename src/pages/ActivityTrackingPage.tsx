@@ -18,6 +18,7 @@ import {
   checkHighFiveProximity,
   type LiveNearbyRunner
 } from '../services/liveEncounterService';
+import { recordExplorationDistance, saveExploredBreadcrumbs } from '../utils/fogOfWar';
 
 type RunNavigationState = {
   course: Course;
@@ -369,6 +370,14 @@ export default function ActivityTrackingPage() {
 
     if (gpsSessionId) {
       await completeGpsSession(gpsSessionId);
+    }
+
+    // Phase 3: 탐험도 및 전장의 안개 궤적 영구 저장
+    if (distanceKm > 0) {
+      recordExplorationDistance(course.areaId, distanceKm);
+    }
+    if (trackedPath.length > 0) {
+      saveExploredBreadcrumbs(trackedPath);
     }
 
     const summary: CompletedActivitySummary = {

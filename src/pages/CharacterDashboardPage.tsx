@@ -6,7 +6,7 @@ import { subscribeToEquipmentEconomy } from '../services/equipmentEconomyService
 import type { CharacterProfile } from '../types/rpgCharacter';
 import { getGameProgress } from '../utils/gameProgress';
 import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../utils/xp';
-import { defaultExplorationStats } from '../utils/fogOfWar';
+import { getSavedExplorationStats } from '../utils/fogOfWar';
 import { getAvatarThumbnail, isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
 import VideoAdInterstitial from '../components/ads/VideoAdInterstitial';
 
@@ -400,7 +400,7 @@ export default function CharacterDashboardPage() {
         </div>
 
         <div className="grid gap-2.5">
-          {defaultExplorationStats.map((stat) => (
+          {getSavedExplorationStats().map((stat) => (
             <div
               key={stat.areaId}
               className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm"
