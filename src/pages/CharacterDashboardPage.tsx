@@ -9,6 +9,7 @@ import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../
 import { getSavedExplorationStats } from '../utils/fogOfWar';
 import { getAvatarThumbnail, isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
 import VideoAdInterstitial from '../components/ads/VideoAdInterstitial';
+import FactionWarsCard from '../components/faction/FactionWarsCard';
 
 function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: string; isToday: boolean }> {
   const now = new Date();
@@ -315,17 +316,42 @@ export default function CharacterDashboardPage() {
         </div>
       </section>
 
+      {/* 3.5 ⚔️ 마카티 vs BGC 주간 대규모 진영전 (Faction Wars) */}
+      <section className="px-5 pt-3">
+        <FactionWarsCard />
+      </section>
+
       {/* 4. 스와이프 가능한 서브 퀘스트 섹션 (Step 3) */}
       <section className="px-5 pt-4 pb-2">
         <div className="flex items-center justify-between mb-2.5">
-          <h2 className="text-sm font-black text-slate-900">Available Quests</h2>
-          <Link to="/map" className="text-xs font-bold text-violet-600 hover:underline">
-            View All →
+          <h2 className="text-sm font-black text-slate-900">Available Quests & UGC Bounties</h2>
+          <Link to="/bounties" className="text-xs font-bold text-violet-600 hover:underline">
+            의뢰소 보기 →
           </Link>
         </div>
 
         {/* 가로 스와이프 카드 컨테이너 */}
         <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar snap-x">
+          {/* 의뢰소 퀘스트 0 */}
+          <div className="min-w-[210px] bg-gradient-to-br from-violet-50 to-indigo-50/60 rounded-2xl p-3.5 shadow-sm border border-violet-200 snap-start flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xl">📜</span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-violet-600 text-white">
+                  +100 Gold 로열티
+                </span>
+              </div>
+              <h3 className="font-black text-xs text-slate-900 mt-2">UGC Bounty Board</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">유저 제작 코스 탐험</p>
+            </div>
+            <Link
+              to="/bounties"
+              className="mt-3 block w-full py-2 text-center rounded-xl bg-violet-600 hover:bg-violet-700 text-xs font-black text-white shadow-xs active:scale-95 transition-all"
+            >
+              의뢰소 입장
+            </Link>
+          </div>
+
           {/* 퀘스트 1 */}
           <div className="min-w-[210px] bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 snap-start flex flex-col justify-between">
             <div>

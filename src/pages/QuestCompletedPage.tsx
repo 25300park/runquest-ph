@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { applyRunReward } from '../services/characterService';
 import { refreshCharacterAvatar } from '../services/aiAvatarService';
-import { maybeDropEquipment } from '../services/equipmentEconomyService';
+import { maybeDropEquipment, degradeEquipmentOnRun } from '../services/equipmentEconomyService';
+import RivalLogList from '../components/rival/RivalLogList';
 import { contributeToGuild } from '../services/guildService';
 import { updateLeaderboardScore } from '../features/leaderboard/leaderboardService';
 import { getCharacterProfile } from '../services/characterService';
@@ -84,6 +85,7 @@ export default function QuestCompletedPage() {
 
     processedRef.current = true;
     setProgressUpdate(completeActivityProgress(course, summary));
+    degradeEquipmentOnRun(summary.distanceKm);
     applyRunReward({
       distanceKm: summary.distanceKm,
       difficultyMultiplier: difficultyXpValues[summary.difficulty ?? course.difficulty] ?? 1,
@@ -248,6 +250,12 @@ export default function QuestCompletedPage() {
           </div>
         </div>
       </div>
+
+      {/* Phase 7: 스쳐간 라이벌 로그 리스트 */}
+      <div className="text-left">
+        <RivalLogList />
+      </div>
+
       <Link
         to="/profile"
         className="block rounded-2xl border border-amber-200 bg-amber-300 px-4 py-4 font-black text-stone-950"

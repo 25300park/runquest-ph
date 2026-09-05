@@ -7,6 +7,7 @@ import { getCurrentAdminProfile } from '../admin/adminService';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
 import TrophyRoomModal from '../components/profile/TrophyRoomModal';
+import GearDurabilityCard from '../components/profile/GearDurabilityCard';
 
 export default function ProfilePage() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -187,6 +188,9 @@ export default function ProfilePage() {
           <p className="font-black text-violet-600 text-base mt-0.5">{progress.completedActivities}</p>
         </div>
       </div>
+
+      {/* 2.5 👟 장비 내구도 및 수리 카드 */}
+      <GearDurabilityCard />
 
       {/* 3. 🏆 트로피 룸 & 특별 스킨 진열장 그리드 */}
       <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm space-y-3">

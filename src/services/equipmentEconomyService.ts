@@ -156,3 +156,101 @@ export function subscribeToEquipmentEconomy(characterId: string, onChange: () =>
     client.removeChannel(channel);
   };
 }
+
+export interface EquipmentDurability {
+  id: string;
+  name: string;
+  slot: 'shoes' | 'backpack' | 'cap' | 'charm';
+  icon: string;
+  durability: number; // 0 ~ 100
+  repairCostGold: number;
+  buff: string;
+  rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary';
+}
+
+const DURABILITY_STORAGE_KEY = 'rq_gear_durability_v1';
+
+export const defaultGearList: EquipmentDurability[] = [
+  {
+    id: 'gear-shoes-1',
+    name: 'Starter Striders',
+    slot: 'shoes',
+    icon: '👟',
+    durability: 85,
+    repairCostGold: 50,
+    buff: '+5% Running XP',
+    rarity: 'Common'
+  },
+  {
+    id: 'gear-pack-1',
+    name: 'Quest Hydration Pack',
+    slot: 'backpack',
+    icon: '🎒',
+    durability: 92,
+    repairCostGold: 60,
+    buff: '+10% Stamina Save',
+    rarity: 'Rare'
+  },
+  {
+    id: 'gear-cap-1',
+    name: 'Sun Runner Visor',
+    slot: 'cap',
+    icon: '🧢',
+    durability: 74,
+    repairCostGold: 45,
+    buff: '+5% Heat Resist',
+    rarity: 'Common'
+  },
+  {
+    id: 'gear-charm-1',
+    name: 'BGC Neon Charm',
+    slot: 'charm',
+    icon: '✨',
+    durability: 100,
+    repairCostGold: 120,
+    buff: '+15% Territory Gold',
+    rarity: 'Epic'
+  }
+];
+
+export function getSavedGearDurability(): EquipmentDurability[] {
+  if (typeof window === 'undefined') return defaultGearList;
+  try {
+    const saved = localStorage.getItem(DURABILITY_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : defaultGearList;
+  } catch {
+    return defaultGearList;
+  }
+}
+
+export function saveGearDurability(list: EquipmentDurability[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(DURABILITY_STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    // ignore
+  }
+}
+
+export function repairEquipmentItem(gearId: string): { success: boolean; updatedList: EquipmentDurability[] } {
+  const list = getSavedGearDurability();
+  const updated = list.map((gear) => {
+    if (gear.id === gearId) {
+      return { ...gear, durability: 100 };
+    }
+    return gear;
+  });
+  saveGearDurability(updated);
+  return { success: true, updatedList: updated };
+}
+
+export function degradeEquipmentOnRun(distanceKm: number): EquipmentDurability[] {
+  const wear = Math.max(1, Math.round(distanceKm * 1.2));
+  const list = getSavedGearDurability();
+  const updated = list.map((gear) => ({
+    ...gear,
+    durability: Math.max(0, gear.durability - wear)
+  }));
+  saveGearDurability(updated);
+  return updated;
+}
