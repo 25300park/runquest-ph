@@ -1,4 +1,4 @@
-﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 /**
  * [Group C - Phase 10 & Special]
@@ -54,14 +54,12 @@ test.describe('Group C: Crew Raid O2O GPS Geofence Check-in E2E Test', () => {
     });
 
     // 2. 오프라인 집결 상세 페이지 진입
-    await page.goto('/map');
+    await page.goto('/raid');
     await page.waitForLoadState('networkidle');
 
-    // 3. 지오펜스 외부(200m) 상태 확인: 원거리 안내 또는 [Join Raid] 버튼 검증
-    const raidBeacon = page.locator('[data-testid="raid-beacon-marker"], .raid-beacon-pin').first();
-    if (await raidBeacon.isVisible()) {
-      await raidBeacon.click();
-    }
+    // 3. 지오펜스 외부(200m) 상태 확인
+    const raidBeacon = page.locator('[data-testid="raid-beacon-marker"]').first();
+    await expect(raidBeacon).toBeVisible();
 
     // 4. GPS 위치를 집결지 30m 반경 내부로 실시간 업데이트 (Dynamic Geolocation Mocking)
     await context.setGeolocation(INSIDE_POSITION);
@@ -85,7 +83,7 @@ test.describe('Group C: Crew Raid O2O GPS Geofence Check-in E2E Test', () => {
     await checkInButton.click();
 
     // 7. 축하 모달 및 XP 획득 UI 노출 검증
-    const rewardModal = page.locator('text=Raid Completed, text=체크인 완료, text=+500 XP, text=보상 획득');
-    await expect(rewardModal.first()).toBeVisible({ timeout: 4000 });
+    const rewardModal = page.getByText('+500 XP');
+    await expect(rewardModal).toBeVisible({ timeout: 4000 });
   });
 });

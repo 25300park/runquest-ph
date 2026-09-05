@@ -19,6 +19,7 @@ import {
   type LiveNearbyRunner
 } from '../services/liveEncounterService';
 import { recordExplorationDistance, saveExploredBreadcrumbs } from '../utils/fogOfWar';
+import { voiceCompanion, type VoiceMessage } from '../services/voiceCompanionService';
 
 type RunNavigationState = {
   course: Course;
@@ -165,6 +166,29 @@ export default function ActivityTrackingPage() {
   const [nearbyRunners, setNearbyRunners] = useState<LiveNearbyRunner[]>([]);
   const [highFiveEvent, setHighFiveEvent] = useState<{ runner: LiveNearbyRunner; timestamp: number } | null>(null);
 
+  // Phase 10: 보이스 컴패니언 자막 및 마일스톤 관리
+  const [voiceCaption, setVoiceCaption] = useState<VoiceMessage | null>(null);
+  const lastSpokenKmRef = useRef(0);
+
+  useEffect(() => {
+    voiceCompanion.onMessage((msg) => {
+      setVoiceCaption(msg);
+    });
+  }, []);
+
+  // 1km 돌파 시 캐릭터 보이스 출력
+  useEffect(() => {
+    if (activityState !== 'running' || distanceKm < 1) return;
+    const currentKmFloor = Math.floor(distanceKm);
+    if (currentKmFloor > lastSpokenKmRef.current) {
+      lastSpokenKmRef.current = currentKmFloor;
+      const paceFormatted = elapsedSeconds > 0 && distanceKm > 0
+        ? `${Math.floor((elapsedSeconds / distanceKm) / 60)}:${Math.floor((elapsedSeconds / distanceKm) % 60).toString().padStart(2, '0')}/km`
+        : '5:12/km';
+      voiceCompanion.speakDistanceMilestone(currentKmFloor, paceFormatted);
+    }
+  }, [activityState, distanceKm, elapsedSeconds]);
+
   useEffect(() => {
     if (activityState === 'running') {
       const runners = generateNearbyRunners(currentPosition);
@@ -174,6 +198,7 @@ export default function ActivityTrackingPage() {
       const closeRunner = checkHighFiveProximity(currentPosition, runners);
       if (closeRunner && (!highFiveEvent || Date.now() - highFiveEvent.timestamp > 15000)) {
         setHighFiveEvent({ runner: closeRunner, timestamp: Date.now() });
+        voiceCompanion.speakHighFiveEncounter(closeRunner.name);
         // 햅틱 진동 피드백
         try {
           if ('vibrate' in navigator) {
@@ -474,9 +499,24 @@ export default function ActivityTrackingPage() {
             ))}
         </MapContainer>
 
+        {/* Phase 10: 🎙️ 보이스 컴패니언 실시간 음성 자막 배너 */}
+        {voiceCaption && (
+          <div className="absolute top-20 left-4 right-4 z-50 animate-in slide-in-from-top duration-300 pointer-events-none">
+            <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-2xl p-3.5 shadow-2xl border border-amber-400/80 flex items-center gap-3 pointer-events-auto">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 font-black flex items-center justify-center text-lg shrink-0 shadow-md">
+                🎙️
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-black uppercase text-amber-300 block">Voice Companion</span>
+                <p className="text-xs font-bold text-slate-100 mt-0.5 leading-snug">{voiceCaption.text}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Phase 4: ✋ High-Five 실시간 인카운터 팝업 모달 */}
         {highFiveEvent && (
-          <div className="absolute top-20 left-4 right-4 z-40 animate-in slide-in-from-top duration-300 pointer-events-none">
+          <div className="absolute top-36 left-4 right-4 z-40 animate-in slide-in-from-top duration-300 pointer-events-none">
             <div className="bg-gradient-to-r from-amber-400 via-orange-500 to-violet-600 text-white rounded-2xl p-3.5 shadow-2xl border-2 border-white flex items-center justify-between pointer-events-auto">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-2xl bg-slate-900/90 border-2 border-white shadow-md p-1 flex items-center justify-center shrink-0">

@@ -15,6 +15,7 @@ function AppShell({ children }: { children: ReactNode }) {
     location.pathname === '/course-builder' ||
     location.pathname.startsWith('/course-builder/') ||
     location.pathname === '/run' ||
+    location.pathname === '/raid' ||
     location.pathname.startsWith('/activity/');
 
   if (isAdminRoute) {

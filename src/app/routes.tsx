@@ -22,6 +22,7 @@ import UpdatePasswordPage from '../pages/UpdatePasswordPage';
 import ProfilePage from '../pages/ProfilePage';
 import QuestCompletedPage from '../pages/QuestCompletedPage';
 import BountyBoardPage from '../pages/BountyBoardPage';
+import CrewRaidPage from '../pages/CrewRaidPage';
 import RegisterPage from '../pages/RegisterPage';
 import RewardsPage from '../pages/RewardsPage';
 import BgcTestModePage from '../pages/BgcTestModePage';
@@ -60,6 +61,7 @@ export const appRoutes = (
     <Route path="/activity/:courseId" element={<ActivityTrackingPage />} />
     <Route path="/completed/:courseId" element={<QuestCompletedPage />} />
     <Route path="/bounties" element={<BountyBoardPage />} />
+    <Route path="/raid" element={<CrewRaidPage />} />
     <Route path="/profile" element={<ProfilePage />} />
     <Route path="/rewards" element={<RewardsPage />} />
     <Route path="/admin/login" element={<AdminLogin />} />

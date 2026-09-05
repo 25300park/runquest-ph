@@ -321,6 +321,33 @@ export default function CharacterDashboardPage() {
         <FactionWarsCard />
       </section>
 
+      {/* 3.8 🔥 O2O 오프라인 크루 집결 레이드 (Crew Raid) 배너 */}
+      <section className="px-5 pt-3">
+        <Link
+          to="/raid"
+          className="block rounded-3xl p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-2 border-indigo-500/60 shadow-xl relative overflow-hidden group active:scale-[0.98] transition-all"
+        >
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-500 to-cyan-400 p-0.5 shadow-lg flex items-center justify-center text-2xl shrink-0 animate-bounce">
+                🐆
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded-full border border-amber-400/30">
+                  🔥 O2O Offline Raid
+                </span>
+                <h3 className="text-sm font-black text-white mt-1">BGC Midnight Cyber Raid</h3>
+                <p className="text-[11px] text-indigo-200 mt-0.5">50m 현장 체크인 시 +500 XP & 전설 뱃지 지급!</p>
+              </div>
+            </div>
+            <span className="text-xs font-black text-cyan-300 bg-cyan-950/80 px-3 py-1.5 rounded-xl border border-cyan-500/40 shrink-0">
+              참가하기 →
+            </span>
+          </div>
+        </Link>
+      </section>
+
       {/* 4. 스와이프 가능한 서브 퀘스트 섹션 (Step 3) */}
       <section className="px-5 pt-4 pb-2">
         <div className="flex items-center justify-between mb-2.5">
