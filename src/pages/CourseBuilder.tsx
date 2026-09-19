@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import CourseBuilderMap from '../components/CourseBuilderMap';
-import GpxImportModal from '../components/GpxImportModal';
+import WearableSyncModal from '../components/wearable/WearableSyncModal';
 import { mockAreas } from '../data/mockAreas';
 import type { LatLngTuple } from '../types/area';
 import type { CheckpointType, Course, CourseCheckpoint, Difficulty } from '../types/course';
@@ -872,16 +872,12 @@ export default function CourseBuilder() {
         </div>
       </footer>
 
-      {/* ⌚ 스마트워치 GPX 데이터 연동 모달 */}
-      <GpxImportModal
+      {/* ⌚ 스마트워치 클라우드 자동 동기화 & GPX 모달 */}
+      <WearableSyncModal
         isOpen={showGpxModal}
         onClose={() => setShowGpxModal(false)}
-        onImportSuccess={(data) => {
-          setRoutePoints(data.routeCoordinates);
-          setCourseName(data.title);
-          setUserLivePosition(data.routeCoordinates[0]);
-          setBuilderState('reviewing');
-          setSaveStatus(`⌚ ${data.sourceDevice} 데이터 (${data.distanceKm}km) 불러오기 완료!`);
+        onSyncSuccess={() => {
+          setSaveStatus(`⌚ 워치 데이터 자동 동기화 완료!`);
         }}
       />
     </div>

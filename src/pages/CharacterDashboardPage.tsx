@@ -10,7 +10,7 @@ import { getSavedExplorationStats } from '../utils/fogOfWar';
 import { getAvatarThumbnail, isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
 import VideoAdInterstitial from '../components/ads/VideoAdInterstitial';
 import FactionWarsCard from '../components/faction/FactionWarsCard';
-import GpxImportModal from '../components/GpxImportModal';
+import WearableSyncModal from '../components/wearable/WearableSyncModal';
 
 function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: string; isToday: boolean }> {
   const now = new Date();
@@ -97,9 +97,15 @@ export default function CharacterDashboardPage() {
       }
     }
 
+    function handleWearableSynced() {
+      const nextProgress = getGameProgress();
+      setTotalXpOverride(nextProgress.totalXp);
+    }
+
     syncAvatarState();
     window.addEventListener('storage', syncAvatarState);
     window.addEventListener('runquest-avatar-updated', syncAvatarState);
+    window.addEventListener('runquest:wearable-activity-synced', handleWearableSynced);
 
     return () => {
       unsubscribers.forEach((unsubscribe) => {
@@ -107,6 +113,7 @@ export default function CharacterDashboardPage() {
       });
       window.removeEventListener('storage', syncAvatarState);
       window.removeEventListener('runquest-avatar-updated', syncAvatarState);
+      window.removeEventListener('runquest:wearable-activity-synced', handleWearableSynced);
     };
   }, []);
 
@@ -228,12 +235,11 @@ export default function CharacterDashboardPage() {
         </div>
       </header>
 
-      {/* ⌚ 스마트워치 GPX 데이터 연동 모달 */}
-      <GpxImportModal
+      {/* ⌚ 스마트워치 클라우드 자동 동기화 & GPX 모달 */}
+      <WearableSyncModal
         isOpen={showGpxModal}
         onClose={() => setShowGpxModal(false)}
-        onImportSuccess={() => {
-          // 캐릭터 상태 갱신
+        onSyncSuccess={() => {
           const nextProgress = getGameProgress();
           setTotalXpOverride(nextProgress.totalXp);
         }}
