@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import CourseBuilderMap from '../components/CourseBuilderMap';
+import GpxImportModal from '../components/GpxImportModal';
 import { mockAreas } from '../data/mockAreas';
 import type { LatLngTuple } from '../types/area';
 import type { CheckpointType, Course, CourseCheckpoint, Difficulty } from '../types/course';
@@ -64,6 +65,7 @@ function formatElapsedTime(totalSeconds: number): string {
 
 export default function CourseBuilder() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { courseId } = useParams();
 
   // 기본 설정 (자유 러닝이 주 목적)
@@ -78,6 +80,7 @@ export default function CourseBuilder() {
   const [saveStatus, setSaveStatus] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showCourseCreatorSection, setShowCourseCreatorSection] = useState(false);
+  const [showGpxModal, setShowGpxModal] = useState(false);
 
   // 워크플로우 상태 머신 (idle | recording | paused | matching | reviewing)
   const [builderState, setBuilderState] = useState<BuilderState>('idle');
@@ -167,6 +170,17 @@ export default function CourseBuilder() {
   useEffect(() => {
     let isMounted = true;
 
+    // A. 이전 화면에서 전달된 GPX 데이터가 있는 경우
+    const navState = location.state as { importedRoutePoints?: LatLngTuple[]; courseName?: string } | null;
+    if (navState?.importedRoutePoints && navState.importedRoutePoints.length > 0) {
+      setRoutePoints(navState.importedRoutePoints);
+      if (navState.courseName) setCourseName(navState.courseName);
+      setUserLivePosition(navState.importedRoutePoints[0]);
+      setBuilderState('reviewing');
+      setSaveStatus(`⌚ 워치 데이터 (${navState.importedRoutePoints.length}P) 불러오기 완료!`);
+      return;
+    }
+
     async function loadEditableCourse() {
       if (!courseId) return;
 
@@ -196,7 +210,7 @@ export default function CourseBuilder() {
     return () => {
       isMounted = false;
     };
-  }, [courseId]);
+  }, [courseId, location.state]);
 
   // 5. GPS 원시 데이터 처리 파이프라인 (칼만 필터 + 이상치 제거 + 거리 누적)
   function processIncomingGpsPosition(pos: GeolocationPosition) {
@@ -558,8 +572,16 @@ export default function CourseBuilder() {
         </div>
       </header>
 
-      {/* 3. 우측 플로팅 퀵 툴 (테스트 시뮬레이션 / 되돌리기 / 초기화) */}
+      {/* 3. 우측 플로팅 퀵 툴 (워치 불러오기 / 테스트 시뮬레이션 / 되돌리기 / 초기화) */}
       <aside className="absolute right-4 top-20 z-20 flex flex-col gap-2.5">
+        <button
+          type="button"
+          onClick={() => setShowGpxModal(true)}
+          className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg flex items-center justify-center active:scale-90 transition-all text-xs"
+          title="스마트워치 GPX 파일 불러오기"
+        >
+          ⌚
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -849,6 +871,19 @@ export default function CourseBuilder() {
           )}
         </div>
       </footer>
+
+      {/* ⌚ 스마트워치 GPX 데이터 연동 모달 */}
+      <GpxImportModal
+        isOpen={showGpxModal}
+        onClose={() => setShowGpxModal(false)}
+        onImportSuccess={(data) => {
+          setRoutePoints(data.routeCoordinates);
+          setCourseName(data.title);
+          setUserLivePosition(data.routeCoordinates[0]);
+          setBuilderState('reviewing');
+          setSaveStatus(`⌚ ${data.sourceDevice} 데이터 (${data.distanceKm}km) 불러오기 완료!`);
+        }}
+      />
     </div>
   );
 }

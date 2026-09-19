@@ -10,6 +10,7 @@ import { getSavedExplorationStats } from '../utils/fogOfWar';
 import { getAvatarThumbnail, isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
 import VideoAdInterstitial from '../components/ads/VideoAdInterstitial';
 import FactionWarsCard from '../components/faction/FactionWarsCard';
+import GpxImportModal from '../components/GpxImportModal';
 
 function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: string; isToday: boolean }> {
   const now = new Date();
@@ -43,6 +44,8 @@ export default function CharacterDashboardPage() {
   const [profile, setProfile] = useState<CharacterProfile | null>(null);
   const [status, setStatus] = useState('Loading hero...');
   const [showAd, setShowAd] = useState(false);
+  const [showGpxModal, setShowGpxModal] = useState(false);
+  const [totalXpOverride, setTotalXpOverride] = useState<number | null>(null);
   const [customRunnerName, setCustomRunnerName] = useState(() => {
     return (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-name')) || '';
   });
@@ -108,16 +111,17 @@ export default function CharacterDashboardPage() {
   }, []);
 
   const progress = getGameProgress();
-  const currentLevel = calculateLevelFromXp(progress.totalXp);
-  const nextLevelXp = getNextLevelXp(progress.totalXp);
-  const currentLevelBaseXp = getCurrentLevelBaseXp(progress.totalXp);
+  const effectiveTotalXp = totalXpOverride ?? progress.totalXp;
+  const currentLevel = calculateLevelFromXp(effectiveTotalXp);
+  const nextLevelXp = getNextLevelXp(effectiveTotalXp);
+  const currentLevelBaseXp = getCurrentLevelBaseXp(effectiveTotalXp);
   const xpProgressPercent =
-    nextLevelXp <= progress.totalXp
+    nextLevelXp <= effectiveTotalXp
       ? 100
       : Math.round(
-          ((progress.totalXp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100
+          ((effectiveTotalXp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100
         );
-  const currentLevelCurrentXp = progress.totalXp - currentLevelBaseXp;
+  const currentLevelCurrentXp = effectiveTotalXp - currentLevelBaseXp;
   const currentLevelRequiredXp = nextLevelXp - currentLevelBaseXp;
 
   const equippedItems = useMemo(
@@ -179,8 +183,18 @@ export default function CharacterDashboardPage() {
           </div>
         </div>
 
-        {/* 우측 광고 테스트 & 랭킹 & 프로필 아바타 버튼 */}
-        <div className="flex items-center gap-2">
+        {/* 우측 스마트워치 연동 & 광고 & 랭킹 & 프로필 아바타 버튼 */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowGpxModal(true)}
+            className="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[10px] font-black shadow-xs active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+            title="스마트워치 운동 데이터(.gpx) 가져오기"
+          >
+            <span>⌚</span>
+            <span>워치 연동</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setShowAd(true)}
@@ -213,6 +227,17 @@ export default function CharacterDashboardPage() {
           </Link>
         </div>
       </header>
+
+      {/* ⌚ 스마트워치 GPX 데이터 연동 모달 */}
+      <GpxImportModal
+        isOpen={showGpxModal}
+        onClose={() => setShowGpxModal(false)}
+        onImportSuccess={() => {
+          // 캐릭터 상태 갱신
+          const nextProgress = getGameProgress();
+          setTotalXpOverride(nextProgress.totalXp);
+        }}
+      />
 
       {/* 2. 주간 캘린더 스트립 (Mon ~ Sun) */}
       <section className="px-5 pt-4 pb-2">
