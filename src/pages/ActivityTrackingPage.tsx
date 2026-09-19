@@ -20,6 +20,7 @@ import {
 } from '../services/liveEncounterService';
 import { recordExplorationDistance, saveExploredBreadcrumbs } from '../utils/fogOfWar';
 import { voiceCompanion, type VoiceMessage } from '../services/voiceCompanionService';
+import { GpsKalmanFilter, snapPointToRoute, isGpsOutlier } from '../utils/gpsSmoothing';
 
 type RunNavigationState = {
   course: Course;
@@ -162,6 +163,10 @@ export default function ActivityTrackingPage() {
   const [gpsStatus, setGpsStatus] = useState('GPS ready');
   const isStartingRef = useRef(false);
 
+  // 🛰️ 칼만 필터 및 도로 스냅 보정 Ref
+  const kalmanFilterRef = useRef(new GpsKalmanFilter(2.5));
+  const lastRecordedPointRef = useRef<{ coord: LatLngTuple; timeMs: number } | null>(null);
+
   // Phase 4: 주변 라이브 러너 및 High-Five 이벤트
   const [nearbyRunners, setNearbyRunners] = useState<LiveNearbyRunner[]>([]);
   const [highFiveEvent, setHighFiveEvent] = useState<{ runner: LiveNearbyRunner; timestamp: number } | null>(null);
@@ -302,21 +307,39 @@ export default function ActivityTrackingPage() {
       sessionId: gpsSessionId,
       minDistanceMeters: 10, // 10m 이상 이동 시 (코너링/러닝 대응)
       fallbackTimeIntervalMs: 10_000, // 10초 경과 보완
-      minJitterMeters: 3, // 3m 미만 떨림 필터링
       onRawPoint: (rawPoint) => {
-        // 실시간 지도 마커 위치 즉각 업데이트 및 궤적 연결
-        const newCoord: LatLngTuple = [rawPoint.lat, rawPoint.lng];
-        setCurrentPosition(newCoord);
+        const accuracy = rawPoint.accuracy ?? 5;
+        const nowMs = Date.now();
+        const rawCoord: LatLngTuple = [rawPoint.lat, rawPoint.lng];
+
+        // 1. 이상치 및 순간 텔레포트/정지 시 떨림 필터
+        if (lastRecordedPointRef.current) {
+          const timeDiffSec = (nowMs - lastRecordedPointRef.current.timeMs) / 1000;
+          if (isGpsOutlier(rawCoord, lastRecordedPointRef.current.coord, timeDiffSec, accuracy)) {
+            return;
+          }
+        }
+
+        // 2. 칼만 필터 스무딩 적용
+        const filteredCoord = kalmanFilterRef.current.filter(rawPoint.lat, rawPoint.lng, accuracy, nowMs);
+
+        // 3. 코스 도로 중심선 자석 스냅 (Snap to Road)
+        const snapResult = snapPointToRoute(filteredCoord, routeCoordinates, 28);
+        const finalCoord = snapResult.snappedPosition;
+
+        lastRecordedPointRef.current = { coord: finalCoord, timeMs: nowMs };
+        setCurrentPosition(finalCoord);
+
         setTrackedPath((prev) => {
-          if (prev.length === 0) return [newCoord];
+          if (prev.length === 0) return [finalCoord];
           const last = prev[prev.length - 1];
           const distMeters =
             Math.sqrt(
-              Math.pow((newCoord[0] - last[0]) * 111000, 2) +
-              Math.pow((newCoord[1] - last[1]) * 111000, 2)
+              Math.pow((finalCoord[0] - last[0]) * 111000, 2) +
+              Math.pow((finalCoord[1] - last[1]) * 111000, 2)
             );
-          if (distMeters >= 2) {
-            return [...prev, newCoord];
+          if (distMeters >= 2.5) {
+            return [...prev, finalCoord];
           }
           return prev;
         });
