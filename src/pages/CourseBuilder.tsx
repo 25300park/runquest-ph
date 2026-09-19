@@ -4,7 +4,7 @@ import CourseBuilderMap from '../components/CourseBuilderMap';
 import WearableSyncModal from '../components/wearable/WearableSyncModal';
 import { mockAreas } from '../data/mockAreas';
 import type { LatLngTuple } from '../types/area';
-import type { CheckpointType, Course, CourseCheckpoint, Difficulty } from '../types/course';
+import type { Course, CourseCheckpoint, Difficulty } from '../types/course';
 import type { CompletedActivitySummary } from '../types/activity';
 import {
   getCourseById,
@@ -17,6 +17,7 @@ import { calculateHaversineDistanceKm, calculateRouteDistanceKm } from '../utils
 import { GpsKalmanFilter, isGpsOutlier } from '../utils/gpsSmoothing';
 import { completeActivityProgress } from '../utils/gameProgress';
 import { recordExplorationDistance, saveExploredBreadcrumbs } from '../utils/fogOfWar';
+import { buildOptimizedCheckpoints } from '../utils/pathSimplification';
 
 const difficulties: Difficulty[] = ['Easy', 'Normal', 'Hard', 'Challenge'];
 type BuilderState = 'idle' | 'recording' | 'paused' | 'matching' | 'reviewing';
@@ -32,22 +33,7 @@ function toDatabaseArea(areaName: string): CourseArea {
 }
 
 function buildCheckpoints(routePoints: LatLngTuple[]): CourseCheckpoint[] {
-  if (routePoints.length === 0) {
-    return [];
-  }
-
-  return routePoints.map((point, index) => {
-    const checkpointType: CheckpointType =
-      index === 0 ? 'START' : index === routePoints.length - 1 ? 'FINISH' : 'CHECKPOINT';
-
-    return {
-      id: `builder-checkpoint-${index}`,
-      name: `${checkpointType} ${index + 1}`,
-      type: checkpointType,
-      position: point,
-      distanceFromStartKm: calculateRouteDistanceKm(routePoints.slice(0, index + 1))
-    };
-  });
+  return buildOptimizedCheckpoints(routePoints);
 }
 
 function formatElapsedTime(totalSeconds: number): string {

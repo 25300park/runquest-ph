@@ -1,15 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import L from 'leaflet';
 import { Circle, CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import type { LatLngTuple } from '../types/area';
-import type { CourseCheckpoint } from '../types/course';
+import type { CheckpointType, CourseCheckpoint } from '../types/course';
+import { extractCornerKeypoints } from '../utils/pathSimplification';
 
 type CourseBuilderMapProps = {
   center: LatLngTuple;
   userLivePosition?: LatLngTuple | null;
   isTracking?: boolean;
   routePoints: LatLngTuple[];
-  checkpoints: CourseCheckpoint[];
+  checkpoints?: CourseCheckpoint[];
   onAddRoutePoint: (position: LatLngTuple) => void;
   onMoveRoutePoint: (index: number, position: LatLngTuple) => void;
   onDeleteRoutePoint: (index: number) => void;
@@ -54,20 +55,23 @@ export default function CourseBuilderMap({
   userLivePosition,
   isTracking,
   routePoints,
-  checkpoints,
   onAddRoutePoint,
   onMoveRoutePoint,
   onDeleteRoutePoint
 }: CourseBuilderMapProps) {
-  function createPointIcon(index: number) {
-    const label =
-      index === 0 ? 'S' : index === routePoints.length - 1 ? 'F' : String(index + 1);
+  // 🧭 코너(모서리) 각도 기반 핵심 키포인트만 추출 (직선 구간 24개 중첩 핀 방지)
+  const cornerKeypoints = useMemo(
+    () => extractCornerKeypoints(routePoints, 22, 35),
+    [routePoints]
+  );
+
+  function createKeypointIcon(label: string, type: CheckpointType) {
     const color =
-      index === 0 ? '#10b981' : index === routePoints.length - 1 ? '#f59e0b' : '#8b5cf6';
+      type === 'START' ? '#10b981' : type === 'FINISH' ? '#f59e0b' : '#8b5cf6';
 
     return L.divIcon({
       className: '',
-      html: `<div style="height:32px;width:32px;border-radius:9999px;border:2.5px solid white;background:${color};display:grid;place-items:center;color:white;font-weight:900;font-size:11px;box-shadow:0 8px 20px rgba(0,0,0,.25);">${label}</div>`,
+      html: `<div style="height:32px;width:32px;border-radius:9999px;border:2.5px solid white;background:${color};display:grid;place-items:center;color:white;font-weight:900;font-size:11px;box-shadow:0 8px 20px rgba(0,0,0,.28);">${label}</div>`,
       iconSize: [32, 32],
       iconAnchor: [16, 16]
     });
@@ -113,11 +117,11 @@ export default function CourseBuilderMap({
           </>
         )}
 
-        {/* 1. Fog of War 실시간 50m Reveal 광원 효과 */}
-        {routePoints.map((point, index) => (
+        {/* 1. Fog of War 실시간 50m Reveal 광원 효과 (코너 키포인트에만 생성하여 과부하 방지) */}
+        {cornerKeypoints.map((kp) => (
           <Circle
-            key={`fog-reveal-${index}`}
-            center={point}
+            key={`fog-reveal-kp-${kp.originalIndex}`}
+            center={kp.point}
             radius={50}
             pathOptions={{
               color: '#8b5cf6',
@@ -129,7 +133,7 @@ export default function CourseBuilderMap({
           />
         ))}
 
-        {/* 2. 네온 이동 궤적 라인 */}
+        {/* 2. 네온 이동 궤적 라인 (직선 도로는 매끄러운 1줄 폴리라인으로 완벽 유지) */}
         {routePoints.length > 1 && (
           <Polyline
             positions={routePoints}
@@ -141,49 +145,36 @@ export default function CourseBuilderMap({
           />
         )}
 
-        {/* 3. 포인트 마커들 */}
-        {routePoints.map((point, index) => (
+        {/* 3. 코너(모서리) 핵심 포인트 마커만 렌더링 (S, Corner 1, Corner 2, F) */}
+        {cornerKeypoints.map((kp) => (
           <Marker
-            key={`route-point-${index}-${point[0]}-${point[1]}`}
-            position={point}
+            key={`corner-keypoint-${kp.originalIndex}-${kp.point[0]}-${kp.point[1]}`}
+            position={kp.point}
             draggable
-            icon={createPointIcon(index)}
+            icon={createKeypointIcon(kp.label, kp.type)}
             eventHandlers={{
-              click: () => onDeleteRoutePoint(index),
+              click: () => onDeleteRoutePoint(kp.originalIndex),
               dragend: (event) => {
                 const marker = event.target as L.Marker;
                 const nextPosition = marker.getLatLng();
-                onMoveRoutePoint(index, [nextPosition.lat, nextPosition.lng]);
+                onMoveRoutePoint(kp.originalIndex, [nextPosition.lat, nextPosition.lng]);
               }
             }}
           >
             <Popup>
-              {index === 0 ? 'START' : index === routePoints.length - 1 ? 'FINISH' : 'CHECKPOINT'}{' '}
-              point {index + 1}
+              <strong>
+                {kp.type === 'START'
+                  ? '🟢 출발점 (START)'
+                  : kp.type === 'FINISH'
+                  ? '🏁 도착점 (FINISH)'
+                  : `📍 코너 ${kp.label} (${kp.turnAngleDeg ? `${kp.turnAngleDeg}° 턴` : '방향 전환'})`}
+              </strong>
               <br />
-              Drag to move. Click marker to delete.
+              이동 거리: {kp.distanceFromStartKm.toFixed(2)}km
+              <br />
+              <span className="text-[10px] text-slate-400">드래그하여 위치 조정 가능</span>
             </Popup>
           </Marker>
-        ))}
-
-        {checkpoints.map((checkpoint) => (
-          <CircleMarker
-            key={checkpoint.id}
-            center={checkpoint.position}
-            radius={8}
-            pathOptions={{
-              color: '#ffffff',
-              fillColor: checkpoint.type === 'START' ? '#10b981' : checkpoint.type === 'FINISH' ? '#f59e0b' : '#8b5cf6',
-              fillOpacity: 1,
-              weight: 2
-            }}
-          >
-            <Popup>
-              <strong>{checkpoint.type}</strong>
-              <br />
-              {checkpoint.name}
-            </Popup>
-          </CircleMarker>
         ))}
       </MapContainer>
 
