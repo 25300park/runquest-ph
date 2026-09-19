@@ -3,8 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import CourseBuilderMap from '../components/CourseBuilderMap';
 import { mockAreas } from '../data/mockAreas';
 import type { LatLngTuple } from '../types/area';
-import type { CheckpointType, CourseCheckpoint, Difficulty } from '../types/course';
-import { isSupabaseConfigured } from '../lib/supabase';
+import type { CheckpointType, Course, CourseCheckpoint, Difficulty } from '../types/course';
+import type { CompletedActivitySummary } from '../types/activity';
 import {
   getCourseById,
   saveRouteAsCourse,
@@ -13,9 +13,12 @@ import {
 } from '../services/courseService';
 import { snapToRoad } from '../services/mapMatchingService';
 import { calculateHaversineDistanceKm, calculateRouteDistanceKm } from '../utils/route';
+import { GpsKalmanFilter, isGpsOutlier } from '../utils/gpsSmoothing';
+import { completeActivityProgress } from '../utils/gameProgress';
+import { recordExplorationDistance, saveExploredBreadcrumbs } from '../utils/fogOfWar';
 
 const difficulties: Difficulty[] = ['Easy', 'Normal', 'Hard', 'Challenge'];
-type BuilderState = 'idle' | 'recording' | 'matching' | 'reviewing';
+type BuilderState = 'idle' | 'recording' | 'paused' | 'matching' | 'reviewing';
 
 function toDatabaseArea(areaName: string): CourseArea {
   if (areaName.includes('Makati')) {
@@ -62,23 +65,32 @@ function formatElapsedTime(totalSeconds: number): string {
 export default function CourseBuilder() {
   const navigate = useNavigate();
   const { courseId } = useParams();
-  const [courseName, setCourseName] = useState('My Field Route');
+
+  // 기본 설정 (자유 러닝이 주 목적)
+  const [courseName, setCourseName] = useState(() => {
+    const today = new Date();
+    const dateStr = `${today.getMonth() + 1}/${today.getDate()}`;
+    return `자유 러닝 (${dateStr})`;
+  });
   const [areaId, setAreaId] = useState(mockAreas[0].id);
   const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
   const [routePoints, setRoutePoints] = useState<LatLngTuple[]>([]);
   const [saveStatus, setSaveStatus] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingCourse, setIsLoadingCourse] = useState(Boolean(courseId));
-  
-  // 워크플로우 상태 머신 (idle | recording | matching | reviewing)
+  const [showCourseCreatorSection, setShowCourseCreatorSection] = useState(false);
+
+  // 워크플로우 상태 머신 (idle | recording | paused | matching | reviewing)
   const [builderState, setBuilderState] = useState<BuilderState>('idle');
-  const [isGpsRecording, setIsGpsRecording] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState(0);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
-  
+  const [userLivePosition, setUserLivePosition] = useState<LatLngTuple | null>(null);
+
+  // 🛰️ 고성능 칼만 필터 및 트래킹 참조 변수
+  const kalmanFilterRef = useRef(new GpsKalmanFilter(2.5));
   const watchIdRef = useRef<number | null>(null);
+  const pollingIntervalRef = useRef<number | null>(null);
   const lastPointRef = useRef<LatLngTuple | null>(null);
   const lastSavedTimeRef = useRef<number>(0);
   const lastPositionTimeRef = useRef<number>(0);
@@ -87,9 +99,20 @@ export default function CourseBuilder() {
   const selectedArea = mockAreas.find((area) => area.id === areaId) ?? mockAreas[0];
   const checkpoints = useMemo(() => buildCheckpoints(routePoints), [routePoints]);
   const routeDistanceKm = useMemo(() => calculateRouteDistanceKm(routePoints), [routePoints]);
-  const estimatedXp = Math.round(routeDistanceKm * 100);
+  const estimatedXp = Math.max(50, Math.round(routeDistanceKm * 120) + 30);
+  const estimatedCalories = Math.max(10, Math.round(routeDistanceKm * 65));
 
-  // 1. 화면 꺼짐 방지 (Wake Lock) 요청/해제 함수
+  // 평균 페이스 계산
+  const avgPaceFormatted = useMemo(() => {
+    if (routeDistanceKm <= 0.05 || elapsedSeconds <= 0) return "--'--\"";
+    const secPerKm = elapsedSeconds / routeDistanceKm;
+    const paceMin = Math.floor(secPerKm / 60);
+    const paceSec = Math.floor(secPerKm % 60);
+    if (paceMin > 30) return "--'--\"";
+    return `${paceMin}'${paceSec.toString().padStart(2, '0')}"`;
+  }, [routeDistanceKm, elapsedSeconds]);
+
+  // 1. 화면 꺼짐 방지 (Wake Lock)
   async function requestWakeLock() {
     try {
       if ('wakeLock' in navigator) {
@@ -111,18 +134,36 @@ export default function CourseBuilder() {
     }
   }
 
-  // 2. 타이머 로직 (기록 중일 때 매초 증가)
+  // 2. 초기 로드 시 유저의 실시간 위치 미리 탐색
   useEffect(() => {
-    if (!isGpsRecording) return;
+    if (!('geolocation' in navigator)) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const rawCoord: LatLngTuple = [pos.coords.latitude, pos.coords.longitude];
+        const filteredCoord = kalmanFilterRef.current.filter(rawCoord[0], rawCoord[1], pos.coords.accuracy);
+        setUserLivePosition(filteredCoord);
+        setGpsAccuracy(Math.round(pos.coords.accuracy));
+      },
+      () => {
+        // 위치 실패 시 기본 지역 중심 유지
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+    );
+  }, []);
+
+  // 3. 타이머 로직 (기록 중일 때 매초 증가)
+  useEffect(() => {
+    if (builderState !== 'recording') return;
 
     const interval = window.setInterval(() => {
       setElapsedSeconds((prev) => prev + 1);
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [isGpsRecording]);
+  }, [builderState]);
 
-  // 3. 기존 코스 로드
+  // 4. 기존 코스 수정 모드일 때 로드
   useEffect(() => {
     let isMounted = true;
 
@@ -130,7 +171,6 @@ export default function CourseBuilder() {
       if (!courseId) return;
 
       try {
-        setIsLoadingCourse(true);
         setSaveStatus('코스를 불러오는 중...');
         const editableCourse = await getCourseById(courseId);
 
@@ -143,13 +183,12 @@ export default function CourseBuilder() {
         setRoutePoints(
           editableCourse.course_points.map((point) => [point.lat, point.lng] as LatLngTuple)
         );
+        setShowCourseCreatorSection(true);
         setBuilderState('reviewing');
         setSaveStatus(`코스 수정 모드: ${editableCourse.id}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : '불러오기 실패';
         setSaveStatus(`에러: ${message}`);
-      } finally {
-        if (isMounted) setIsLoadingCourse(false);
       }
     }
 
@@ -159,130 +198,238 @@ export default function CourseBuilder() {
     };
   }, [courseId]);
 
-  // 4. GPS 트래킹 및 Wake Lock 정리 & 탭 복귀 시 재요청
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isGpsRecording) {
-        void requestWakeLock();
+  // 5. GPS 원시 데이터 처리 파이프라인 (칼만 필터 + 이상치 제거 + 거리 누적)
+  function processIncomingGpsPosition(pos: GeolocationPosition) {
+    const accuracy = Math.round(pos.coords.accuracy);
+    const nowMs = Date.now();
+    const rawCoord: LatLngTuple = [pos.coords.latitude, pos.coords.longitude];
+    setGpsAccuracy(accuracy);
+    setGpsError(null);
+
+    // 1. 칼만 필터 스무딩
+    const filteredCoord = kalmanFilterRef.current.filter(rawCoord[0], rawCoord[1], accuracy, nowMs);
+    setUserLivePosition(filteredCoord);
+
+    // 기록 중이 아닐 때는 마커 위치만 갱신
+    if (builderState !== 'recording') {
+      return;
+    }
+
+    // 2. 속도 계산
+    if (pos.coords.speed !== null && pos.coords.speed >= 0) {
+      setCurrentSpeedKmh(Number((pos.coords.speed * 3.6).toFixed(1)));
+    } else if (lastPointRef.current) {
+      const deltaKm = calculateHaversineDistanceKm(lastPointRef.current, filteredCoord);
+      const deltaHours = (nowMs - lastPositionTimeRef.current) / 1000 / 3600;
+      if (deltaHours > 0) {
+        setCurrentSpeedKmh(Number(Math.min(35, deltaKm / deltaHours).toFixed(1)));
       }
-    };
+    }
+    lastPositionTimeRef.current = nowMs;
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // 3. 최초 지점 등록 (Start Point)
+    if (!lastPointRef.current || routePoints.length === 0) {
+      lastPointRef.current = filteredCoord;
+      lastSavedTimeRef.current = nowMs;
+      setRoutePoints([filteredCoord]);
+      setSaveStatus('🟢 출발 지점 확인! 자유롭게 달리세요.');
+      return;
+    }
 
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-      void releaseWakeLock();
-    };
-  }, [isGpsRecording]);
+    // 4. 이상치 필터
+    const timeDiffSec = (nowMs - lastSavedTimeRef.current) / 1000;
+    if (isGpsOutlier(filteredCoord, lastPointRef.current, timeDiffSec, accuracy)) {
+      return;
+    }
 
-  // 5. 하이브리드 GPS 기록 시작 함수
-  function startGpsRecording() {
+    const distanceMovedKm = calculateHaversineDistanceKm(lastPointRef.current, filteredCoord);
+
+    // 5. 이동 조건 판별 (2.5m 이상 이동 시 궤적 추가)
+    if (distanceMovedKm >= 0.0025 || (timeDiffSec >= 4 && distanceMovedKm >= 0.0015)) {
+      lastPointRef.current = filteredCoord;
+      lastSavedTimeRef.current = nowMs;
+      setRoutePoints((prev) => [...prev, filteredCoord]);
+      setSaveStatus(`🏃 운동 기록 중... (${(routeDistanceKm + distanceMovedKm).toFixed(2)}km)`);
+    }
+  }
+
+  // 6. 하이브리드 GPS 트래킹 시작 (watchPosition + 3초 폴백 Heartbeat)
+  function startWorkoutTracking() {
     if (!('geolocation' in navigator)) {
-      setGpsError('위치 서비스를 지원하지 않는 기기입니다.');
+      setGpsError('위치 서비스를 지원하지 않는 브라우저입니다.');
       return;
     }
 
     void requestWakeLock();
-    setIsGpsRecording(true);
     setBuilderState('recording');
     setGpsError(null);
-    setSaveStatus('📍 GPS 기록 시작! 이동하면 경로가 지도에 표시됩니다.');
+    setSaveStatus('🛰️ GPS 연결 중... 실시간 이동 경로를 기록합니다.');
     lastSavedTimeRef.current = Date.now();
     lastPositionTimeRef.current = Date.now();
 
-    // 시작 즉시 첫 현재 위치를 첫 번째 핀으로 등록
+    // 1단계: 즉시 현재 위치 단발성 락 요청
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const startCoord: LatLngTuple = [pos.coords.latitude, pos.coords.longitude];
-        lastPointRef.current = startCoord;
-        setGpsAccuracy(Math.round(pos.coords.accuracy));
-        setRoutePoints((prev) => (prev.length === 0 ? [startCoord] : prev));
+        processIncomingGpsPosition(pos);
       },
       (err) => {
-        console.warn('Initial GPS position error:', err.message);
+        console.warn('Initial GPS lock delay:', err.message);
+        setSaveStatus(`🛰️ GPS 신호 수신 대기 중 (신호 찾는 중...)`);
       },
-      { enableHighAccuracy: true, timeout: 5000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
+    // 2단계: 연속 위치 감시 (watchPosition)
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
     watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const currentCoord: LatLngTuple = [position.coords.latitude, position.coords.longitude];
-        const currentTime = Date.now();
-        setGpsAccuracy(Math.round(position.coords.accuracy));
-
-        // 속도 계산 (coords.speed 또는 수동 계산)
-        if (position.coords.speed !== null && position.coords.speed >= 0) {
-          setCurrentSpeedKmh(Number((position.coords.speed * 3.6).toFixed(1)));
-        } else if (lastPointRef.current) {
-          const deltaKm = calculateHaversineDistanceKm(lastPointRef.current, currentCoord);
-          const deltaHours = (currentTime - lastPositionTimeRef.current) / 1000 / 3600;
-          if (deltaHours > 0) {
-            setCurrentSpeedKmh(Number(Math.min(30, deltaKm / deltaHours).toFixed(1)));
-          }
-        }
-        lastPositionTimeRef.current = currentTime;
-
-        let shouldAddPoint = false;
-
-        if (!lastPointRef.current) {
-          shouldAddPoint = true;
-        } else {
-          const distanceMovedKm = calculateHaversineDistanceKm(lastPointRef.current, currentCoord);
-          const timeElapsedMs = currentTime - lastSavedTimeRef.current;
-
-          // Jittering 방지: 2m 미만 무시
-          if (distanceMovedKm < 0.002) {
-            return;
-          }
-
-          // 조건 A: 5m 이상 이동 시 추가 (러닝/코너링 반응성 향상)
-          if (distanceMovedKm >= 0.005) {
-            shouldAddPoint = true;
-          }
-          // 조건 B: 5초 경과 + 2m 이상 이동 시 추가 (느린 걸음 보완)
-          else if (timeElapsedMs >= 5000 && distanceMovedKm >= 0.002) {
-            shouldAddPoint = true;
-          }
-        }
-
-        if (shouldAddPoint) {
-          lastPointRef.current = currentCoord;
-          lastSavedTimeRef.current = currentTime;
-          setRoutePoints((prev) => [...prev, currentCoord]);
-        }
+      (pos) => {
+        processIncomingGpsPosition(pos);
       },
-      (error) => {
-        setGpsError(error.message);
+      (err) => {
+        console.warn('watchPosition warning:', err.message);
       },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 2000,
-        timeout: 10000
-      }
+      { enableHighAccuracy: true, maximumAge: 1500 }
     );
+
+    // 3단계: 안드로이드 브라우저 잠자기 방지 3초 Heartbeat Interval
+    if (pollingIntervalRef.current !== null) {
+      window.clearInterval(pollingIntervalRef.current);
+    }
+    pollingIntervalRef.current = window.setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          processIncomingGpsPosition(pos);
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 4000, maximumAge: 2000 }
+      );
+    }, 3500);
   }
 
-  // 6. 실시간 GPS 기록 일시정지 함수
-  function stopGpsRecording() {
+  // 7. 일시정지 / 재개
+  function pauseWorkoutTracking() {
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
-    void releaseWakeLock();
-    setIsGpsRecording(false);
+    if (pollingIntervalRef.current !== null) {
+      window.clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    setBuilderState('paused');
     setCurrentSpeedKmh(0);
-    lastPointRef.current = null;
+    setSaveStatus('⏸️ 운동이 일시 정지되었습니다.');
   }
 
-  // 7. 기록 종료 및 스냅 투 로드(Map Matching) 워크플로우 진입 (Step 2)
-  async function handleFinishAndMatch() {
-    stopGpsRecording();
+  function resumeWorkoutTracking() {
+    startWorkoutTracking();
+  }
 
+  // 8. 운동 종료 및 리뷰 모드 진입
+  function finishWorkout() {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (pollingIntervalRef.current !== null) {
+      window.clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    void releaseWakeLock();
+    setCurrentSpeedKmh(0);
+    setBuilderState('reviewing');
+    setSaveStatus('🏁 운동이 종료되었습니다! 오늘의 운동 기록을 확인하고 저장하세요.');
+  }
+
+  // 9. 전체 초기화
+  function resetAll() {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (pollingIntervalRef.current !== null) {
+      window.clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    void releaseWakeLock();
+    setRoutePoints([]);
+    setElapsedSeconds(0);
+    setCurrentSpeedKmh(0);
+    setBuilderState('idle');
+    setSaveStatus('');
+    lastPointRef.current = null;
+    kalmanFilterRef.current.reset();
+  }
+
+  // 10. 🏆 주 목적: [당일 운동 기록 저장] (Save Daily Activity)
+  async function handleSaveDailyWorkout() {
+    if (routeDistanceKm < 0.05 && elapsedSeconds < 10) {
+      setSaveStatus('⚠️ 최소 50m 이상 이동해야 운동 기록이 저장됩니다.');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveStatus('오늘의 운동 기록을 저장하고 경험치를 반영하는 중...');
+
+    try {
+      const freeCourse: Course = {
+        id: `free-run-${Date.now()}`,
+        areaId: selectedArea.id,
+        areaName: selectedArea.name,
+        name: courseName.trim() || '오늘의 자유 러닝',
+        description: '자유 러닝 당일 운동 기록',
+        courseType: 'running',
+        distanceKm: Math.max(0.1, Number(routeDistanceKm.toFixed(2))),
+        estimatedTimeMin: Math.max(1, Math.ceil(elapsedSeconds / 60)),
+        difficulty: 'Easy',
+        xpReward: estimatedXp,
+        explorationReward: Math.max(1, Math.round(routeDistanceKm * 3)),
+        startPoint: routePoints[0] ?? selectedArea.mapCenter,
+        finishPoint: routePoints[routePoints.length - 1] ?? selectedArea.mapCenter,
+        routeCoordinates: routePoints,
+        checkpoints: buildCheckpoints(routePoints),
+        pois: [],
+        safetyNotes: ''
+      };
+
+      const summary: CompletedActivitySummary = {
+        activityId: `act-free-${Date.now()}`,
+        courseId: freeCourse.id,
+        courseName: freeCourse.name,
+        areaName: selectedArea.name,
+        difficulty: 'Easy',
+        distanceKm: Number(routeDistanceKm.toFixed(2)),
+        durationSeconds: elapsedSeconds
+      };
+
+      // 1. 캐릭터 레벨업 및 XP 기록
+      completeActivityProgress(freeCourse, summary);
+
+      // 2. Fog of War 지도 개척 반영
+      if (routePoints.length > 0) {
+        saveExploredBreadcrumbs(routePoints);
+        recordExplorationDistance(selectedArea.id, Number(routeDistanceKm.toFixed(2)));
+      }
+
+      setSaveStatus(`🎉 저장 완료! +${estimatedXp} XP 획득! 1초 후 대시보드로 이동합니다.`);
+
+      setTimeout(() => {
+        navigate('/character-dashboard');
+      }, 1000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '저장 실패';
+      setSaveStatus(`❌ 저장 오류: ${message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  // 11. 🛣️ 부수 기능: [이 경로를 공식 코스로 등록하기] (Map Matching & Course Publish)
+  async function handlePublishAsCourse() {
     if (routePoints.length < 2) {
-      setSaveStatus('⚠️ 최소 2개 이상의 포인트가 필요합니다. 지도를 클릭하거나 [🧪 테스트 궤적]을 눌러보세요.');
+      setSaveStatus('⚠️ 최소 2개 이상의 위치 포인트가 필요합니다.');
       return;
     }
 
@@ -290,132 +437,85 @@ export default function CourseBuilder() {
     setSaveStatus('🛣️ GPS 궤적을 도로망에 맞게 정밀 교정하는 중 (OSRM)...');
 
     try {
-      const result = await snapToRoad(routePoints);
-      setRoutePoints(result.matchedPoints);
-      setBuilderState('reviewing');
-      setSaveStatus(`✨ 도로망 매칭 완료! (${result.originalCount}P → ${result.matchedCount}P) 경로를 확인 후 최종 저장하세요.`);
-    } catch {
-      setBuilderState('reviewing');
-      setSaveStatus('⚠️ 도로 매칭에 실패하여 원본 경로로 검토합니다.');
-    }
-  }
+      const matchResult = await snapToRoad(routePoints);
+      const finalPoints = matchResult.matchedPoints.length >= 2 ? matchResult.matchedPoints : routePoints;
+      setRoutePoints(finalPoints);
 
-  function addRoutePoint(position: LatLngTuple) {
-    setRoutePoints((currentPoints) => [...currentPoints, position]);
-    setSaveStatus(`📍 포인트가 추가되었습니다 (${routePoints.length + 1}개)`);
-  }
+      setIsSaving(true);
+      setSaveStatus('코스 데이터베이스에 저장 중...');
+      const databaseArea = toDatabaseArea(selectedArea.name);
+      const distance = calculateRouteDistanceKm(finalPoints);
 
-  function moveRoutePoint(index: number, position: LatLngTuple) {
-    setRoutePoints((currentPoints) =>
-      currentPoints.map((point, pointIndex) => (pointIndex === index ? position : point))
-    );
-  }
-
-  function deleteRoutePoint(index: number) {
-    setRoutePoints((currentPoints) =>
-      currentPoints.filter((_, pointIndex) => pointIndex !== index)
-    );
-  }
-
-  function undoLastPoint() {
-    setRoutePoints((currentPoints) => currentPoints.slice(0, -1));
-  }
-
-  function clearRoute() {
-    if (isGpsRecording) {
-      stopGpsRecording();
-    }
-    setRoutePoints([]);
-    setElapsedSeconds(0);
-    setBuilderState('idle');
-    setSaveStatus('');
-  }
-
-  // 테스트용 BGC 코스 시뮬레이션 궤적 주입 함수
-  function loadMockCourseForTesting() {
-    const mockBgcTrack: LatLngTuple[] = [
-      [14.5492, 121.0505],
-      [14.5510, 121.0520],
-      [14.5528, 121.0545],
-      [14.5540, 121.0532],
-      [14.5522, 121.0510],
-      [14.5505, 121.0490]
-    ];
-    setRoutePoints(mockBgcTrack);
-    setElapsedSeconds(180);
-    setSaveStatus('🧪 테스트 궤적 6개가 주입되었습니다! [⏹️ 기록 종료]를 눌러 맵 매칭을 확인하세요.');
-  }
-
-  // 8. 최종 코스 저장 (Step 3: 유저 최종 승인 시 실행)
-  async function handleFinalSave() {
-    if (routePoints.length < 2) {
-      setSaveStatus('⚠️ 최소 2개 이상의 포인트가 필요합니다.');
-      return;
-    }
-
-    setIsSaving(true);
-    setSaveStatus('코스 저장 중...');
-    const databaseArea = toDatabaseArea(selectedArea.name);
-    const distance = routeDistanceKm;
-
-    try {
       if (courseId) {
         const id = await updateCourse(
           {
             id: courseId,
-            name: courseName.trim() || 'Creator Route',
+            name: courseName.trim() || 'My Custom Route',
             area: databaseArea,
             difficulty,
             distance
           },
-          routePoints
+          finalPoints
         );
-        setSaveStatus(`✅ 수정 완료! 1초 후 코스 상세로 이동합니다...`);
-        setTimeout(() => {
-          navigate(`/courses/${id}`);
-        }, 1200);
+        setSaveStatus(`✨ 코스 수정 완료! 코스 상세 페이지로 이동합니다.`);
+        setTimeout(() => navigate(`/courses/${id}`), 1000);
       } else {
         const id = await saveRouteAsCourse(
           {
-            name: courseName.trim() || 'Creator Route',
+            name: courseName.trim() || 'My Custom Route',
             area: databaseArea,
             difficulty,
             distance
           },
-          routePoints
+          finalPoints
         );
-        setSaveStatus(`✅ 저장 완료! 1초 후 코스 상세로 이동합니다...`);
-        setTimeout(() => {
-          navigate(`/courses/${id}`);
-        }, 1200);
+        setSaveStatus(`✨ 새 공식 코스 등록 완료! 코스 상세 페이지로 이동합니다.`);
+        setTimeout(() => navigate(`/courses/${id}`), 1000);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '저장 실패';
-      setSaveStatus(
-        isSupabaseConfigured
-          ? `❌ DB 저장 실패: ${message}`
-          : '⚠️ 로컬 저장 완료 (Supabase 미설정)'
-      );
+    } catch {
+      setBuilderState('reviewing');
+      setSaveStatus('⚠️ 도로 매칭 실패. 원본 경로로 다시 검토합니다.');
     } finally {
       setIsSaving(false);
     }
   }
+
+  // 화면 정리
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+      if (pollingIntervalRef.current !== null) {
+        window.clearInterval(pollingIntervalRef.current);
+      }
+      void releaseWakeLock();
+    };
+  }, []);
 
   return (
     <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none">
       {/* 1. 배경: 풀스크린 지도 (100vh) */}
       <div className="absolute inset-0 z-0">
         <CourseBuilderMap
-          center={routePoints.length > 0 ? routePoints[routePoints.length - 1] : selectedArea.mapCenter}
+          center={userLivePosition ?? (routePoints.length > 0 ? routePoints[routePoints.length - 1] : selectedArea.mapCenter)}
+          userLivePosition={userLivePosition}
+          isTracking={builderState === 'recording'}
           routePoints={routePoints}
           checkpoints={checkpoints}
-          onAddRoutePoint={addRoutePoint}
-          onMoveRoutePoint={moveRoutePoint}
-          onDeleteRoutePoint={deleteRoutePoint}
+          onAddRoutePoint={(point) => {
+            setRoutePoints((prev) => [...prev, point]);
+          }}
+          onMoveRoutePoint={(index, point) => {
+            setRoutePoints((prev) => prev.map((p, i) => (i === index ? point : p)));
+          }}
+          onDeleteRoutePoint={(index) => {
+            setRoutePoints((prev) => prev.filter((_, i) => i !== index));
+          }}
         />
       </div>
 
-      {/* 2. 상단 네비게이션 & GPS 상태 배지 */}
+      {/* 2. 상단 네비게이션 & 실시간 상태 배지 */}
       <header className="absolute top-0 left-0 right-0 z-20 px-4 pt-4 flex items-center justify-between pointer-events-none">
         {/* 뒤로가기 버튼 */}
         <button
@@ -429,101 +529,86 @@ export default function CourseBuilder() {
 
         {/* 상단 우측 둥근 GPS 상태 배지 */}
         <div className="pointer-events-auto flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-slate-200/80 shadow-lg shadow-black/10 text-xs font-bold text-slate-700">
+          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg shadow-black/10 text-xs font-bold text-slate-700">
             <span className="relative flex h-2.5 w-2.5">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                isGpsRecording ? 'bg-emerald-400' : 'bg-slate-400'
-              }`} />
-              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                isGpsRecording ? 'bg-emerald-500' : 'bg-slate-500'
-              }`} />
+              <span
+                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  builderState === 'recording' ? 'bg-emerald-400' : 'bg-slate-400'
+                }`}
+              />
+              <span
+                className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                  builderState === 'recording' ? 'bg-emerald-500' : 'bg-slate-500'
+                }`}
+              />
             </span>
-            <span className="font-extrabold tracking-tight">GPS</span>
+            <span className="font-extrabold tracking-tight">
+              {builderState === 'recording' ? 'GPS Active' : 'GPS Standby'}
+            </span>
             {gpsAccuracy !== null && (
-              <span className="text-[10px] text-slate-500 font-medium">±{gpsAccuracy}m</span>
+              <span
+                className={`text-[10px] font-mono font-black ${
+                  gpsAccuracy <= 15 ? 'text-emerald-600' : gpsAccuracy <= 35 ? 'text-amber-600' : 'text-rose-500'
+                }`}
+              >
+                ±{gpsAccuracy}m
+              </span>
             )}
           </div>
         </div>
       </header>
 
-      {/* 3. 우측 플로팅 퀵 툴 (되돌리기 / 초기화 / 테스트 시뮬레이션) */}
+      {/* 3. 우측 플로팅 퀵 툴 (테스트 시뮬레이션 / 되돌리기 / 초기화) */}
       <aside className="absolute right-4 top-20 z-20 flex flex-col gap-2.5">
         <button
           type="button"
-          onClick={loadMockCourseForTesting}
-          disabled={builderState === 'matching'}
-          className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md border border-violet-200 text-violet-700 font-black shadow-lg flex items-center justify-center active:scale-90 disabled:opacity-40 disabled:pointer-events-none transition-all text-xs"
-          title="테스트 궤적 불러오기"
+          onClick={() => {
+            const mockBgcTrack: LatLngTuple[] = [
+              [14.5492, 121.0505],
+              [14.551, 121.052],
+              [14.5528, 121.0545],
+              [14.554, 121.0532],
+              [14.5522, 121.051],
+              [14.5505, 121.049]
+            ];
+            setRoutePoints(mockBgcTrack);
+            setElapsedSeconds(320);
+            setUserLivePosition(mockBgcTrack[mockBgcTrack.length - 1]);
+            setSaveStatus('🧪 테스트 궤적 6개가 주입되었습니다! [⏹️ 운동 종료]를 눌러보세요.');
+          }}
+          className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md border border-violet-200 text-violet-700 font-black shadow-lg flex items-center justify-center active:scale-90 transition-all text-xs"
+          title="테스트 궤적 주입"
         >
           🧪
         </button>
         <button
           type="button"
-          onClick={undoLastPoint}
-          disabled={routePoints.length === 0 || builderState === 'matching'}
-          className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/80 text-slate-700 font-bold shadow-lg flex items-center justify-center active:scale-90 disabled:opacity-40 disabled:pointer-events-none transition-all"
+          onClick={() => setRoutePoints((prev) => prev.slice(0, -1))}
+          disabled={routePoints.length === 0 || builderState === 'recording'}
+          className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md border border-slate-200 text-slate-700 font-bold shadow-lg flex items-center justify-center active:scale-90 disabled:opacity-40 disabled:pointer-events-none transition-all"
           title="마지막 포인트 취소"
         >
           ↩️
         </button>
         <button
           type="button"
-          onClick={clearRoute}
-          disabled={(routePoints.length === 0 && elapsedSeconds === 0) || builderState === 'matching'}
-          className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/80 text-rose-500 font-bold shadow-lg flex items-center justify-center active:scale-90 disabled:opacity-40 disabled:pointer-events-none transition-all"
+          onClick={resetAll}
+          disabled={routePoints.length === 0 && elapsedSeconds === 0 && builderState === 'idle'}
+          className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md border border-slate-200 text-rose-500 font-bold shadow-lg flex items-center justify-center active:scale-90 disabled:opacity-40 disabled:pointer-events-none transition-all"
           title="전체 초기화"
         >
           🗑️
         </button>
       </aside>
 
-      {/* 4. 하단 모던 화이트 바텀시트 UI (Step 2 & Step 3) */}
-      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-white text-slate-900 rounded-t-3xl shadow-[0_-6px_30px_rgba(0,0,0,0.12)] px-6 pt-5 pb-7 transition-all duration-300">
+      {/* 4. 하단 모던 컨트롤 바텀시트 */}
+      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-white text-slate-900 rounded-t-3xl shadow-[0_-8px_35px_rgba(0,0,0,0.15)] px-6 pt-5 pb-7 transition-all duration-300">
         <div className="max-w-md mx-auto flex flex-col">
-          {/* 바텀시트 상단 드래그 핸들 바 */}
+          {/* 바텀시트 상단 드래그 핸들 */}
           <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3" />
 
-          {/* 상단 라인: 코스 이름 & 설정 인라인 */}
-          <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100">
-            <input
-              type="text"
-              value={courseName}
-              onChange={(e) => setCourseName(e.target.value)}
-              placeholder="코스 이름 입력"
-              disabled={builderState === 'matching'}
-              className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none focus:border-teal-500 transition-all disabled:opacity-50"
-            />
-            <div className="flex items-center gap-1.5 shrink-0">
-              <select
-                value={areaId}
-                onChange={(e) => setAreaId(e.target.value)}
-                disabled={builderState === 'matching'}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 disabled:opacity-50"
-              >
-                {mockAreas.map((area) => (
-                  <option key={area.id} value={area.id}>
-                    {area.name}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-                disabled={builderState === 'matching'}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-bold text-amber-600 disabled:opacity-50"
-              >
-                {difficulties.map((diff) => (
-                  <option key={diff} value={diff}>
-                    {diff}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           {/* ======================================================= */}
-          {/* 1. 도로망 매칭 로딩 상태 (matching)                       */}
+          {/* 상태 A: 도로망 매칭 중 (matching)                         */}
           {/* ======================================================= */}
           {builderState === 'matching' ? (
             <div className="py-6 flex flex-col items-center justify-center gap-3">
@@ -534,123 +619,229 @@ export default function CourseBuilder() {
             </div>
           ) : builderState === 'reviewing' ? (
             /* ======================================================= */
-            /* 2. 최종 경로 검토 및 승인 상태 (reviewing) - Step 3       */
+            /* 상태 B: 🏆 운동 완료 및 저장 화면 (Reviewing)           */
             /* ======================================================= */
             <div className="flex flex-col gap-3">
-              <div className="p-3 bg-teal-50 border border-teal-200/80 rounded-2xl text-center">
-                <p className="text-[11px] font-black text-teal-900 uppercase tracking-wider">
-                  ✨ Map Matching Complete
+              <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl text-center">
+                <p className="text-[11px] font-black text-emerald-900 uppercase tracking-wider">
+                  🏁 Workout Finished (운동 완료)
                 </p>
-                <p className="text-xs text-teal-700 font-semibold mt-0.5">
-                  교정된 코스 경로({routePoints.length}P / {routeDistanceKm.toFixed(2)}km)를 확인하세요.
-                </p>
+                <div className="flex items-center justify-center gap-4 mt-2">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold block">이동 거리</span>
+                    <span className="text-lg font-black text-slate-900">{routeDistanceKm.toFixed(2)} km</span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-200" />
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold block">운동 시간</span>
+                    <span className="text-lg font-black text-slate-900">{formatElapsedTime(elapsedSeconds)}</span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-200" />
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold block">보상 XP</span>
+                    <span className="text-lg font-black text-amber-500">+{estimatedXp} XP</span>
+                  </div>
+                </div>
               </div>
 
-              {/* 최종 승인 버튼 그룹 (Step 3) */}
-              <div className="grid grid-cols-2 gap-2.5 pt-1">
+              {/* 🌟 주 기능: [당일 운동 기록 저장] */}
+              <button
+                type="button"
+                onClick={() => void handleSaveDailyWorkout()}
+                disabled={isSaving}
+                className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-sm shadow-xl shadow-emerald-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <span>🎉</span>
+                <span>{isSaving ? '저장 중...' : `당일 운동 기록 저장하기 (+${estimatedXp} XP)`}</span>
+              </button>
+
+              {/* 🛠️ 부수 기능: [이 경로를 정식 코스로 등록] 토글 */}
+              <div className="pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={clearRoute}
-                  className="py-4 px-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm shadow-sm active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+                  onClick={() => setShowCourseCreatorSection((prev) => !prev)}
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-500 hover:text-slate-800 py-1"
                 >
-                  <span>❌ 다시 기록하기</span>
+                  <span className="flex items-center gap-1.5">
+                    <span>✨</span>
+                    <span>이 경로를 새 공식 코스로 등록하기 (옵션)</span>
+                  </span>
+                  <span>{showCourseCreatorSection ? '▲ 접기' : '▼ 펼치기'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => void handleFinalSave()}
-                  disabled={isSaving || isLoadingCourse}
-                  className="py-4 px-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-sm shadow-lg shadow-emerald-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
-                >
-                  <span>{isSaving ? '저장 중...' : '✅ 이 경로로 최종 저장'}</span>
-                </button>
+                {showCourseCreatorSection && (
+                  <div className="mt-3 p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex flex-col gap-2.5 animate-in fade-in duration-200">
+                    <input
+                      type="text"
+                      value={courseName}
+                      onChange={(e) => setCourseName(e.target.value)}
+                      placeholder="코스 이름 (예: BGC 나이트 런)"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none focus:border-teal-500"
+                    />
+
+                    <div className="flex gap-2">
+                      <select
+                        value={areaId}
+                        onChange={(e) => setAreaId(e.target.value)}
+                        className="flex-1 bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-700"
+                      >
+                        {mockAreas.map((area) => (
+                          <option key={area.id} value={area.id}>
+                            {area.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={difficulty}
+                        onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+                        className="flex-1 bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-amber-600"
+                      >
+                        {difficulties.map((diff) => (
+                          <option key={diff} value={diff}>
+                            {diff}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => void handlePublishAsCourse()}
+                      disabled={isSaving}
+                      className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-black text-xs shadow-md shadow-violet-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      <span>🛣️</span>
+                      <span>도로망 매칭 후 공식 코스로 등록</span>
+                    </button>
+                  </div>
+                )}
               </div>
+
+              {/* 다시 기록하기 버튼 */}
+              <button
+                type="button"
+                onClick={resetAll}
+                className="w-full py-2.5 text-center text-xs font-bold text-slate-400 hover:text-slate-600"
+              >
+                ✕ 기록 취소 및 새로 시작
+              </button>
             </div>
           ) : (
             /* ======================================================= */
-            /* 3. 일반 기록/제작 상태 (idle | recording)               */
+            /* 상태 C: 🏃 실시간 자유 운동 기록 화면 (Idle / Recording)  */
             /* ======================================================= */
             <>
-              {/* 패널 상단: 실시간 진행 시간 & 원형 액션 컨트롤러 */}
+              {/* 패널 상단: 타이머 & 원형 액션 컨트롤 */}
               <div className="flex items-center justify-between gap-4">
-                {/* 좌측: 거대한 시간 타이포그래피 */}
+                {/* 시간 표시 */}
                 <div className="flex flex-col">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                    {isGpsRecording ? '🔴 REC TIME' : 'TIME ELAPSED'}
+                    {builderState === 'recording'
+                      ? '🔴 REC TIME'
+                      : builderState === 'paused'
+                      ? '⏸️ PAUSED'
+                      : 'FREE RUN TIME'}
                   </span>
                   <span className="text-4xl font-black tracking-tight text-slate-900 tabular-nums">
                     {formatElapsedTime(elapsedSeconds)}
                   </span>
                 </div>
 
-                {/* 우측: 크고 동그란 원형 액션 버튼 (w-16 h-16 rounded-full) */}
-                <div className="flex items-center gap-2">
-                  {!isGpsRecording ? (
+                {/* 우측 원형 컨트롤 버튼들 */}
+                <div className="flex items-center gap-2.5">
+                  {builderState === 'idle' ? (
                     <button
                       type="button"
-                      onClick={startGpsRecording}
+                      onClick={startWorkoutTracking}
                       className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white shadow-xl shadow-emerald-500/30 flex items-center justify-center text-2xl transition-all duration-200 border-2 border-emerald-300/40"
-                      title="기록 시작"
+                      title="운동 시작"
                     >
                       ▶️
                     </button>
+                  ) : builderState === 'recording' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={pauseWorkoutTracking}
+                        className="w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-600 active:scale-95 text-white shadow-lg shadow-amber-500/30 flex items-center justify-center text-xl transition-all border-2 border-amber-300/40 animate-pulse"
+                        title="일시정지"
+                      >
+                        ⏸️
+                      </button>
+                      <button
+                        type="button"
+                        onClick={finishWorkout}
+                        className="w-14 h-14 rounded-full bg-slate-900 hover:bg-slate-800 active:scale-95 text-white shadow-lg flex items-center justify-center text-xl transition-all"
+                        title="운동 종료"
+                      >
+                        ⏹️
+                      </button>
+                    </>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={stopGpsRecording}
-                      className="w-16 h-16 rounded-full bg-amber-500 hover:bg-amber-600 active:scale-95 text-white shadow-xl shadow-amber-500/30 flex items-center justify-center text-2xl transition-all duration-200 border-2 border-amber-300/40 animate-pulse"
-                      title="일시정지"
-                    >
-                      ⏸️
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={resumeWorkoutTracking}
+                        className="w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white shadow-lg shadow-emerald-500/30 flex items-center justify-center text-xl transition-all"
+                        title="재개"
+                      >
+                        ▶️
+                      </button>
+                      <button
+                        type="button"
+                        onClick={finishWorkout}
+                        className="w-14 h-14 rounded-full bg-slate-900 hover:bg-slate-800 active:scale-95 text-white shadow-lg flex items-center justify-center text-xl transition-all"
+                        title="운동 종료"
+                      >
+                        ⏹️
+                      </button>
+                    </>
                   )}
-
-                  {/* ⏹️ 기록 종료 및 도로망 매칭 시작 버튼 (Step 2) */}
-                  <button
-                    type="button"
-                    onClick={() => void handleFinishAndMatch()}
-                    disabled={routePoints.length < 2 || isLoadingCourse}
-                    className="w-12 h-12 rounded-full bg-slate-900 hover:bg-slate-800 active:scale-95 text-white shadow-lg flex items-center justify-center text-lg transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none"
-                    title="기록 종료 및 도로망 매칭"
-                  >
-                    ⏹️
-                  </button>
                 </div>
               </div>
 
-              {/* 패널 하단: 3칸 스탯 그리드 (거리, 포인트/XP, 속도) */}
-              <div className="grid grid-cols-3 gap-2 pt-4 mt-4 border-t border-slate-100 text-center">
-                {/* 1. 이동 거리 */}
+              {/* 4칸 스탯 그리드: 거리 / 속도 / 페이스 / 칼로리 */}
+              <div className="grid grid-cols-4 gap-1.5 pt-4 mt-4 border-t border-slate-100 text-center">
+                {/* 1. 거리 */}
                 <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">거리</span>
-                  <span className="text-xl font-black text-slate-900 tabular-nums">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">거리</span>
+                  <span className="text-lg font-black text-slate-900 tabular-nums">
                     {routeDistanceKm.toFixed(2)}
-                    <span className="text-xs font-semibold text-slate-500 ml-0.5">km</span>
+                    <span className="text-[10px] font-semibold text-slate-500 ml-0.5">km</span>
                   </span>
                 </div>
 
-                {/* 2. 수집 포인트 / 예상 XP */}
-                <div className="flex flex-col items-center border-x border-slate-100 px-2">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">예상 보상</span>
-                  <span className="text-xl font-black text-amber-500 tabular-nums">
-                    +{estimatedXp}
-                    <span className="text-xs font-semibold text-slate-500 ml-0.5">XP</span>
-                  </span>
-                </div>
-
-                {/* 3. 현재 속도 */}
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">현재 속도</span>
-                  <span className="text-xl font-black text-teal-600 tabular-nums">
+                {/* 2. 현재 속도 */}
+                <div className="flex flex-col items-center border-l border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">속도</span>
+                  <span className="text-lg font-black text-teal-600 tabular-nums">
                     {currentSpeedKmh.toFixed(1)}
-                    <span className="text-xs font-semibold text-slate-500 ml-0.5">km/h</span>
+                    <span className="text-[10px] font-semibold text-slate-500 ml-0.5">km/h</span>
+                  </span>
+                </div>
+
+                {/* 3. 페이스 */}
+                <div className="flex flex-col items-center border-l border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">페이스</span>
+                  <span className="text-lg font-black text-indigo-600 tabular-nums text-xs sm:text-base">
+                    {avgPaceFormatted}
+                  </span>
+                </div>
+
+                {/* 4. 칼로리 */}
+                <div className="flex flex-col items-center border-l border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">칼로리</span>
+                  <span className="text-lg font-black text-amber-500 tabular-nums">
+                    {estimatedCalories}
+                    <span className="text-[10px] font-semibold text-slate-500 ml-0.5">kcal</span>
                   </span>
                 </div>
               </div>
             </>
           )}
 
-          {/* 상태/에러 메시지 알림 바 */}
+          {/* 상태/에러 안내 바 */}
           {(saveStatus || gpsError) && (
             <div className="mt-3 py-1.5 px-3 rounded-xl bg-slate-100 text-center text-xs font-bold text-slate-700">
               {saveStatus || gpsError}

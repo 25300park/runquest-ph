@@ -1,16 +1,43 @@
-﻿import L from 'leaflet';
-import { Circle, CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMapEvents } from 'react-leaflet';
+import { useEffect, useRef } from 'react';
+import L from 'leaflet';
+import { Circle, CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import type { LatLngTuple } from '../types/area';
 import type { CourseCheckpoint } from '../types/course';
 
 type CourseBuilderMapProps = {
   center: LatLngTuple;
+  userLivePosition?: LatLngTuple | null;
+  isTracking?: boolean;
   routePoints: LatLngTuple[];
   checkpoints: CourseCheckpoint[];
   onAddRoutePoint: (position: LatLngTuple) => void;
   onMoveRoutePoint: (index: number, position: LatLngTuple) => void;
   onDeleteRoutePoint: (index: number) => void;
 };
+
+function MapController({
+  position,
+  isTracking
+}: {
+  position?: LatLngTuple | null;
+  isTracking?: boolean;
+}) {
+  const map = useMap();
+  const isFirstPanRef = useRef(true);
+
+  useEffect(() => {
+    if (position) {
+      if (isFirstPanRef.current) {
+        map.setView(position, 16, { animate: true });
+        isFirstPanRef.current = false;
+      } else if (isTracking) {
+        map.panTo(position, { animate: true, duration: 0.5 });
+      }
+    }
+  }, [position, isTracking, map]);
+
+  return null;
+}
 
 function MapClickLayer({ onAddRoutePoint }: { onAddRoutePoint: (position: LatLngTuple) => void }) {
   useMapEvents({
@@ -24,6 +51,8 @@ function MapClickLayer({ onAddRoutePoint }: { onAddRoutePoint: (position: LatLng
 
 export default function CourseBuilderMap({
   center,
+  userLivePosition,
+  isTracking,
   routePoints,
   checkpoints,
   onAddRoutePoint,
@@ -47,11 +76,42 @@ export default function CourseBuilderMap({
   return (
     <div className="relative h-full w-full">
       <MapContainer center={center} zoom={15} scrollWheelZoom className="h-full min-h-[500px] w-full">
+        <MapController position={userLivePosition} isTracking={isTracking} />
         <MapClickLayer onAddRoutePoint={onAddRoutePoint} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+
+        {/* 0. 실시간 사용자 위치 펄스 마커 */}
+        {userLivePosition && (
+          <>
+            <CircleMarker
+              center={userLivePosition}
+              radius={16}
+              pathOptions={{
+                color: '#06b6d4',
+                fillColor: '#06b6d4',
+                fillOpacity: 0.25,
+                weight: 1.5
+              }}
+            />
+            <CircleMarker
+              center={userLivePosition}
+              radius={7}
+              pathOptions={{
+                color: '#ffffff',
+                fillColor: '#0284c7',
+                fillOpacity: 1,
+                weight: 2.5
+              }}
+            >
+              <Popup>
+                <strong>📍 현재 위치 (GPS)</strong>
+              </Popup>
+            </CircleMarker>
+          </>
+        )}
 
         {/* 1. Fog of War 실시간 50m Reveal 광원 효과 */}
         {routePoints.map((point, index) => (
