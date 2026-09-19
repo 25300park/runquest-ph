@@ -29,16 +29,30 @@ export async function snapToRoad(
     };
   }
 
+  // OSRM GET 요청 URL 길이 및 좌표 수 제한 (공용 OSRM은 100개 제한)
+  // 60개를 초과하는 경우 시작점, 끝점을 보존하며 균등 샘플링
+  const sampleTarget = 60;
+  let queryPoints = points;
+  if (points.length > sampleTarget) {
+    queryPoints = [points[0]];
+    const step = (points.length - 1) / (sampleTarget - 1);
+    for (let i = 1; i < sampleTarget - 1; i++) {
+      const idx = Math.round(i * step);
+      queryPoints.push(points[idx]);
+    }
+    queryPoints.push(points[points.length - 1]);
+  }
+
   try {
     // 1. OSRM API 형식에 맞게 lng,lat;lng,lat 문자열 생성 (OSRM은 경도,위도 순서)
-    const coordinatesQuery = points
+    const coordinatesQuery = queryPoints
       .map(([lat, lng]) => `${lng.toFixed(6)},${lat.toFixed(6)}`)
       .join(';');
 
     // 2. OpenStreetMap OSRM 매칭 API 호출 (도보/러닝 최적화 또는 도로 라우팅)
     const response = await fetch(
       `https://router.project-osrm.org/match/v1/foot/${coordinatesQuery}?geometries=geojson&overview=full&steps=false`,
-      { signal: AbortSignal.timeout(6000) }
+      { signal: AbortSignal.timeout(7000) }
     );
 
     if (!response.ok) {
@@ -48,22 +62,40 @@ export async function snapToRoad(
     const data = await response.json();
 
     if (data.code === 'Ok' && data.matchings && data.matchings.length > 0) {
-      // 매칭된 GeoJSON geometry ([lng, lat] 배열) 추출 후 [lat, lng]로 변환
-      const matchedGeometry: [number, number][] = data.matchings[0].geometry.coordinates;
-      const matchedPoints: LatLngTuple[] = matchedGeometry.map(([lng, lat]) => [lat, lng]);
+      // 매칭된 모든 geometry ([lng, lat] 배열) 추출 후 [lat, lng]로 변환
+      const matchedPoints: LatLngTuple[] = [];
+      for (const matching of data.matchings) {
+        if (matching.geometry && matching.geometry.coordinates) {
+          for (const [lng, lat] of matching.geometry.coordinates) {
+            matchedPoints.push([lat, lng]);
+          }
+        }
+      }
 
-      console.log('✅ [MapMatching] OSRM 도로망 매칭 성공:', {
-        original: points.length,
-        matched: matchedPoints.length,
-        confidence: data.matchings[0].confidence
-      });
+      if (matchedPoints.length >= 2) {
+        // 인접한 중복 좌표 제거
+        const deduplicated: LatLngTuple[] = [matchedPoints[0]];
+        for (let i = 1; i < matchedPoints.length; i++) {
+          const prev = deduplicated[deduplicated.length - 1];
+          const curr = matchedPoints[i];
+          if (Math.abs(prev[0] - curr[0]) > 0.00001 || Math.abs(prev[1] - curr[1]) > 0.00001) {
+            deduplicated.push(curr);
+          }
+        }
 
-      return {
-        matchedPoints,
-        originalCount: points.length,
-        matchedCount: matchedPoints.length,
-        confidence: data.matchings[0].confidence ?? 0.95
-      };
+        console.log('✅ [MapMatching] OSRM 도로망 매칭 성공:', {
+          original: points.length,
+          matched: deduplicated.length,
+          confidence: data.matchings[0].confidence
+        });
+
+        return {
+          matchedPoints: deduplicated,
+          originalCount: points.length,
+          matchedCount: deduplicated.length,
+          confidence: data.matchings[0].confidence ?? 0.95
+        };
+      }
     }
   } catch (error) {
     console.warn('⚠️ [MapMatching] OSRM 호출 실패 또는 Fallback 동작:', error);

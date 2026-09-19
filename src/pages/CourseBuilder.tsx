@@ -327,8 +327,8 @@ export default function CourseBuilder() {
     startWorkoutTracking();
   }
 
-  // 8. 운동 종료 및 리뷰 모드 진입
-  function finishWorkout() {
+  // 8. 운동 종료 및 도로망 자동 오버랩 매칭 후 리뷰 모드 진입
+  async function finishWorkout() {
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
@@ -339,8 +339,26 @@ export default function CourseBuilder() {
     }
     void releaseWakeLock();
     setCurrentSpeedKmh(0);
-    setBuilderState('reviewing');
-    setSaveStatus('🏁 운동이 종료되었습니다! 오늘의 운동 기록을 확인하고 저장하세요.');
+
+    if (routePoints.length >= 2) {
+      setBuilderState('matching');
+      setSaveStatus('🛣️ GPS 궤적을 지도 도로망에 정밀 매칭하는 중...');
+      try {
+        const matchResult = await snapToRoad(routePoints);
+        if (matchResult.matchedPoints && matchResult.matchedPoints.length >= 2) {
+          setRoutePoints(matchResult.matchedPoints);
+        }
+        setBuilderState('reviewing');
+        setSaveStatus('✨ 도로망 매칭 완료! 도로 중심선에 깔끔하게 오버랩되었습니다.');
+      } catch (err) {
+        console.warn('Map matching on finish error:', err);
+        setBuilderState('reviewing');
+        setSaveStatus('🏁 운동이 종료되었습니다! 오늘의 운동 기록을 확인하고 저장하세요.');
+      }
+    } else {
+      setBuilderState('reviewing');
+      setSaveStatus('🏁 운동이 종료되었습니다! 오늘의 운동 기록을 확인하고 저장하세요.');
+    }
   }
 
   // 9. 전체 초기화
