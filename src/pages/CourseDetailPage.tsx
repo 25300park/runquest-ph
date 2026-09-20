@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { MapContainer, Marker, Polyline, Popup, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
 import { getCourseById, type CourseWithPoints } from '../services/courseService';
+import { snapToRoad } from '../services/mapMatchingService';
 import type { LatLngTuple } from '../types/area';
 import type { Course, CourseCheckpoint } from '../types/course';
 
@@ -83,11 +84,35 @@ export default function CourseDetailPage() {
     };
   }, [courseId]);
 
-  const routeCoordinates = useMemo(
-    () =>
-      course?.course_points.map((point) => [point.lat, point.lng] as LatLngTuple) ?? [],
-    [course]
-  );
+  const [enrichedRouteCoordinates, setEnrichedRouteCoordinates] = useState<LatLngTuple[]>([]);
+
+  useEffect(() => {
+    if (!course || course.course_points.length < 2) {
+      setEnrichedRouteCoordinates([]);
+      return;
+    }
+
+    const rawCoords = course.course_points.map((point) => [point.lat, point.lng] as LatLngTuple);
+    setEnrichedRouteCoordinates(rawCoords);
+
+    let isMounted = true;
+    // 도로망 매칭을 통해 체크포인트 간 직선이 건물을 관통하지 않도록 자동 도로 보정
+    void snapToRoad(rawCoords).then((res) => {
+      if (isMounted && res.matchedPoints && res.matchedPoints.length >= 2) {
+        setEnrichedRouteCoordinates(res.matchedPoints);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [course]);
+
+  const routeCoordinates = useMemo(() => {
+    if (enrichedRouteCoordinates.length >= 2) return enrichedRouteCoordinates;
+    return course?.course_points.map((point) => [point.lat, point.lng] as LatLngTuple) ?? [];
+  }, [course, enrichedRouteCoordinates]);
+
   const startPoint = routeCoordinates[0];
   const baseDistanceKm = course ? Number(course.distance.toFixed(2)) : 0;
   const totalDistanceKm = Number((baseDistanceKm * loopCount).toFixed(2));

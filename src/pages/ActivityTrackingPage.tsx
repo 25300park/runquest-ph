@@ -21,6 +21,7 @@ import {
 import { recordExplorationDistance, saveExploredBreadcrumbs } from '../utils/fogOfWar';
 import { voiceCompanion, type VoiceMessage } from '../services/voiceCompanionService';
 import { GpsKalmanFilter, snapPointToRoute, isGpsOutlier } from '../utils/gpsSmoothing';
+import { snapToRoad } from '../services/mapMatchingService';
 
 type RunNavigationState = {
   course: Course;
@@ -223,8 +224,36 @@ export default function ActivityTrackingPage() {
     ? calculateActivityReward(course, distanceKm, progressSnapshot.completedActivities)
     : { baseXp: 0, difficultyBonusXp: 0, consistencyBonusXp: 0, totalXp: 0 };
   const xpEarned = rewardPreview.totalXp;
-  const routeCoordinates = course?.routeCoordinates ?? [];
-  const routeMatch = calculateRouteProgress(currentPosition, routeCoordinates);
+
+  // 코스 계획선이 건물을 가로지르지 않도록 OSRM 도로망에 자동 맞춤
+  const [enrichedRouteCoordinates, setEnrichedRouteCoordinates] = useState<LatLngTuple[]>([]);
+
+  useEffect(() => {
+    if (!course || course.routeCoordinates.length < 2) {
+      setEnrichedRouteCoordinates([]);
+      return;
+    }
+
+    setEnrichedRouteCoordinates(course.routeCoordinates);
+
+    let isMounted = true;
+    void snapToRoad(course.routeCoordinates).then((res) => {
+      if (isMounted && res.matchedPoints && res.matchedPoints.length >= 2) {
+        setEnrichedRouteCoordinates(res.matchedPoints);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [course]);
+
+  const activeRouteCoordinates = useMemo(() => {
+    if (enrichedRouteCoordinates.length >= 2) return enrichedRouteCoordinates;
+    return course?.routeCoordinates ?? [];
+  }, [course, enrichedRouteCoordinates]);
+
+  const routeMatch = calculateRouteProgress(currentPosition, activeRouteCoordinates);
   const distanceProgress = course ? Math.min(distanceKm / course.distanceKm, 1) : 0;
   const routeProgress = Math.max(routeMatch.progressPercent / 100, distanceProgress);
   const nextCheckpoint = useMemo(
@@ -323,8 +352,8 @@ export default function ActivityTrackingPage() {
         // 2. 칼만 필터 스무딩 적용
         const filteredCoord = kalmanFilterRef.current.filter(rawPoint.lat, rawPoint.lng, accuracy, nowMs);
 
-        // 3. 코스 도로 중심선 자석 스냅 (Snap to Road)
-        const snapResult = snapPointToRoute(filteredCoord, routeCoordinates, 28);
+        // 3. 코스 도로 중심선 자석 스냅 (Snap to Road, 반경 45m 강력 밀착)
+        const snapResult = snapPointToRoute(filteredCoord, activeRouteCoordinates, 45);
         const finalCoord = snapResult.snappedPosition;
 
         lastRecordedPointRef.current = { coord: finalCoord, timeMs: nowMs };
@@ -420,12 +449,27 @@ export default function ActivityTrackingPage() {
       await completeGpsSession(gpsSessionId);
     }
 
+    // 🏁 퀘스트 완료 시 전체 수집 궤적을 도로망에 자동 정밀 오버랩 (Snap to Road)
+    let finalTrackedPath = trackedPath;
+    if (trackedPath.length >= 2) {
+      setGpsStatus('🛣️ 도로망에 러닝 궤적을 정밀 매칭하는 중...');
+      try {
+        const matchResult = await snapToRoad(trackedPath);
+        if (matchResult.matchedPoints && matchResult.matchedPoints.length >= 2) {
+          finalTrackedPath = matchResult.matchedPoints;
+          setTrackedPath(finalTrackedPath);
+        }
+      } catch (err) {
+        console.warn('Map matching on quest completion fallback:', err);
+      }
+    }
+
     // Phase 3: 탐험도 및 전장의 안개 궤적 영구 저장
     if (distanceKm > 0) {
       recordExplorationDistance(course.areaId, distanceKm);
     }
-    if (trackedPath.length > 0) {
-      saveExploredBreadcrumbs(trackedPath);
+    if (finalTrackedPath.length > 0) {
+      saveExploredBreadcrumbs(finalTrackedPath);
     }
 
     const summary: CompletedActivitySummary = {
@@ -467,9 +511,9 @@ export default function ActivityTrackingPage() {
           />
           <MapRecenter position={currentPosition} isTracking={isTracking} />
           
-          {/* 전체 계획 코스 가이드선 (반투명 슬레이트) */}
+          {/* 전체 계획 코스 가이드선 (반투명 슬레이트, 도로망 정밀 정렬) */}
           <Polyline 
-            positions={course.routeCoordinates} 
+            positions={activeRouteCoordinates.length > 0 ? activeRouteCoordinates : course.routeCoordinates} 
             pathOptions={{ color: '#64748b', weight: 6, opacity: 0.45, dashArray: '8, 8' }} 
           />
 
