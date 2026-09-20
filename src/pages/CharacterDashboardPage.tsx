@@ -344,6 +344,24 @@ export default function CharacterDashboardPage() {
             <span className="text-lg">▶️</span>
             <span>Start Daily Quest</span>
           </Link>
+
+          {/* 서브 액션: 자유 러닝 및 활동 기록 보관소 */}
+          <div className="flex gap-2">
+            <Link
+              to="/course-builder"
+              className="flex-1 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-xs active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-slate-200 shadow-sm"
+            >
+              <span>🏃</span>
+              <span>자유 러닝</span>
+            </Link>
+            <Link
+              to="/history"
+              className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-300 font-extrabold text-xs active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <span>📜</span>
+              <span>활동 기록 보관소</span>
+            </Link>
+          </div>
         </div>
       </section>
 

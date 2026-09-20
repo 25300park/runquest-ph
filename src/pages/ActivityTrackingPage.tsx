@@ -22,6 +22,15 @@ import { recordExplorationDistance, saveExploredBreadcrumbs } from '../utils/fog
 import { voiceCompanion, type VoiceMessage } from '../services/voiceCompanionService';
 import { GpsKalmanFilter, snapPointToRoute, isGpsOutlier } from '../utils/gpsSmoothing';
 import { snapToRoad } from '../services/mapMatchingService';
+import { saveActivityRecord } from '../services/activityHistoryService';
+import {
+  startSilentAudioKeepAlive,
+  stopSilentAudioKeepAlive,
+  requestScreenWakeLock,
+  releaseScreenWakeLock,
+  updateMediaSession,
+  clearMediaSession
+} from '../utils/backgroundKeepAlive';
 
 type RunNavigationState = {
   course: Course;
@@ -269,36 +278,43 @@ export default function ActivityTrackingPage() {
     }
   }, [course, navigate]);
 
+  const startTimeMsRef = useRef<number>(0);
+  const pausedDurationMsRef = useRef<number>(0);
+  const pauseStartMsRef = useRef<number>(0);
+
   useEffect(() => {
     if (course && activityState === 'idle') {
       setCurrentPosition(course.startPoint);
       setDistanceKm(0);
       setGpsSessionId(null);
       setTrackedPath([course.startPoint]);
+      startTimeMsRef.current = 0;
+      pausedDurationMsRef.current = 0;
+      pauseStartMsRef.current = 0;
     }
   }, [activityState, course]);
 
-  // Screen Wake Lock (화면 꺼짐 방지)
+  // Screen Wake Lock & 백그라운드 오디오 킵얼라이브
   useEffect(() => {
-    let wakeLock: WakeLockSentinel | null = null;
-
-    async function requestLock() {
-      try {
-        if ('wakeLock' in navigator && activityState === 'running') {
-          wakeLock = await navigator.wakeLock.request('screen');
-        }
-      } catch {
-        // 미지원 브라우저 등 무시
-      }
-    }
-
     if (activityState === 'running') {
-      void requestLock();
+      void requestScreenWakeLock();
+      startSilentAudioKeepAlive();
+    } else {
+      void releaseScreenWakeLock();
+      stopSilentAudioKeepAlive();
     }
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && activityState === 'running') {
-        void requestLock();
+        void requestScreenWakeLock();
+        startSilentAudioKeepAlive();
+        if (startTimeMsRef.current > 0) {
+          const actualElapsed = Math.max(
+            0,
+            Math.floor((Date.now() - startTimeMsRef.current - pausedDurationMsRef.current) / 1000)
+          );
+          setElapsedSeconds(actualElapsed);
+        }
       }
     };
 
@@ -306,24 +322,43 @@ export default function ActivityTrackingPage() {
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (wakeLock) {
-        void wakeLock.release();
-      }
     };
   }, [activityState]);
 
-  // 경과 시간 타이머
+  // 절대 시간 기반 타이머 (화면 꺼짐 시에도 백그라운드 시간 100% 복구)
   useEffect(() => {
     if (activityState !== 'running') {
       return undefined;
     }
 
+    if (startTimeMsRef.current === 0) {
+      startTimeMsRef.current = Date.now();
+    }
+
     const timer = window.setInterval(() => {
-      setElapsedSeconds((current) => current + 1);
+      const now = Date.now();
+      const actualElapsed = Math.max(
+        0,
+        Math.floor((now - startTimeMsRef.current - pausedDurationMsRef.current) / 1000)
+      );
+      setElapsedSeconds(actualElapsed);
     }, 1000);
 
     return () => window.clearInterval(timer);
   }, [activityState]);
+
+  // 잠금화면 & 알림바 MediaSession 실시간 연동
+  useEffect(() => {
+    if (activityState === 'running') {
+      const paceFormatted =
+        elapsedSeconds > 0 && distanceKm > 0
+          ? `${Math.floor((elapsedSeconds / distanceKm) / 60)}'${Math.floor((elapsedSeconds / distanceKm) % 60).toString().padStart(2, '0')}"`
+          : "--'--\"";
+      const m = Math.floor(elapsedSeconds / 60);
+      const s = elapsedSeconds % 60;
+      updateMediaSession(distanceKm, `${m}:${s.toString().padStart(2, '0')}`, paceFormatted);
+    }
+  }, [activityState, distanceKm, elapsedSeconds]);
 
   // 하이브리드 GPS 추적 (10m 거리 / 10초 보완 / 3m Jittering 방지)
   useEffect(() => {
@@ -399,6 +434,11 @@ export default function ActivityTrackingPage() {
 
     isStartingRef.current = true;
     setGpsStatus('🛰️ GPS 위성 연결 및 위치 탐색 중...');
+    startTimeMsRef.current = Date.now();
+    pausedDurationMsRef.current = 0;
+    pauseStartMsRef.current = 0;
+    void requestScreenWakeLock();
+    startSilentAudioKeepAlive();
     // 즉각 러닝 상태로 전환하여 화면 오버레이를 걷고 러닝 HUD를 표시
     setActivityState('running');
 
@@ -432,10 +472,19 @@ export default function ActivityTrackingPage() {
   }
 
   function pauseActivity() {
+    pauseStartMsRef.current = Date.now();
+    stopSilentAudioKeepAlive();
+    clearMediaSession();
     setActivityState('paused');
   }
 
   function resumeActivity() {
+    if (pauseStartMsRef.current > 0) {
+      pausedDurationMsRef.current += Date.now() - pauseStartMsRef.current;
+      pauseStartMsRef.current = 0;
+    }
+    void requestScreenWakeLock();
+    startSilentAudioKeepAlive();
     setActivityState('running');
   }
 
@@ -448,6 +497,13 @@ export default function ActivityTrackingPage() {
     if (gpsSessionId) {
       await completeGpsSession(gpsSessionId);
     }
+
+    void releaseScreenWakeLock();
+    stopSilentAudioKeepAlive();
+    clearMediaSession();
+    startTimeMsRef.current = 0;
+    pausedDurationMsRef.current = 0;
+    pauseStartMsRef.current = 0;
 
     // 🏁 퀘스트 완료 시 전체 수집 궤적을 도로망에 자동 정밀 오버랩 (Snap to Road)
     let finalTrackedPath = trackedPath;
@@ -472,6 +528,11 @@ export default function ActivityTrackingPage() {
       saveExploredBreadcrumbs(finalTrackedPath);
     }
 
+    const paceFormatted =
+      elapsedSeconds > 0 && distanceKm > 0
+        ? `${Math.floor((elapsedSeconds / distanceKm) / 60)}'${Math.floor((elapsedSeconds / distanceKm) % 60).toString().padStart(2, '0')}"`
+        : "--'--\"";
+
     const summary: CompletedActivitySummary = {
       activityId: `activity-${course.id}-${Date.now()}`,
       courseId: course.id,
@@ -483,6 +544,21 @@ export default function ActivityTrackingPage() {
       distanceKm,
       durationSeconds: elapsedSeconds
     };
+
+    // 🏁 활동 보관소(Activity History)에 영구 저장
+    saveActivityRecord({
+      id: summary.activityId,
+      createdAt: new Date().toISOString(),
+      activityType: 'quest_run',
+      title: course.name,
+      areaName: course.areaName,
+      distanceKm: summary.distanceKm,
+      durationSeconds: elapsedSeconds,
+      paceFormatted,
+      calories: Math.max(10, Math.round(distanceKm * 65)),
+      xpEarned: course.xpReward ?? Math.round(distanceKm * 100),
+      routePoints: finalTrackedPath
+    });
 
     setActivityState('completed');
     navigate(`/completed/${course.id}`, { state: summary });

@@ -133,17 +133,38 @@ export default function CourseBuilderMap({
           />
         ))}
 
-        {/* 2. 네온 이동 궤적 라인 (직선 도로는 매끄러운 1줄 폴리라인으로 완벽 유지) */}
-        {routePoints.length > 1 && (
-          <Polyline
-            positions={routePoints}
-            pathOptions={{
-              color: '#7c3aed',
-              weight: 7,
-              opacity: 0.95
-            }}
-          />
-        )}
+        {/* 2. 네온 실시간 이동 궤적 라인 (햇빛 아래에서도 선명한 형광 네온 + 테두리) */}
+        {(() => {
+          const displayPoints =
+            isTracking && userLivePosition && routePoints.length > 0
+              ? [...routePoints, userLivePosition]
+              : routePoints;
+
+          if (displayPoints.length < 2) return null;
+
+          return (
+            <>
+              {/* 외곽 테두리 (대비 강조) */}
+              <Polyline
+                positions={displayPoints}
+                pathOptions={{
+                  color: '#0f172a',
+                  weight: 8,
+                  opacity: 0.4
+                }}
+              />
+              {/* 메인 네온 궤적 라인 */}
+              <Polyline
+                positions={displayPoints}
+                pathOptions={{
+                  color: isTracking ? '#f59e0b' : '#8b5cf6',
+                  weight: 6,
+                  opacity: 1
+                }}
+              />
+            </>
+          );
+        })()}
 
         {/* 3. 코너(모서리) 핵심 포인트 마커만 렌더링 (S, Corner 1, Corner 2, F) */}
         {cornerKeypoints.map((kp) => (

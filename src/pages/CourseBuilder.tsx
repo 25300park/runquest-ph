@@ -18,6 +18,15 @@ import { GpsKalmanFilter, isGpsOutlier } from '../utils/gpsSmoothing';
 import { completeActivityProgress } from '../utils/gameProgress';
 import { recordExplorationDistance, saveExploredBreadcrumbs } from '../utils/fogOfWar';
 import { buildOptimizedCheckpoints } from '../utils/pathSimplification';
+import { saveActivityRecord } from '../services/activityHistoryService';
+import {
+  startSilentAudioKeepAlive,
+  stopSilentAudioKeepAlive,
+  requestScreenWakeLock,
+  releaseScreenWakeLock,
+  updateMediaSession,
+  clearMediaSession
+} from '../utils/backgroundKeepAlive';
 
 const difficulties: Difficulty[] = ['Easy', 'Normal', 'Hard', 'Challenge'];
 type BuilderState = 'idle' | 'recording' | 'paused' | 'matching' | 'reviewing';
@@ -83,7 +92,9 @@ export default function CourseBuilder() {
   const lastPointRef = useRef<LatLngTuple | null>(null);
   const lastSavedTimeRef = useRef<number>(0);
   const lastPositionTimeRef = useRef<number>(0);
-  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const startTimeMsRef = useRef<number>(0);
+  const pausedDurationMsRef = useRef<number>(0);
+  const pauseStartMsRef = useRef<number>(0);
 
   const selectedArea = mockAreas.find((area) => area.id === areaId) ?? mockAreas[0];
   const checkpoints = useMemo(() => buildCheckpoints(routePoints), [routePoints]);
@@ -101,29 +112,7 @@ export default function CourseBuilder() {
     return `${paceMin}'${paceSec.toString().padStart(2, '0')}"`;
   }, [routeDistanceKm, elapsedSeconds]);
 
-  // 1. 화면 꺼짐 방지 (Wake Lock)
-  async function requestWakeLock() {
-    try {
-      if ('wakeLock' in navigator) {
-        wakeLockRef.current = await navigator.wakeLock.request('screen');
-      }
-    } catch {
-      // 미지원 기기 무시
-    }
-  }
-
-  async function releaseWakeLock() {
-    try {
-      if (wakeLockRef.current) {
-        await wakeLockRef.current.release();
-        wakeLockRef.current = null;
-      }
-    } catch {
-      // 무시
-    }
-  }
-
-  // 2. 초기 로드 시 유저의 실시간 위치 미리 탐색
+  // 1. 초기 로드 시 유저의 실시간 위치 미리 탐색
   useEffect(() => {
     if (!('geolocation' in navigator)) return;
 
@@ -141,16 +130,56 @@ export default function CourseBuilder() {
     );
   }, []);
 
-  // 3. 타이머 로직 (기록 중일 때 매초 증가)
+  // 2. 타이머 및 백그라운드 시간 동기화 (화면 꺼짐 및 앱 숨김 시에도 절대 시계 복구)
   useEffect(() => {
     if (builderState !== 'recording') return;
 
+    if (startTimeMsRef.current === 0) {
+      startTimeMsRef.current = Date.now();
+    }
+
     const interval = window.setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
+      const now = Date.now();
+      const actualElapsed = Math.max(
+        0,
+        Math.floor((now - startTimeMsRef.current - pausedDurationMsRef.current) / 1000)
+      );
+      setElapsedSeconds(actualElapsed);
     }, 1000);
 
-    return () => window.clearInterval(interval);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && builderState === 'recording') {
+        void requestScreenWakeLock();
+        startSilentAudioKeepAlive();
+        if (startTimeMsRef.current > 0) {
+          const actualElapsed = Math.max(
+            0,
+            Math.floor((Date.now() - startTimeMsRef.current - pausedDurationMsRef.current) / 1000)
+          );
+          setElapsedSeconds(actualElapsed);
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => processIncomingGpsPosition(pos),
+          () => {},
+          { enableHighAccuracy: true, timeout: 5000 }
+        );
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [builderState]);
+
+  // 3. 잠금화면 및 알림바 MediaSession 실시간 연동
+  useEffect(() => {
+    if (builderState === 'recording') {
+      updateMediaSession(routeDistanceKm, formatElapsedTime(elapsedSeconds), avgPaceFormatted);
+    }
+  }, [builderState, routeDistanceKm, elapsedSeconds, avgPaceFormatted]);
 
   // 4. 기존 코스 수정 모드일 때 로드
   useEffect(() => {
@@ -244,8 +273,8 @@ export default function CourseBuilder() {
 
     const distanceMovedKm = calculateHaversineDistanceKm(lastPointRef.current, filteredCoord);
 
-    // 5. 이동 조건 판별 (2.5m 이상 이동 시 궤적 추가)
-    if (distanceMovedKm >= 0.0025 || (timeDiffSec >= 4 && distanceMovedKm >= 0.0015)) {
+    // 5. 이동 조건 판별 (1.5m 이상 이동 시 즉시 궤적 추가하여 지도에 실시간 선 표시)
+    if (distanceMovedKm >= 0.0015 || (timeDiffSec >= 3 && distanceMovedKm >= 0.001)) {
       lastPointRef.current = filteredCoord;
       lastSavedTimeRef.current = nowMs;
       setRoutePoints((prev) => [...prev, filteredCoord]);
@@ -260,7 +289,8 @@ export default function CourseBuilder() {
       return;
     }
 
-    void requestWakeLock();
+    void requestScreenWakeLock();
+    startSilentAudioKeepAlive();
     setBuilderState('recording');
     setGpsError(null);
     setSaveStatus('🛰️ GPS 연결 중... 실시간 이동 경로를 기록합니다.');
@@ -318,12 +348,19 @@ export default function CourseBuilder() {
       window.clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
+    pauseStartMsRef.current = Date.now();
+    stopSilentAudioKeepAlive();
+    clearMediaSession();
     setBuilderState('paused');
     setCurrentSpeedKmh(0);
     setSaveStatus('⏸️ 운동이 일시 정지되었습니다.');
   }
 
   function resumeWorkoutTracking() {
+    if (pauseStartMsRef.current > 0) {
+      pausedDurationMsRef.current += Date.now() - pauseStartMsRef.current;
+      pauseStartMsRef.current = 0;
+    }
     startWorkoutTracking();
   }
 
@@ -337,7 +374,12 @@ export default function CourseBuilder() {
       window.clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
-    void releaseWakeLock();
+    void releaseScreenWakeLock();
+    stopSilentAudioKeepAlive();
+    clearMediaSession();
+    startTimeMsRef.current = 0;
+    pausedDurationMsRef.current = 0;
+    pauseStartMsRef.current = 0;
     setCurrentSpeedKmh(0);
 
     if (routePoints.length >= 2) {
@@ -371,7 +413,12 @@ export default function CourseBuilder() {
       window.clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
-    void releaseWakeLock();
+    void releaseScreenWakeLock();
+    stopSilentAudioKeepAlive();
+    clearMediaSession();
+    startTimeMsRef.current = 0;
+    pausedDurationMsRef.current = 0;
+    pauseStartMsRef.current = 0;
     setRoutePoints([]);
     setElapsedSeconds(0);
     setCurrentSpeedKmh(0);
@@ -431,10 +478,25 @@ export default function CourseBuilder() {
         recordExplorationDistance(selectedArea.id, Number(routeDistanceKm.toFixed(2)));
       }
 
+      // 3. 활동 보관소(Activity History)에 영구 저장
+      saveActivityRecord({
+        id: summary.activityId,
+        createdAt: new Date().toISOString(),
+        activityType: 'free_run',
+        title: freeCourse.name,
+        areaName: selectedArea.name,
+        distanceKm: summary.distanceKm,
+        durationSeconds: elapsedSeconds,
+        paceFormatted: avgPaceFormatted,
+        calories: estimatedCalories,
+        xpEarned: estimatedXp,
+        routePoints: routePoints
+      });
+
       setSaveStatus(`🎉 저장 완료! +${estimatedXp} XP 획득! 1초 후 대시보드로 이동합니다.`);
 
       setTimeout(() => {
-        navigate('/character-dashboard');
+        navigate('/history');
       }, 1000);
     } catch (error) {
       const message = error instanceof Error ? error.message : '저장 실패';
@@ -507,7 +569,9 @@ export default function CourseBuilder() {
       if (pollingIntervalRef.current !== null) {
         window.clearInterval(pollingIntervalRef.current);
       }
-      void releaseWakeLock();
+      void releaseScreenWakeLock();
+      stopSilentAudioKeepAlive();
+      clearMediaSession();
     };
   }, []);
 

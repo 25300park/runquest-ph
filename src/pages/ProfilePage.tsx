@@ -189,6 +189,30 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* 2.4 📜 활동 기록 보관소 바로가기 배너 */}
+      <Link
+        to="/history"
+        className="block rounded-3xl p-4 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-violet-500/10 border border-amber-300 hover:border-amber-400 shadow-sm transition-all active:scale-[0.98]"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white font-black flex items-center justify-center text-xl shadow-md shrink-0">
+              📜
+            </div>
+            <div>
+              <h3 className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                <span>활동 기록 보관소 (Activity Log)</span>
+                <span className="text-[9px] font-black bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded-full">New</span>
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">완료된 모든 러닝 기록과 주행 궤적을 표로 확인</p>
+            </div>
+          </div>
+          <span className="text-xs font-black text-amber-700 bg-amber-100/90 px-3 py-1.5 rounded-xl border border-amber-200 shrink-0">
+            보기 →
+          </span>
+        </div>
+      </Link>
+
       {/* 2.5 👟 장비 내구도 및 수리 카드 */}
       <GearDurabilityCard />
 

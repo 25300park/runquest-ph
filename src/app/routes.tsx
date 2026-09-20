@@ -19,6 +19,7 @@ import LaunchPage from '../pages/LaunchPage';
 import LoginPage from '../pages/LoginPage';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage';
 import UpdatePasswordPage from '../pages/UpdatePasswordPage';
+import ActivityHistoryPage from '../pages/ActivityHistoryPage';
 import ProfilePage from '../pages/ProfilePage';
 import QuestCompletedPage from '../pages/QuestCompletedPage';
 import BountyBoardPage from '../pages/BountyBoardPage';
@@ -62,6 +63,7 @@ export const appRoutes = (
     <Route path="/completed/:courseId" element={<QuestCompletedPage />} />
     <Route path="/bounties" element={<BountyBoardPage />} />
     <Route path="/raid" element={<CrewRaidPage />} />
+    <Route path="/history" element={<ActivityHistoryPage />} />
     <Route path="/profile" element={<ProfilePage />} />
     <Route path="/rewards" element={<RewardsPage />} />
     <Route path="/admin/login" element={<AdminLogin />} />
