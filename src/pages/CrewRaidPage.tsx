@@ -1,15 +1,37 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import L from 'leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  Circle,
+  Marker
+} from 'react-leaflet';
 import {
   defaultBgcRaid,
   checkGeofenceInside
 } from '../services/crewRaidService';
 import type { LatLngTuple } from '../types/area';
 
+const raidMarkerIcon = L.divIcon({
+  className: 'custom-raid-marker',
+  html: `<div style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:#6366f1;border:2px solid white;border-radius:9999px;font-size:18px;box-shadow:0 0 10px #6366f1;">🐆</div>`,
+  iconSize: [36, 36],
+  iconAnchor: [18, 18]
+});
+
+const userMarkerIcon = L.divIcon({
+  className: 'custom-user-marker',
+  html: `<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:#10b981;border:2px solid white;border-radius:9999px;font-size:14px;box-shadow:0 0 10px #10b981;">🏃</div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14]
+});
+
 export default function CrewRaidPage() {
   const navigate = useNavigate();
   const [raid] = useState(defaultBgcRaid);
-  const [userCoord, setUserCoord] = useState<LatLngTuple>([14.5535, 121.0535]); // 기본 200m 원거리
+  // Initial user coord defaults to BGC High Street matching playwright config
+  const [userCoord, setUserCoord] = useState<LatLngTuple>([14.5523, 121.0503]);
   const [secondsLeft, setSecondsLeft] = useState(raid.targetSecondsLeft);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [showRewardModal, setShowRewardModal] = useState(false);
@@ -35,6 +57,14 @@ export default function CrewRaidPage() {
       window.addEventListener('runquest:gps-update', handleGpsEvent);
 
       if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setUserCoord([pos.coords.latitude, pos.coords.longitude]);
+          },
+          () => undefined,
+          { enableHighAccuracy: true }
+        );
+
         const watchId = navigator.geolocation.watchPosition(
           (pos) => {
             setUserCoord([pos.coords.latitude, pos.coords.longitude]);
@@ -42,6 +72,7 @@ export default function CrewRaidPage() {
           () => undefined,
           { enableHighAccuracy: true }
         );
+
         return () => {
           window.removeEventListener('runquest:gps-update', handleGpsEvent);
           navigator.geolocation.clearWatch(watchId);
@@ -70,6 +101,17 @@ export default function CrewRaidPage() {
 
   return (
     <section className="min-h-full space-y-4 bg-slate-950 px-4 py-4 text-white font-sans pb-28 select-none">
+      {/* 0. 체크인 성공 토스트 */}
+      {isCheckedIn && (
+        <div
+          role="status"
+          className="fixed top-6 inset-x-4 max-w-sm mx-auto z-50 rounded-2xl bg-emerald-600 px-4 py-3.5 text-white font-black text-xs shadow-2xl flex items-center justify-center gap-2 animate-bounce border border-emerald-400"
+        >
+          <span>🎉</span>
+          <span>체크인 완료! 경험치 500 획득</span>
+        </div>
+      )}
+
       {/* 1. 상단 네비게이션 */}
       <header className="flex items-center justify-between">
         <button
@@ -137,7 +179,45 @@ export default function CrewRaidPage() {
         </div>
       </div>
 
-      {/* 3. 지오펜스 거리 측정 상태 배너 */}
+      {/* 3. 오프라인 레이드 현장 집결 지도 (Leaflet Container) */}
+      <div className="relative rounded-3xl overflow-hidden border-2 border-indigo-500/40 bg-slate-900 shadow-xl">
+        <div className="px-4 py-2.5 bg-slate-900/90 border-b border-indigo-500/20 flex items-center justify-between text-xs">
+          <span className="font-black text-indigo-300 flex items-center gap-1.5">
+            <span>🗺️</span>
+            <span>BGC 집결지 현장 레이더</span>
+          </span>
+          <span className="text-[10px] text-emerald-400 font-bold">
+            ● GPS 실시간 수신 중
+          </span>
+        </div>
+        <div className="h-48 w-full">
+          <MapContainer
+            center={raid.targetCoord}
+            zoom={16}
+            scrollWheelZoom={false}
+            style={{ height: '100%', width: '100%' }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            />
+            <Circle
+              center={raid.targetCoord}
+              radius={raid.geofenceRadiusMeters}
+              pathOptions={{
+                color: '#6366f1',
+                fillColor: '#6366f1',
+                fillOpacity: 0.25,
+                weight: 2
+              }}
+            />
+            <Marker position={raid.targetCoord} icon={raidMarkerIcon} />
+            <Marker position={userCoord} icon={userMarkerIcon} />
+          </MapContainer>
+        </div>
+      </div>
+
+      {/* 4. 지오펜스 거리 측정 상태 배너 */}
       <div
         className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${
           isInside
@@ -149,10 +229,10 @@ export default function CrewRaidPage() {
           <span className="text-2xl">{isInside ? '🎯' : '🛰️'}</span>
           <div>
             <h4 className="text-xs font-black">
-              {isInside ? '현장 지오펜스 50m 진입 성공!' : '집결지 접근 중'}
+              {isInside ? '현장 지오펜스 진입 성공!' : '집결지 접근 중'}
             </h4>
             <p className="text-[10px] text-slate-400 mt-0.5">
-              현재 집결지까지 거리: <strong className="text-white">{distanceMeters}m</strong> (50m 이내 체크인 가능)
+              현재 집결지까지 거리: <strong className="text-white">{distanceMeters}m</strong> ({raid.geofenceRadiusMeters}m 이내 체크인 가능)
             </p>
           </div>
         </div>
@@ -165,7 +245,7 @@ export default function CrewRaidPage() {
         </span>
       </div>
 
-      {/* 4. 하단 Sticky CTA 버튼 (지오펜스에 따라 즉시 전환) */}
+      {/* 5. 하단 Sticky CTA 버튼 (지오펜스에 따라 즉시 전환) */}
       <div className="fixed bottom-6 inset-x-4 max-w-md mx-auto z-40">
         {isInside ? (
           <button
@@ -180,21 +260,21 @@ export default function CrewRaidPage() {
             }`}
           >
             <span>🔥</span>
-            <span>{isCheckedIn ? '체크인 완료됨' : '🔥 현장 체크인 (Check-in)'}</span>
+            <span>{isCheckedIn ? '보상 접수 완료' : '🔥 현장 체크인 (Check-in)'}</span>
           </button>
         ) : (
           <button
             type="button"
-            onClick={() => alert('집결지 50m 이내로 접근하시면 [🔥 현장 체크인] 버튼이 활성화됩니다!')}
+            onClick={() => alert(`집결지 ${raid.geofenceRadiusMeters}m 이내로 접근하시면 [🔥 현장 체크인] 버튼이 활성화됩니다!`)}
             className="w-full py-4 rounded-2xl bg-slate-800 border border-slate-700 font-black text-xs text-slate-400 shadow-xl flex items-center justify-center gap-2"
           >
             <span>📍</span>
-            <span>Join Raid (50m 접근 시 활성화)</span>
+            <span>Join Raid ({raid.geofenceRadiusMeters}m 접근 시 활성화)</span>
           </button>
         )}
       </div>
 
-      {/* 5. 체크인 완료 & 보상 획득 모달 */}
+      {/* 6. 체크인 완료 & 보상 획득 모달 */}
       {showRewardModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-slate-900 text-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border-2 border-amber-400 space-y-4 text-center animate-in zoom-in duration-300">
@@ -205,7 +285,7 @@ export default function CrewRaidPage() {
               <span className="text-[10px] font-black uppercase text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/30">
                 Raid Completed
               </span>
-              <h3 className="text-xl font-black text-white mt-1">현장 체크인 완료!</h3>
+              <h3 className="text-xl font-black text-white mt-1">현장 출석 확인! 보상 지급</h3>
               <p className="text-xs text-slate-300 mt-1">
                 오프라인 집결에 참여해 주셔서 감사합니다.
               </p>

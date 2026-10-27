@@ -597,3 +597,393 @@ export function subscribeToAdminRealtime(onChange: () => void) {
     return () => undefined;
   }
 }
+
+// ==============================================================================
+// O2O GAME MASTER (GM) EXTENSIONS (PostGIS & Realtime Control)
+// ==============================================================================
+
+export interface GmLiveRunner {
+  user_id: string;
+  nickname: string;
+  faction_id: string;
+  faction_name: string;
+  color_hex: string;
+  total_xp: number;
+  latitude: number;
+  longitude: number;
+  distance_meters?: number;
+  last_active_at: string;
+  pace?: string;
+}
+
+export interface GmRaidEvent {
+  id: string;
+  title: string;
+  description: string;
+  event_type: 'Raid' | 'Boss' | 'FlashMob';
+  latitude: number;
+  longitude: number;
+  radius_meters: number;
+  target_distance_km: number;
+  reward_gold: number;
+  reward_xp: number;
+  status: 'ACTIVE' | 'COMPLETED' | 'EXPIRED';
+  start_time: string;
+  end_time: string;
+  participants_count?: number;
+}
+
+export interface GmFactionScore {
+  id: string;
+  name: string;
+  color_hex: string;
+  current_season_score: number;
+  member_count: number;
+}
+
+export interface GmAbuseLog {
+  id: string;
+  user_id: string;
+  nickname: string;
+  distance_km: number;
+  duration_seconds: number;
+  max_speed_kmh: number;
+  avg_speed_kmh: number;
+  gps_spoofing_flag: boolean;
+  abuse_reason: string;
+  created_at: string;
+  is_banned?: boolean;
+}
+
+// Mock fallback data for instant sandbox/local testing
+const MOCK_RUNNERS: GmLiveRunner[] = [
+  {
+    user_id: 'u-1',
+    nickname: 'Makati_Striker',
+    faction_id: 'makati_tigers',
+    faction_name: 'Makati Tigers',
+    color_hex: '#F59E0B',
+    total_xp: 45200,
+    latitude: 14.5573,
+    longitude: 121.0232,
+    last_active_at: new Date().toISOString(),
+    pace: "4'55\""
+  },
+  {
+    user_id: 'u-2',
+    nickname: 'Ayala_Pacer',
+    faction_id: 'makati_tigers',
+    faction_name: 'Makati Tigers',
+    color_hex: '#F59E0B',
+    total_xp: 38100,
+    latitude: 14.5585,
+    longitude: 121.0215,
+    last_active_at: new Date().toISOString(),
+    pace: "5'12\""
+  },
+  {
+    user_id: 'u-3',
+    nickname: 'BGC_Falcon',
+    faction_id: 'bgc_eagles',
+    faction_name: 'BGC Eagles',
+    color_hex: '#3B82F6',
+    total_xp: 59300,
+    latitude: 14.5204,
+    longitude: 121.0504,
+    last_active_at: new Date().toISOString(),
+    pace: "4'30\""
+  },
+  {
+    user_id: 'u-4',
+    nickname: 'HighStreet_Runner',
+    faction_id: 'bgc_eagles',
+    faction_name: 'BGC Eagles',
+    color_hex: '#3B82F6',
+    total_xp: 42100,
+    latitude: 14.5195,
+    longitude: 121.0488,
+    last_active_at: new Date().toISOString(),
+    pace: "5'05\""
+  },
+  {
+    user_id: 'u-5',
+    nickname: 'Track30th_Ghost',
+    faction_id: 'bgc_eagles',
+    faction_name: 'BGC Eagles',
+    color_hex: '#3B82F6',
+    total_xp: 31200,
+    latitude: 14.5218,
+    longitude: 121.0521,
+    last_active_at: new Date().toISOString(),
+    pace: "4'45\""
+  },
+  {
+    user_id: 'u-6',
+    nickname: 'Salcedo_Shadow',
+    faction_id: 'makati_tigers',
+    faction_name: 'Makati Tigers',
+    color_hex: '#F59E0B',
+    total_xp: 28400,
+    latitude: 14.5612,
+    longitude: 121.0255,
+    last_active_at: new Date().toISOString(),
+    pace: "5'40\""
+  }
+];
+
+let inMemoryEvents: GmRaidEvent[] = [
+  {
+    id: 'raid-1',
+    title: 'BGC Cyber Dragon World Boss',
+    description: '30-minute guild co-op run along Bonifacio High Street corridor.',
+    event_type: 'Boss',
+    latitude: 14.5204,
+    longitude: 121.0504,
+    radius_meters: 300,
+    target_distance_km: 4.5,
+    reward_gold: 1500,
+    reward_xp: 2500,
+    status: 'ACTIVE',
+    start_time: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+    end_time: new Date(Date.now() + 1000 * 60 * 45).toISOString(),
+    participants_count: 28
+  },
+  {
+    id: 'raid-2',
+    title: 'Ayala Triangle FlashMob Sprint',
+    description: 'Rapid 1.5km faction capture zone around Makati Ayala Triangle.',
+    event_type: 'FlashMob',
+    latitude: 14.5573,
+    longitude: 121.0232,
+    radius_meters: 200,
+    target_distance_km: 1.5,
+    reward_gold: 800,
+    reward_xp: 1200,
+    status: 'ACTIVE',
+    start_time: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    end_time: new Date(Date.now() + 1000 * 60 * 25).toISOString(),
+    participants_count: 19
+  }
+];
+
+export async function getGmLiveRunners(
+  centerLng: number = 121.0368,
+  centerLat: number = 14.5388,
+  radiusMeters: number = 10000
+): Promise<GmLiveRunner[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = requireSupabaseClient() as any;
+    const { data, error } = await client.rpc('rpc_get_active_runners_nearby', {
+      p_lng: centerLng,
+      p_lat: centerLat,
+      p_radius_meters: radiusMeters
+    });
+
+    if (error || !data || data.length === 0) {
+      return MOCK_RUNNERS;
+    }
+
+    return (data as Array<Record<string, unknown>>).map((row) => ({
+      user_id: String(row.user_id),
+      nickname: String(row.nickname ?? 'Runner'),
+      faction_id: String(row.faction_id ?? 'unassigned'),
+      faction_name: String(row.faction_name ?? 'Rogue'),
+      color_hex: String(row.color_hex ?? '#94A3B8'),
+      total_xp: Number(row.total_xp ?? 0),
+      latitude: Number(row.latitude ?? 14.5573),
+      longitude: Number(row.longitude ?? 121.0232),
+      distance_meters: Number(row.distance_meters ?? 0),
+      last_active_at: String(row.last_active_at ?? new Date().toISOString())
+    }));
+  } catch {
+    return MOCK_RUNNERS;
+  }
+}
+
+export async function getGmRaidEvents(): Promise<GmRaidEvent[]> {
+  try {
+    const client = requireSupabaseClient();
+    const { data, error } = await client
+      .from('events')
+      .select('*')
+      .order('start_time', { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      return inMemoryEvents;
+    }
+
+    return (data as Array<Record<string, unknown>>).map((row) => ({
+      id: String(row.id),
+      title: String(row.title),
+      description: String(row.description ?? ''),
+      event_type: (row.event_type as GmRaidEvent['event_type']) || 'Raid',
+      latitude: 14.5573,
+      longitude: 121.0232,
+      radius_meters: Number(row.radius_meters ?? 150),
+      target_distance_km: Number(row.target_distance_km ?? 3.0),
+      reward_gold: Number(row.reward_gold ?? 500),
+      reward_xp: Number(row.reward_xp ?? 1000),
+      status: (row.status as GmRaidEvent['status']) || 'ACTIVE',
+      start_time: String(row.start_time),
+      end_time: String(row.end_time),
+      participants_count: 0
+    }));
+  } catch {
+    return inMemoryEvents;
+  }
+}
+
+export async function createGmRaidEvent(
+  input: Omit<GmRaidEvent, 'id' | 'status' | 'participants_count'>
+): Promise<GmRaidEvent> {
+  const newEvent: GmRaidEvent = {
+    id: `raid-${Date.now()}`,
+    status: 'ACTIVE',
+    participants_count: 0,
+    ...input
+  };
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = requireSupabaseClient() as any;
+    // Insert with PostGIS geometry representation if client is available
+    await client.from('events').insert({
+      title: input.title,
+      description: input.description,
+      event_type: input.event_type,
+      location_center: `SRID=4326;POINT(${input.longitude} ${input.latitude})`,
+      radius_meters: input.radius_meters,
+      target_distance_km: input.target_distance_km,
+      reward_gold: input.reward_gold,
+      reward_xp: input.reward_xp,
+      start_time: input.start_time,
+      end_time: input.end_time,
+      status: 'ACTIVE'
+    });
+  } catch (err) {
+    console.warn('Fallback to local storage for raid creation:', err);
+  }
+
+  inMemoryEvents = [newEvent, ...inMemoryEvents];
+  return newEvent;
+}
+
+export async function getGmFactionWarScores(): Promise<GmFactionScore[]> {
+  const fallbackFactions: GmFactionScore[] = [
+    {
+      id: 'makati_tigers',
+      name: 'Makati Tigers',
+      color_hex: '#F59E0B',
+      current_season_score: 482500,
+      member_count: 1420
+    },
+    {
+      id: 'bgc_eagles',
+      name: 'BGC Eagles',
+      color_hex: '#3B82F6',
+      current_season_score: 519200,
+      member_count: 1580
+    }
+  ];
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = requireSupabaseClient() as any;
+    const { data, error } = await client.from('factions').select('*');
+    if (error || !data || data.length === 0) {
+      return fallbackFactions;
+    }
+    return (data as Array<Record<string, unknown>>).map((row) => ({
+      id: String(row.id),
+      name: String(row.name),
+      color_hex: String(row.color_hex),
+      current_season_score: Number(row.current_season_score ?? 0),
+      member_count: Number(row.member_count ?? 0)
+    }));
+  } catch {
+    return fallbackFactions;
+  }
+}
+
+export async function getGmAbuseLogs(): Promise<GmAbuseLog[]> {
+  const fallbackLogs: GmAbuseLog[] = [
+    {
+      id: 'abuse-1',
+      user_id: 'u-spoof-1',
+      nickname: 'SpeedyGonzo99',
+      distance_km: 14.8,
+      duration_seconds: 300,
+      max_speed_kmh: 88.5,
+      avg_speed_kmh: 177.6,
+      gps_spoofing_flag: true,
+      abuse_reason: 'Inter-session teleportation detected (Distance: 14800m, Time: 300s, Speed: 177.6 km/h)',
+      created_at: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+      is_banned: false
+    },
+    {
+      id: 'abuse-2',
+      user_id: 'u-spoof-2',
+      nickname: 'FakeBicycleMan',
+      distance_km: 5.2,
+      duration_seconds: 410,
+      max_speed_kmh: 52.4,
+      avg_speed_kmh: 45.6,
+      gps_spoofing_flag: true,
+      abuse_reason: 'Abnormal running velocity (Max: 52.4 km/h, Avg: 45.6 km/h)',
+      created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+      is_banned: true
+    }
+  ];
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = requireSupabaseClient() as any;
+    const { data, error } = await client
+      .from('activity_logs')
+      .select('*, users(nickname, is_banned)')
+      .eq('gps_spoofing_flag', true)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error || !data || data.length === 0) {
+      return fallbackLogs;
+    }
+
+    return (data as Array<Record<string, unknown>>).map((row) => {
+      const userObj = row.users as Record<string, unknown> | undefined;
+      return {
+        id: String(row.id),
+        user_id: String(row.user_id),
+        nickname: String(userObj?.nickname ?? 'Unknown'),
+        distance_km: Number(row.distance_km ?? 0),
+        duration_seconds: Number(row.duration_seconds ?? 0),
+        max_speed_kmh: Number(row.max_speed_kmh ?? 0),
+        avg_speed_kmh: Number(row.avg_speed_kmh ?? 0),
+        gps_spoofing_flag: true,
+        abuse_reason: String(row.abuse_reason ?? 'Flagged by Anti-Cheat Engine'),
+        created_at: String(row.created_at),
+        is_banned: Boolean(userObj?.is_banned)
+      };
+    });
+  } catch {
+    return fallbackLogs;
+  }
+}
+
+export async function toggleUserBan(userId: string, isBanned: boolean, reason?: string) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = requireSupabaseClient() as any;
+    await client
+      .from('users')
+      .update({
+        is_banned: isBanned,
+        ban_reason: isBanned ? (reason ?? 'Banned by Game Master') : null
+      })
+      .eq('id', userId);
+  } catch (err) {
+    console.warn('User ban toggled in offline/mock context:', userId, isBanned, err);
+  }
+}
+

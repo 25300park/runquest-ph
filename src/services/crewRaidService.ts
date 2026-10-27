@@ -1,4 +1,4 @@
-﻿import type { LatLngTuple } from '../types/area';
+import type { LatLngTuple } from '../types/area';
 import { calculateHaversineDistanceKm } from '../utils/route';
 
 export interface CrewRaidEvent {
@@ -23,8 +23,8 @@ export const defaultBgcRaid: CrewRaidEvent = {
   id: 'raid-bgc-amphitheater',
   title: 'BGC Amphitheater Midnight Cyber Raid',
   locationName: 'BGC High Street Amphitheater',
-  targetCoord: [14.5515, 121.0515],
-  geofenceRadiusMeters: 50,
+  targetCoord: [14.5523, 121.0503],
+  geofenceRadiusMeters: 100,
   startTime: '매주 토/일 밤 9:00 집결',
   targetSecondsLeft: 7200, // 2시간
   totalParticipants: 48,

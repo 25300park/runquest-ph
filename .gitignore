@@ -11,3 +11,9 @@ vite-dev.log
 vite-dev.err
 test-results/
 playwright-report/
+
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

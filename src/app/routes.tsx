@@ -63,6 +63,7 @@ export const appRoutes = (
     <Route path="/completed/:courseId" element={<QuestCompletedPage />} />
     <Route path="/bounties" element={<BountyBoardPage />} />
     <Route path="/raid" element={<CrewRaidPage />} />
+    <Route path="/crew-raid" element={<CrewRaidPage />} />
     <Route path="/history" element={<ActivityHistoryPage />} />
     <Route path="/profile" element={<ProfilePage />} />
     <Route path="/rewards" element={<RewardsPage />} />
