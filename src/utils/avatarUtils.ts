@@ -1,10 +1,25 @@
-﻿export function normalizeAvatarUrl(url?: string | null): string {
+import { getExplorerOutfitTier } from '../services/aiCharacterService';
+
+export function normalizeAvatarUrl(url?: string | null, level?: number): string {
+  const defaultTierImage = getExplorerOutfitTier(level ?? 1).fallbackImage;
+
   if (!url || typeof url !== 'string') {
-    return '/images/avatars/1.png';
+    return defaultTierImage;
+  }
+
+  // 0. AI 생성 Base64 이미지, Blob URL, 외부 URL, 또는 레벨별 애니메이션 RPG 탐험가 티어 이미지인 경우 그대로 유지
+  if (
+    url.startsWith('data:image/') ||
+    url.startsWith('blob:') ||
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('/images/explorer-tiers/')
+  ) {
+    return url;
   }
 
   // 8번 아바타의 경우: webm 투명 비디오 지원
-  if (url.includes('8.webm') || url.includes('8.mp4') || url.includes('/8.')) {
+  if (url.includes('8.webm') || url.includes('8.mp4') || url === '/images/avatars/8.png') {
     return '/images/avatars/8.webm';
   }
 
@@ -31,28 +46,22 @@
     return `/images/avatars/${validNum}.png`;
   }
 
-  // 3. 숫자만 추출 가능한 경우
-  const digits = url.match(/\d+/);
-  if (digits) {
-    const num = parseInt(digits[0], 10);
-    const validNum = num >= 1 && num <= 23 ? num : ((num - 1) % 23) + 1;
-    if (validNum === 8) {
-      return '/images/avatars/8.webm';
-    }
-    return `/images/avatars/${validNum}.png`;
-  }
-
-  // 기본 안전 경로
-  return '/images/avatars/1.png';
+  // 기본 안전 경로: 레벨별 애니메이션 RPG 탐험가 일러스트
+  return defaultTierImage;
 }
 
 export function isVideoAvatar(url?: string | null): boolean {
   if (!url) return false;
+  if (
+    url.startsWith('data:') ||
+    url.startsWith('blob:') ||
+    url.startsWith('/images/explorer-tiers/')
+  ) {
+    return false;
+  }
   return (
     url.includes('8.webm') ||
     url.includes('8.mp4') ||
-    url.includes('/8.') ||
-    url.endsWith('8.png') ||
     url === '/images/avatars/8.png' ||
     url === '/images/avatars/8.webm' ||
     url === '/images/avatars/8.mp4' ||
@@ -60,14 +69,14 @@ export function isVideoAvatar(url?: string | null): boolean {
   );
 }
 
-export function getAvatarThumbnail(url?: string | null): string {
+export function getAvatarThumbnail(url?: string | null, level?: number): string {
   if (!url || typeof url !== 'string') {
-    return '/images/avatars/1.png';
+    return getExplorerOutfitTier(level ?? 1).fallbackImage;
   }
   if (isVideoAvatar(url)) {
     return '/images/avatars/8.png';
   }
-  const normalized = normalizeAvatarUrl(url);
+  const normalized = normalizeAvatarUrl(url, level);
   if (normalized.endsWith('.webm') || normalized.endsWith('.mp4')) {
     return '/images/avatars/8.png';
   }

@@ -2,14 +2,33 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getCharacterProfile, subscribeToCharacterUpdates } from '../services/characterService';
 import { subscribeToAvatarRealtime } from '../services/aiAvatarService';
-import { subscribeToEquipmentEconomy } from '../services/equipmentEconomyService';
+import {
+  getCharacterVitalStats,
+  getSavedGearDurability,
+  repairEquipmentItem,
+  subscribeToEquipmentEconomy,
+  type EquipmentDurability
+} from '../services/equipmentEconomyService';
 import type { CharacterProfile } from '../types/rpgCharacter';
-import { getGameProgress } from '../utils/gameProgress';
+import {
+  getGameProgress,
+  getRankTitleForLevel,
+  getRunnerName,
+  getSelectedCharacterClass
+} from '../utils/gameProgress';
 import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../utils/xp';
 import { getSavedExplorationStats } from '../utils/fogOfWar';
 import { getAvatarThumbnail, isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
+import {
+  getEquippedLevelGears,
+  getExplorerOutfitTier,
+  getExplorerOutfitTierByNumber,
+} from '../services/aiCharacterService';
+import {
+  getPreferredCharacterDisplayMode,
+  loadCustomCharacterVideoUrl,
+} from '../utils/customMediaStorage';
 import VideoAdInterstitial from '../components/ads/VideoAdInterstitial';
-import FactionWarsCard from '../components/faction/FactionWarsCard';
 import WearableSyncModal from '../components/wearable/WearableSyncModal';
 
 function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: string; isToday: boolean }> {
@@ -42,17 +61,22 @@ function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: stri
 
 export default function CharacterDashboardPage() {
   const [profile, setProfile] = useState<CharacterProfile | null>(null);
-  const [status, setStatus] = useState('Loading hero...');
+  const [status, setStatus] = useState('');
   const [showAd, setShowAd] = useState(false);
   const [showGpxModal, setShowGpxModal] = useState(false);
   const [totalXpOverride, setTotalXpOverride] = useState<number | null>(null);
-  const [customRunnerName, setCustomRunnerName] = useState(() => {
-    return (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-name')) || '';
-  });
+  const [customRunnerName, setCustomRunnerName] = useState(() => getRunnerName());
   const [customAvatarUrl, setCustomAvatarUrl] = useState(() => {
     const saved = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
     return saved ? normalizeAvatarUrl(saved) : '';
   });
+  const [selectedClass, setSelectedClass] = useState(() => getSelectedCharacterClass());
+  const [gearList, setGearList] = useState<EquipmentDurability[]>(() => getSavedGearDurability());
+  const [repairingGearId, setRepairingGearId] = useState<string | null>(null);
+  const [customVideoUrl, setCustomVideoUrl] = useState<string | null>(null);
+  const [displayMode, setDisplayMode] = useState<'video' | 'image'>(() =>
+    getPreferredCharacterDisplayMode()
+  );
 
   const weekdays = useMemo(() => getCurrentWeekdays(), []);
 
@@ -63,7 +87,7 @@ export default function CharacterDashboardPage() {
       try {
         const nextProfile = await getCharacterProfile();
         setProfile(nextProfile);
-        setStatus(nextProfile ? '' : 'No character found.');
+        setStatus('');
 
         if (nextProfile && nextProfile.character && nextProfile.character.id) {
           const charId = nextProfile.character.id;
@@ -90,21 +114,27 @@ export default function CharacterDashboardPage() {
 
     function syncAvatarState() {
       if (typeof window !== 'undefined') {
-        const latestName = window.localStorage.getItem('runquest-selected-name');
+        setCustomRunnerName(getRunnerName());
         const latestAvatar = window.localStorage.getItem('runquest-selected-avatar');
-        if (latestName) setCustomRunnerName(latestName);
         if (latestAvatar) setCustomAvatarUrl(normalizeAvatarUrl(latestAvatar));
+        setSelectedClass(getSelectedCharacterClass());
+        setGearList(getSavedGearDurability());
+        setDisplayMode(getPreferredCharacterDisplayMode());
+        void loadCustomCharacterVideoUrl().then((url) => setCustomVideoUrl(url));
       }
     }
 
     function handleWearableSynced() {
       const nextProgress = getGameProgress();
       setTotalXpOverride(nextProgress.totalXp);
+      setGearList(getSavedGearDurability());
     }
 
     syncAvatarState();
     window.addEventListener('storage', syncAvatarState);
     window.addEventListener('runquest-avatar-updated', syncAvatarState);
+    window.addEventListener('runquest-class-updated', syncAvatarState);
+    window.addEventListener('runquest-gear-updated', syncAvatarState);
     window.addEventListener('runquest:wearable-activity-synced', handleWearableSynced);
 
     return () => {
@@ -113,6 +143,8 @@ export default function CharacterDashboardPage() {
       });
       window.removeEventListener('storage', syncAvatarState);
       window.removeEventListener('runquest-avatar-updated', syncAvatarState);
+      window.removeEventListener('runquest-class-updated', syncAvatarState);
+      window.removeEventListener('runquest-gear-updated', syncAvatarState);
       window.removeEventListener('runquest:wearable-activity-synced', handleWearableSynced);
     };
   }, []);
@@ -120,6 +152,11 @@ export default function CharacterDashboardPage() {
   const progress = getGameProgress();
   const effectiveTotalXp = totalXpOverride ?? progress.totalXp;
   const currentLevel = calculateLevelFromXp(effectiveTotalXp);
+  const rankTitle = getRankTitleForLevel(currentLevel);
+  const vitalStats = useMemo(
+    () => getCharacterVitalStats(currentLevel, gearList),
+    [currentLevel, gearList]
+  );
   const nextLevelXp = getNextLevelXp(effectiveTotalXp);
   const currentLevelBaseXp = getCurrentLevelBaseXp(effectiveTotalXp);
   const xpProgressPercent =
@@ -131,34 +168,33 @@ export default function CharacterDashboardPage() {
   const currentLevelCurrentXp = effectiveTotalXp - currentLevelBaseXp;
   const currentLevelRequiredXp = nextLevelXp - currentLevelBaseXp;
 
-  const equippedItems = useMemo(
-    () => profile?.equipment.filter((equipment) => equipment.equipped) ?? [],
-    [profile]
-  );
   const runnerName = customRunnerName || profile?.character.name || 'Runner';
-  const avatarUrl = customAvatarUrl || normalizeAvatarUrl(profile?.character.avatar_base_url);
+  const savedTierRaw =
+    typeof window !== 'undefined'
+      ? Number(window.localStorage.getItem('runquest-selected-outfit-tier'))
+      : 0;
+  const outfitTier =
+    savedTierRaw >= 1 && savedTierRaw <= 4
+      ? getExplorerOutfitTierByNumber(savedTierRaw as 1 | 2 | 3 | 4)
+      : getExplorerOutfitTier(currentLevel);
+  const avatarUrl =
+    customAvatarUrl &&
+    (customAvatarUrl.startsWith('data:image/') ||
+      customAvatarUrl.startsWith('/images/explorer-tiers/'))
+      ? customAvatarUrl
+      : outfitTier.fallbackImage;
+  const isAnimeExplorerArt =
+    avatarUrl.startsWith('/images/explorer-tiers/') || avatarUrl.startsWith('data:image/');
+  const equippedGrowthGears = getEquippedLevelGears(currentLevel);
 
-  const isCompletelyNewUser = !profile && !customRunnerName && !customAvatarUrl;
-
-  if (isCompletelyNewUser && status === 'No character found.') {
-    return (
-      <section className="grid min-h-screen place-items-center bg-slate-900 px-4 py-8 text-center text-white font-sans">
-        <div className="rounded-3xl border border-slate-700 bg-slate-800/90 p-6 max-w-sm w-full shadow-2xl">
-          <div className="w-16 h-16 bg-violet-600/20 text-violet-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">
-            🧙
-          </div>
-          <p className="text-xs font-black uppercase text-amber-300">RunQuest Hero</p>
-          <h1 className="mt-2 text-2xl font-black">Create your hero first</h1>
-          <p className="mt-2 text-sm text-slate-400">{status}</p>
-          <Link
-            to="/character/create"
-            className="mt-6 block w-full rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3.5 font-bold text-white shadow-lg shadow-violet-600/30 active:scale-95 transition-all"
-          >
-            Create Character
-          </Link>
-        </div>
-      </section>
-    );
+  function handleQuickRepair(gear: EquipmentDurability) {
+    if (gear.durability >= 100) return;
+    setRepairingGearId(gear.id);
+    setTimeout(() => {
+      const { updatedList } = repairEquipmentItem(gear.id);
+      setGearList(updatedList);
+      setRepairingGearId(null);
+    }, 350);
   }
 
   return (
@@ -178,20 +214,36 @@ export default function CharacterDashboardPage() {
       <header className="pt-4 px-5 flex items-center justify-between">
         <div>
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-            Welcome back
+            Welcome back • {status || 'Ready to Run'}
           </span>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
             <h1 className="text-xl font-black text-slate-900">
               Hello, {runnerName} 👋
             </h1>
-            <span className="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-black uppercase tracking-tight">
-              Novice Runner
-            </span>
+            <Link
+              to="/character"
+              className="px-2 py-0.5 rounded-full bg-violet-100 hover:bg-violet-200 text-violet-700 text-[10px] font-black uppercase tracking-tight transition-all"
+              title="클래스 변경하기"
+            >
+              {selectedClass.name.replace('The ', '')} • {rankTitle}
+            </Link>
           </div>
+          <p className="text-[10px] font-bold text-teal-600 mt-0.5">
+            ✨ {selectedClass.bonus}
+          </p>
         </div>
 
-        {/* 우측 스마트워치 연동 & 광고 & 랭킹 & 프로필 아바타 버튼 */}
+        {/* 우측 랜딩 영상 확인 & 스마트워치 연동 & 랭킹 & 프로필 아바타 버튼 */}
         <div className="flex items-center gap-1.5">
+          <Link
+            to="/"
+            className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[10px] font-black shadow-xs active:scale-95 transition-all flex items-center gap-1"
+            title="랜딩페이지 달리는 배경 영상 확인하기"
+          >
+            <span>🎬</span>
+            <span>랜딩 영상</span>
+          </Link>
+
           <button
             type="button"
             onClick={() => setShowGpxModal(true)}
@@ -269,69 +321,121 @@ export default function CharacterDashboardPage() {
       {/* 3. 메인 RPG 카드 (핵심: 동화풍 맑은 자연 모험 배경 + 3D 캐릭터/비디오 피규어 + HUD + Start CTA) */}
       <section className="px-5 py-2">
         <div className="bg-white rounded-3xl p-4 shadow-xl border border-slate-100 relative overflow-hidden flex flex-col gap-3">
-          {/* 캐릭터 3D 자연 모험 뷰포트 */}
+          {/* 캐릭터 애니메이션 RPG 탐험가 뷰포트 */}
           <div className="relative w-full aspect-[9/16] max-h-[380px] rounded-2xl overflow-hidden bg-gradient-to-b from-sky-400 via-sky-200 to-emerald-400 shadow-inner flex flex-col justify-between p-4 border border-emerald-200/60">
-            {/* 햇살 광원 & 뭉게구름 자연 배경 레이어 */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-amber-100/70 via-transparent to-transparent pointer-events-none" />
-            <div className="absolute top-2 left-4 w-20 h-8 bg-white/40 rounded-full blur-md pointer-events-none" />
-            <div className="absolute top-6 right-6 w-28 h-10 bg-white/50 rounded-full blur-lg pointer-events-none" />
-            
-            {/* 싱그러운 푸른 언덕 실루엣 */}
-            <div className="absolute -bottom-6 -left-10 -right-10 h-36 bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 rounded-[50%] pointer-events-none opacity-90 shadow-lg" />
-            <div className="absolute -bottom-10 -left-6 -right-6 h-28 bg-emerald-700 rounded-[50%] pointer-events-none" />
-
-            {/* 상단 오버레이: HP 및 상태 배지 */}
-            <div className="relative z-20 flex items-center justify-between">
-              <span className="px-2.5 py-1 rounded-full bg-white/85 backdrop-blur-md border border-white/80 text-[10px] font-black text-rose-500 flex items-center gap-1 shadow-sm">
-                <span>❤️</span> HP 100/100
-              </span>
-              <span className="px-2.5 py-1 rounded-full bg-white/85 backdrop-blur-md border border-white/80 text-[10px] font-black text-emerald-600 flex items-center gap-1 shadow-sm">
-                <span>⚡</span> Stamina 92%
-              </span>
-            </div>
-
-            {/* 🔥 유저가 선택한 23종 캐릭터 아바타 (8번 캐릭터는 8.mp4 비디오) & 자연 잔디 포디움 */}
-            <div className="relative z-10 my-auto flex flex-col items-center justify-center pt-2">
-              <div className="relative w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center animate-in zoom-in duration-300">
-                {isVideoAvatar(avatarUrl) ? (
-                  <video
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(6,78,59,0.45)] rounded-2xl"
-                  >
-                    <source src="/images/avatars/8.webm" type="video/webm" />
-                    <source src="/images/avatars/8.mp4" type="video/mp4" />
-                  </video>
-                ) : (
-                  <img
-                    src={avatarUrl}
-                    alt="Selected Hero Avatar"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/images/avatars/1.png';
-                    }}
-                    className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(6,78,59,0.45)]"
-                  />
-                )}
-              </div>
-              {/* 잔디 그림자 & 자연스러운 받침대 */}
-              <div className="w-36 h-3.5 bg-emerald-950/30 rounded-full blur-[3px] -mt-3.5 border border-emerald-400/20" />
-            </div>
-
-            {/* 하단 오버레이: 레벨 & EXP 프로그레스 바 (Profile과 100% 동일) */}
-            <div className="relative z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 text-white shadow-md">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-black text-amber-300">Level {currentLevel}</span>
-                <span className="text-[11px] text-slate-300 font-mono font-bold">
-                  {xpProgressPercent}% ({currentLevelCurrentXp}/{currentLevelRequiredXp} XP)
-                </span>
-              </div>
-              <div className="mt-1.5 h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-300 transition-all duration-500"
-                  style={{ width: `${xpProgressPercent}%` }}
+            {customVideoUrl && displayMode === 'video' ? (
+              <>
+                <video
+                  key={customVideoUrl}
+                  src={customVideoUrl}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 w-full h-full object-cover object-top"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/20 pointer-events-none" />
+              </>
+            ) : isAnimeExplorerArt ? (
+              <>
+                <img
+                  src={avatarUrl}
+                  alt="Anime RPG Explorer Avatar"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = outfitTier.fallbackImage;
+                  }}
+                  className="absolute inset-0 w-full h-full object-cover object-top"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/20 pointer-events-none" />
+              </>
+            ) : (
+              <>
+                {/* 햇살 광원 & 뭉게구름 자연 배경 레이어 */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-amber-100/70 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute top-2 left-4 w-20 h-8 bg-white/40 rounded-full blur-md pointer-events-none" />
+                <div className="absolute top-6 right-6 w-28 h-10 bg-white/50 rounded-full blur-lg pointer-events-none" />
+
+                {/* 싱그러운 푸른 언덕 실루엣 */}
+                <div className="absolute -bottom-6 -left-10 -right-10 h-36 bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 rounded-[50%] pointer-events-none opacity-90 shadow-lg" />
+                <div className="absolute -bottom-10 -left-6 -right-6 h-28 bg-emerald-700 rounded-[50%] pointer-events-none" />
+              </>
+            )}
+
+            {/* 상단 오버레이: 실시간 연동 HP 및 장비 내구도 기반 Stamina 배지 */}
+            <div className="relative z-20 flex items-center justify-between gap-1.5">
+              <span className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-white/80 text-[10px] font-black text-rose-500 flex items-center gap-1 shadow-sm">
+                <span>❤️</span> HP {vitalStats.currentHp}/{vitalStats.maxHp}
+              </span>
+              <span className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-white/80 text-[10px] font-black text-emerald-600 flex items-center gap-1 shadow-sm">
+                <span>⚡</span> Stamina {vitalStats.staminaPercent}%
+              </span>
+            </div>
+
+            {!isAnimeExplorerArt && (
+              <div className="relative z-10 my-auto flex flex-col items-center justify-center pt-2">
+                <div className="relative w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center animate-in zoom-in duration-300">
+                  {isVideoAvatar(avatarUrl) ? (
+                    <video
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(6,78,59,0.45)] rounded-2xl"
+                    >
+                      <source src="/images/avatars/8.webm" type="video/webm" />
+                      <source src="/images/avatars/8.mp4" type="video/mp4" />
+                    </video>
+                  ) : (
+                    <img
+                      src={avatarUrl}
+                      alt="Selected Hero Avatar"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = outfitTier.fallbackImage;
+                      }}
+                      className="w-full h-full object-contain filter drop-shadow-[0_16px_24px_rgba(6,78,59,0.45)]"
+                    />
+                  )}
+                </div>
+                <div className="w-36 h-3.5 bg-emerald-950/30 rounded-full blur-[3px] -mt-3.5 border border-emerald-400/20" />
+              </div>
+            )}
+
+            {/* 하단 오버레이: 현재 착용 의상 티어 & 레벨/EXP 프로그레스 바 */}
+            <div className="relative z-20 space-y-2 mt-auto">
+              <div className="flex flex-wrap gap-1">
+                {equippedGrowthGears.slice(-3).map((g) => (
+                  <span
+                    key={g.id}
+                    className="px-2 py-0.5 rounded-full bg-slate-950/75 backdrop-blur-md border border-white/25 text-[9px] font-bold text-white shadow-xs"
+                  >
+                    {g.slotIcon} Lv.{g.level} {g.itemName}
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-emerald-400/40 text-[10px] font-black text-emerald-300 shadow-sm truncate">
+                  👕 Tier {outfitTier.tierNumber} • {outfitTier.outfitName}
+                </span>
+                <Link
+                  to="/character/create"
+                  className="px-2.5 py-1 rounded-full bg-emerald-600/90 hover:bg-emerald-500 text-white text-[10px] font-black shadow-md border border-emerald-300/40 shrink-0 transition-all"
+                >
+                  📸 사진·영상 캐릭터 스튜디오
+                </Link>
+              </div>
+              <div className="bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 text-white shadow-md">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-black text-amber-300">Level {currentLevel}</span>
+                  <span className="text-[11px] text-slate-300 font-mono font-bold">
+                    {xpProgressPercent}% ({currentLevelCurrentXp}/{currentLevelRequiredXp} XP)
+                  </span>
+                </div>
+                <div className="mt-1.5 h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-300 transition-all duration-500"
+                    style={{ width: `${xpProgressPercent}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -365,33 +469,32 @@ export default function CharacterDashboardPage() {
         </div>
       </section>
 
-      {/* 3.5 ⚔️ 마카티 vs BGC 주간 대규모 진영전 (Faction Wars) */}
-      <section className="px-5 pt-3">
-        <FactionWarsCard />
-      </section>
-
-      {/* 3.8 🔥 O2O 오프라인 크루 집결 레이드 (Crew Raid) 배너 */}
+      {/* 3.5 🏕️ 크루 집결 광장 & 크루 관리 통합 페이지 바로가기 배너 */}
       <section className="px-5 pt-3">
         <Link
-          to="/raid"
-          className="block rounded-3xl p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-2 border-indigo-500/60 shadow-xl relative overflow-hidden group active:scale-[0.98] transition-all"
+          to="/crew"
+          className="block rounded-3xl p-4 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border-2 border-emerald-500/50 shadow-xl relative overflow-hidden group active:scale-[0.98] transition-all"
         >
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-500 to-cyan-400 p-0.5 shadow-lg flex items-center justify-center text-2xl shrink-0 animate-bounce">
-                🐆
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-amber-400 p-0.5 shadow-lg flex items-center justify-center text-2xl shrink-0">
+                🏕️
               </div>
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded-full border border-amber-400/30">
-                  🔥 O2O Offline Raid
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 bg-emerald-400/20 px-2 py-0.5 rounded-full border border-emerald-400/30">
+                  Crew Town Plaza & Hub
                 </span>
-                <h3 className="text-sm font-black text-white mt-1">BGC Midnight Cyber Raid</h3>
-                <p className="text-[11px] text-indigo-200 mt-0.5">50m 현장 체크인 시 +500 XP & 전설 뱃지 지급!</p>
+                <h3 className="text-sm font-black text-white mt-1">
+                  조깅 크루 집결 광장 · 크루 관리
+                </h3>
+                <p className="text-[11px] text-emerald-100/90 mt-0.5">
+                  마을 광장 2D 캐릭터 집결 · 진영전 · 오프라인 레이드 한곳에서 보기
+                </p>
               </div>
             </div>
-            <span className="text-xs font-black text-cyan-300 bg-cyan-950/80 px-3 py-1.5 rounded-xl border border-cyan-500/40 shrink-0">
-              참가하기 →
+            <span className="text-xs font-black text-emerald-300 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-500/40 shrink-0">
+              광장 입장 →
             </span>
           </div>
         </Link>
@@ -526,25 +629,70 @@ export default function CharacterDashboardPage() {
         </div>
       </section>
 
-      {/* 5. 장착 장비 퀵 슬롯 */}
-      {equippedItems.length > 0 && (
-        <section className="px-5 pt-3">
-          <h2 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-            Equipped Gear ({equippedItems.length})
+      {/* 5. 장착 장비 및 실시간 내구도 퀵 슬롯 (ProfilePage와 100% 동일 데이터 연동) */}
+      <section className="px-5 pt-3">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <span>👟</span> Equipped Gear & Durability ({gearList.length})
           </h2>
-          <div className="grid grid-cols-2 gap-2">
-            {equippedItems.map((gear) => (
-              <div key={gear.id} className="bg-white rounded-xl p-2.5 border border-slate-100 shadow-sm flex items-center gap-2">
-                <span className="text-lg">👟</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-slate-800 truncate">{gear.item.name}</p>
-                  <p className="text-[10px] font-extrabold text-violet-600 uppercase">{gear.item.rarity}</p>
+          <Link to="/profile" className="text-[10px] font-black text-violet-600 hover:underline">
+            장비 정비소 →
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          {gearList.map((gear) => {
+            const isFull = gear.durability >= 100;
+            const isLow = gear.durability <= 30;
+            return (
+              <div
+                key={gear.id}
+                className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm flex flex-col justify-between gap-2"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xl shrink-0">{gear.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-black text-slate-800 truncate">{gear.name}</p>
+                    <p className="text-[9px] font-extrabold text-violet-600 uppercase">
+                      {gear.rarity} • {gear.buff}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        isLow
+                          ? 'bg-rose-500'
+                          : gear.durability <= 70
+                          ? 'bg-amber-400'
+                          : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${gear.durability}%` }}
+                    />
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-500">
+                      내구도 <strong className={isLow ? 'text-rose-600' : 'text-slate-800'}>{gear.durability}%</strong>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isFull || repairingGearId === gear.id}
+                      onClick={() => handleQuickRepair(gear)}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                        isFull
+                          ? 'bg-slate-100 text-slate-400 cursor-default'
+                          : 'bg-violet-600 text-white hover:bg-violet-700 active:scale-95'
+                      }`}
+                    >
+                      {repairingGearId === gear.id ? '수리중' : isFull ? '최상' : `🔧 ${gear.repairCostGold}G`}
+                    </button>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

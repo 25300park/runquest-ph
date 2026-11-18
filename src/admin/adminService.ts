@@ -34,6 +34,11 @@ export async function signOutAdmin() {
 
 export async function getCurrentAdminProfile() {
   const client = requireSupabaseClient();
+  const { data: sessionData } = await client.auth.getSession();
+  if (!sessionData.session?.user) {
+    return null;
+  }
+
   const { data: userData, error: userError } = await client.auth.getUser();
 
   if (userError) {

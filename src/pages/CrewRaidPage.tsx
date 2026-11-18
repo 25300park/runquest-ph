@@ -12,6 +12,7 @@ import {
   checkGeofenceInside
 } from '../services/crewRaidService';
 import type { LatLngTuple } from '../types/area';
+import CrewTownPlaza from '../components/crew/CrewTownPlaza';
 
 const raidMarkerIcon = L.divIcon({
   className: 'custom-raid-marker',
@@ -178,6 +179,9 @@ export default function CrewRaidPage() {
           </span>
         </div>
       </div>
+
+      {/* 2.5 실시간 모션 크루 타운 광장 (내 캐릭터 & 소속 조깅 크루 집결 로비) */}
+      <CrewTownPlaza />
 
       {/* 3. 오프라인 레이드 현장 집결 지도 (Leaflet Container) */}
       <div className="relative rounded-3xl overflow-hidden border-2 border-indigo-500/40 bg-slate-900 shadow-xl">

@@ -79,12 +79,14 @@ export default function BottomNav() {
           )}
         </div>
 
-        {/* 4. Crew 탭 */}
+        {/* 4. Crew 탭 (크루 관리 & 집결 광장 통합 페이지) */}
         <NavLink
-          to="/community"
+          to="/crew"
           className={({ isActive }) =>
             `flex flex-col items-center justify-center flex-1 py-1 transition-all ${
-              isActive ? 'text-violet-600 font-extrabold' : 'text-slate-400 hover:text-slate-600 font-medium'
+              isActive || location.pathname === '/community'
+                ? 'text-violet-600 font-extrabold'
+                : 'text-slate-400 hover:text-slate-600 font-medium'
             }`
           }
         >

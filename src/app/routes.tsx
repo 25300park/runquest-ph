@@ -49,6 +49,7 @@ export const appRoutes = (
     <Route path="/areas" element={<AreaSelectPage />} />
     <Route path="/map" element={<ExplorationMapPage />} />
     <Route path="/coach" element={<AiCoachPage />} />
+    <Route path="/crew" element={<CommunityPage />} />
     <Route path="/community" element={<CommunityPage />} />
     <Route path="/leaderboard" element={<LeaderboardPage />} />
     <Route path="/launch" element={<LaunchPage />} />

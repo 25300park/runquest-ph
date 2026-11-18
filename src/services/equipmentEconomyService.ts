@@ -227,9 +227,33 @@ export function saveGearDurability(list: EquipmentDurability[]): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(DURABILITY_STORAGE_KEY, JSON.stringify(list));
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(
+      new CustomEvent('runquest-gear-updated', {
+        detail: list
+      })
+    );
   } catch {
     // ignore
   }
+}
+
+export function getCharacterVitalStats(
+  level: number,
+  gearList: EquipmentDurability[] = getSavedGearDurability()
+): { currentHp: number; maxHp: number; staminaPercent: number } {
+  const maxHp = 100 + Math.max(0, level - 1) * 10;
+  const totalDurability = gearList.reduce((sum, item) => sum + item.durability, 0);
+  const staminaPercent =
+    gearList.length > 0 ? Math.round(totalDurability / gearList.length) : 100;
+  const wornItemsCount = gearList.filter((item) => item.durability <= 30).length;
+  const currentHp = Math.max(10, maxHp - wornItemsCount * 15);
+
+  return {
+    currentHp,
+    maxHp,
+    staminaPercent
+  };
 }
 
 export function repairEquipmentItem(gearId: string): { success: boolean; updatedList: EquipmentDurability[] } {

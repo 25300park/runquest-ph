@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getSavedGearDurability,
   repairEquipmentItem,
@@ -9,6 +9,18 @@ export default function GearDurabilityCard() {
   const [gearList, setGearList] = useState<EquipmentDurability[]>(() => getSavedGearDurability());
   const [repairingId, setRepairingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    function syncGear() {
+      setGearList(getSavedGearDurability());
+    }
+    window.addEventListener('storage', syncGear);
+    window.addEventListener('runquest-gear-updated', syncGear);
+    return () => {
+      window.removeEventListener('storage', syncGear);
+      window.removeEventListener('runquest-gear-updated', syncGear);
+    };
+  }, []);
 
   function handleRepair(gear: EquipmentDurability) {
     if (gear.durability >= 100) return;

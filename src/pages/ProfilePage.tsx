@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { mockTrophies, type TrophyItem } from '../data/mockTrophies';
-import { getGameProgress } from '../utils/gameProgress';
+import {
+  getGameProgress,
+  getRankTitleForLevel,
+  getRunnerName,
+  getSelectedCharacterClass,
+} from '../utils/gameProgress';
 import { calculateLevelFromXp, getCurrentLevelBaseXp, getNextLevelXp } from '../utils/xp';
 import { Link } from 'react-router-dom';
 import { getCurrentAdminProfile } from '../admin/adminService';
@@ -8,6 +13,19 @@ import { usePwaInstall } from '../hooks/usePwaInstall';
 import { isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
 import TrophyRoomModal from '../components/profile/TrophyRoomModal';
 import GearDurabilityCard from '../components/profile/GearDurabilityCard';
+import {
+  getCharacterVitalStats,
+  getSavedGearDurability,
+  type EquipmentDurability,
+} from '../services/equipmentEconomyService';
+import {
+  getExplorerOutfitTier,
+  getExplorerOutfitTierByNumber,
+} from '../services/aiCharacterService';
+import {
+  getPreferredCharacterDisplayMode,
+  loadCustomCharacterVideoUrl,
+} from '../utils/customMediaStorage';
 
 export default function ProfilePage() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -16,6 +34,7 @@ export default function ProfilePage() {
   const { isStandalone, showIosGuide, setShowIosGuide, promptInstall } = usePwaInstall();
   const progress = getGameProgress();
   const currentLevel = calculateLevelFromXp(progress.totalXp);
+  const rankTitle = getRankTitleForLevel(currentLevel);
   const nextLevelXp = getNextLevelXp(progress.totalXp);
   const currentLevelBaseXp = getCurrentLevelBaseXp(progress.totalXp);
   const xpProgress =
@@ -25,13 +44,33 @@ export default function ProfilePage() {
           ((progress.totalXp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100
         );
 
-  const [runnerName, setRunnerName] = useState(() => {
-    return (typeof window !== 'undefined' && window.localStorage.getItem('runquest-selected-name')) || 'Shadow Tiger Ranger';
+  const [runnerName, setRunnerName] = useState(() => getRunnerName());
+  const [selectedClass, setSelectedClass] = useState(() => getSelectedCharacterClass());
+  const [gearList, setGearList] = useState<EquipmentDurability[]>(() => getSavedGearDurability());
+  const vitalStats = getCharacterVitalStats(currentLevel, gearList);
+  const [savedTierNum, setSavedTierNum] = useState(() => {
+    return typeof window !== 'undefined'
+      ? Number(window.localStorage.getItem('runquest-selected-outfit-tier'))
+      : 0;
   });
+  const outfitTier =
+    savedTierNum >= 1 && savedTierNum <= 4
+      ? getExplorerOutfitTierByNumber(savedTierNum as 1 | 2 | 3 | 4)
+      : getExplorerOutfitTier(currentLevel);
+
   const [avatarUrl, setAvatarUrl] = useState(() => {
     const saved = typeof window !== 'undefined' ? window.localStorage.getItem('runquest-selected-avatar') : null;
-    return normalizeAvatarUrl(saved);
+    if (saved && (saved.startsWith('data:image/') || saved.startsWith('/images/explorer-tiers/'))) {
+      return saved;
+    }
+    return outfitTier.fallbackImage;
   });
+  const isAnimeExplorerArt =
+    avatarUrl.startsWith('/images/explorer-tiers/') || avatarUrl.startsWith('data:image/');
+  const [customVideoUrl, setCustomVideoUrl] = useState<string | null>(null);
+  const [displayMode, setDisplayMode] = useState<'video' | 'image'>(() =>
+    getPreferredCharacterDisplayMode()
+  );
 
   useEffect(() => {
     getCurrentAdminProfile()
@@ -40,79 +79,133 @@ export default function ProfilePage() {
 
     function syncAvatarState() {
       if (typeof window !== 'undefined') {
-        const latestName = window.localStorage.getItem('runquest-selected-name');
+        setRunnerName(getRunnerName());
+        setSelectedClass(getSelectedCharacterClass());
+        setGearList(getSavedGearDurability());
+        setDisplayMode(getPreferredCharacterDisplayMode());
+        void loadCustomCharacterVideoUrl().then((url) => setCustomVideoUrl(url));
+        const nextTierNum = Number(window.localStorage.getItem('runquest-selected-outfit-tier'));
+        setSavedTierNum(nextTierNum);
         const latestAvatar = window.localStorage.getItem('runquest-selected-avatar');
-        if (latestName) setRunnerName(latestName);
-        if (latestAvatar) setAvatarUrl(normalizeAvatarUrl(latestAvatar));
+        if (
+          latestAvatar &&
+          (latestAvatar.startsWith('data:image/') ||
+            latestAvatar.startsWith('/images/explorer-tiers/'))
+        ) {
+          setAvatarUrl(normalizeAvatarUrl(latestAvatar, currentLevel));
+        } else {
+          const fallbackTier =
+            nextTierNum >= 1 && nextTierNum <= 4
+              ? getExplorerOutfitTierByNumber(nextTierNum as 1 | 2 | 3 | 4)
+              : getExplorerOutfitTier(currentLevel);
+          setAvatarUrl(fallbackTier.fallbackImage);
+        }
       }
     }
 
     syncAvatarState();
     window.addEventListener('storage', syncAvatarState);
     window.addEventListener('runquest-avatar-updated', syncAvatarState);
+    window.addEventListener('runquest-class-updated', syncAvatarState);
+    window.addEventListener('runquest-gear-updated', syncAvatarState);
 
     return () => {
       window.removeEventListener('storage', syncAvatarState);
       window.removeEventListener('runquest-avatar-updated', syncAvatarState);
+      window.removeEventListener('runquest-class-updated', syncAvatarState);
+      window.removeEventListener('runquest-gear-updated', syncAvatarState);
     };
   }, []);
 
   return (
     <section className="min-h-full space-y-4 bg-slate-50 px-4 py-4 text-slate-900 font-sans pb-28 select-none">
-      {/* 1. 상단 60% 몰입형 자연 피규어 쇼룸 뷰포트 (Nature Showcase) */}
+      {/* 1. 상단 60% 몰입형 애니메이션 RPG 탐험가 쇼룸 뷰포트 */}
       <div className="relative w-full aspect-[9/15] min-h-[460px] max-h-[540px] rounded-3xl overflow-hidden bg-gradient-to-b from-sky-400 via-sky-200 to-emerald-400 shadow-2xl border border-emerald-200/80 flex flex-col justify-between p-4">
-        {/* 햇살 광원 & 뭉게구름 자연 배경 레이어 */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-amber-100/75 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-2 left-6 w-24 h-10 bg-white/40 rounded-full blur-md pointer-events-none" />
-        <div className="absolute top-8 right-6 w-32 h-12 bg-white/50 rounded-full blur-lg pointer-events-none" />
+        {customVideoUrl && displayMode === 'video' ? (
+          <>
+            <video
+              key={customVideoUrl}
+              src={customVideoUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover object-top"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-slate-950/35 pointer-events-none" />
+          </>
+        ) : isAnimeExplorerArt ? (
+          <>
+            <img
+              src={avatarUrl}
+              alt="Anime RPG Explorer Showcase"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = outfitTier.fallbackImage;
+              }}
+              className="absolute inset-0 w-full h-full object-cover object-top"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-slate-950/35 pointer-events-none" />
+          </>
+        ) : (
+          <>
+            {/* 햇살 광원 & 뭉게구름 자연 배경 레이어 */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-amber-100/75 via-transparent to-transparent pointer-events-none" />
+            <div className="absolute top-2 left-6 w-24 h-10 bg-white/40 rounded-full blur-md pointer-events-none" />
+            <div className="absolute top-8 right-6 w-32 h-12 bg-white/50 rounded-full blur-lg pointer-events-none" />
 
-        {/* 싱그러운 푸른 언덕 실루엣 */}
-        <div className="absolute -bottom-8 -left-12 -right-12 h-44 bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 rounded-[50%] pointer-events-none opacity-95 shadow-xl" />
-        <div className="absolute -bottom-14 -left-8 -right-8 h-36 bg-emerald-700 rounded-[50%] pointer-events-none" />
+            {/* 싱그러운 푸른 언덕 실루엣 */}
+            <div className="absolute -bottom-8 -left-12 -right-12 h-44 bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 rounded-[50%] pointer-events-none opacity-95 shadow-xl" />
+            <div className="absolute -bottom-14 -left-8 -right-8 h-36 bg-emerald-700 rounded-[50%] pointer-events-none" />
 
-        {/* 🔥 유저가 선택한 23종 캐릭터 아바타 (8번 캐릭터는 8.mp4 비디오) & 자연 잔디 포디움 */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 pt-2">
-          <div className="w-56 h-56 sm:w-64 sm:h-64 flex items-center justify-center animate-in zoom-in duration-300">
-            {isVideoAvatar(avatarUrl) ? (
-              <video
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="w-full h-full object-contain filter drop-shadow-[0_20px_30px_rgba(6,78,59,0.5)] rounded-3xl"
-              >
-                <source src="/images/avatars/8.webm" type="video/webm" />
-                <source src="/images/avatars/8.mp4" type="video/mp4" />
-              </video>
-            ) : (
-              <img
-                src={avatarUrl}
-                alt="Hero Showcase"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/images/avatars/1.png';
-                }}
-                className="w-full h-full object-contain filter drop-shadow-[0_20px_30px_rgba(6,78,59,0.5)]"
-              />
-            )}
-          </div>
-          {/* 바닥 잔디 그림자 & 자연스러운 받침대 */}
-          <div className="w-44 h-4 bg-emerald-950/35 rounded-full blur-[3px] -mt-4 border border-emerald-400/30" />
-        </div>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 pt-2">
+              <div className="w-56 h-56 sm:w-64 sm:h-64 flex items-center justify-center animate-in zoom-in duration-300">
+                {isVideoAvatar(avatarUrl) ? (
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-contain filter drop-shadow-[0_20px_30px_rgba(6,78,59,0.5)] rounded-3xl"
+                  >
+                    <source src="/images/avatars/8.webm" type="video/webm" />
+                    <source src="/images/avatars/8.mp4" type="video/mp4" />
+                  </video>
+                ) : (
+                  <img
+                    src={avatarUrl}
+                    alt="Hero Showcase"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = outfitTier.fallbackImage;
+                    }}
+                    className="w-full h-full object-contain filter drop-shadow-[0_20px_30px_rgba(6,78,59,0.5)]"
+                  />
+                )}
+              </div>
+              <div className="w-44 h-4 bg-emerald-950/35 rounded-full blur-[3px] -mt-4 border border-emerald-400/30" />
+            </div>
+          </>
+        )}
 
         {/* 쇼룸 상단 플로팅 헤더 (Lv 뱃지 & 캐릭터 이름 & 아바타 변경 버튼) */}
         <div className="relative z-20 p-4 space-y-1.5">
           {/* 1행: 서브 뱃지 & 우측 액션 버튼들 */}
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-violet-400 bg-violet-950/80 px-2.5 py-0.5 rounded-full border border-violet-700/60 backdrop-blur-md">
-              Hero Showroom
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-violet-300 bg-violet-950/80 px-2.5 py-0.5 rounded-full border border-violet-700/60 backdrop-blur-md">
+              {selectedClass.name.replace('The ', '')} • {rankTitle}
             </span>
             <div className="flex items-center gap-1.5">
               <Link
-                to="/character/create"
-                className="rounded-full bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 text-[10px] font-black backdrop-blur-md border border-white/30 shadow-md active:scale-95 transition-all flex items-center gap-1"
+                to="/character"
+                className="rounded-full bg-violet-950/60 hover:bg-violet-900/80 text-violet-200 px-2.5 py-1 text-[10px] font-black backdrop-blur-md border border-violet-500/40 shadow-md active:scale-95 transition-all"
               >
-                <span>🔄</span>
-                <span>Change</span>
+                클래스
+              </Link>
+              <Link
+                to="/character/create"
+                className="rounded-full bg-emerald-600/90 hover:bg-emerald-500 text-white px-2.5 py-1 text-[10px] font-black backdrop-blur-md border border-emerald-300/40 shadow-md active:scale-95 transition-all flex items-center gap-1"
+              >
+                <span>📸</span>
+                <span>AI 얼굴 캐릭터화</span>
               </Link>
               <span className="rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 px-2.5 py-1 text-[11px] font-black shadow-lg border border-amber-200">
                 Lv {currentLevel}
@@ -120,10 +213,28 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* 2행: 메인 히어로 타이틀 (한 줄 꽉 채움) */}
-          <h1 className="text-lg sm:text-xl font-black text-white drop-shadow-md truncate whitespace-nowrap">
-            {runnerName}
-          </h1>
+          {/* 2행: 메인 히어로 타이틀 & 클래스 패시브 / HP·Stamina 상태 뱃지 */}
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h1 className="text-lg sm:text-xl font-black text-white drop-shadow-md truncate whitespace-nowrap">
+                {runnerName}
+              </h1>
+              <p className="text-[10px] font-bold text-amber-200 drop-shadow">
+                ✨ {selectedClass.bonus}
+              </p>
+              <span className="inline-block mt-1 rounded-full bg-slate-950/75 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-black text-emerald-300 border border-emerald-400/40">
+                👕 Tier {outfitTier.tierNumber} • {outfitTier.outfitName}
+              </span>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <span className="rounded-full bg-slate-950/65 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-400/40">
+                ❤️ HP {vitalStats.currentHp}/{vitalStats.maxHp}
+              </span>
+              <span className="rounded-full bg-slate-950/65 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-sky-300 border border-sky-400/40">
+                ⚡ Stamina {vitalStats.staminaPercent}%
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* 쇼룸 하단 겹치는 글래스모피즘(Glassmorphism) 장비 슬롯 */}

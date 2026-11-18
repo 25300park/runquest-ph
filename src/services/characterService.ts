@@ -80,32 +80,45 @@ export async function ensureStarterEquipment() {
     throw error;
   }
 
+  const { data: sessionData } = await client.auth.getSession();
+  const isAuthenticated = Boolean(sessionData.session?.user);
+
   const existingNames = new Set((data ?? []).map((item) => item.name));
   const missingItems = starterEquipment.filter((item) => !existingNames.has(item.name));
 
-  if (missingItems.length > 0) {
+  if (missingItems.length > 0 && isAuthenticated) {
     const { error: insertError } = await client.from('equipment_items').insert(missingItems);
 
     if (insertError) {
       throw insertError;
     }
+
+    const { data: items, error: fetchError } = await client.from('equipment_items').select('*');
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    return items ?? [];
   }
 
-  const { data: items, error: fetchError } = await client.from('equipment_items').select('*');
-
-  if (fetchError) {
-    throw fetchError;
-  }
-
-  return items ?? [];
+  return data ?? [];
 }
 
 export async function createCharacter(input: { name: string; avatarBaseUrl: string; userId?: string | null }) {
   const client = requireSupabaseClient();
+  const { data: sessionData } = await client.auth.getSession();
+  const effectiveUserId = input.userId ?? sessionData.session?.user?.id ?? null;
+
+  // 비로그인(게스트) 상태에서는 RLS 401 에러를 방지하고 로컬 스토리지 중심으로 동작
+  if (!effectiveUserId) {
+    return null;
+  }
+
   const { data: character, error } = await client
     .from('characters')
     .insert({
-      user_id: input.userId ?? null,
+      user_id: effectiveUserId,
       name: input.name,
       avatar_base_url: input.avatarBaseUrl
     })
@@ -164,8 +177,8 @@ async function getCharacterStats(characterId: string): Promise<CharacterStatsRow
 
 export async function getCharacterProfile(characterId?: string): Promise<CharacterProfile | null> {
   const client = requireSupabaseClient();
-  const { data: authData } = await client.auth.getUser();
-  const authUserId = authData.user?.id ?? null;
+  const { data: sessionData } = await client.auth.getSession();
+  const authUserId = sessionData.session?.user?.id ?? null;
   const targetCharacterId = characterId ?? getStoredActiveCharacterId();
 
   const characterQuery = client
