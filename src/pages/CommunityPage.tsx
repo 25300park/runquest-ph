@@ -13,7 +13,6 @@ import {
 } from '../services/guildService';
 import { initialFeedItems, type ActivityFeedItem } from '../data/mockFeed';
 import CrewTownPlaza from '../components/crew/CrewTownPlaza';
-import FactionWarsCard from '../components/faction/FactionWarsCard';
 
 type GuildWithMembers = GuildRow & {
   members: GuildMemberRow[];
@@ -247,10 +246,10 @@ export default function CommunityPage() {
           </div>
           <div className="text-right">
             <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-black">
-              ⚡ 파티 버프 +15% XP
+              🏃 주간 목표 60km 도전 중
             </span>
             <p className="text-[10px] text-slate-300 font-bold mt-1">
-              크루원 4명 마을 광장 집결 중
+              크루원 4명 로비 집결 중
             </p>
           </div>
         </div>
@@ -284,8 +283,8 @@ export default function CommunityPage() {
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <span>🏕️</span>
-          <span>집결 광장</span>
+          <span>🏃</span>
+          <span>크루 로비</span>
         </button>
         <button
           type="button"
@@ -309,7 +308,7 @@ export default function CommunityPage() {
           }`}
         >
           <span>🔥</span>
-          <span>레이드·피드</span>
+          <span>러닝 피드</span>
         </button>
       </div>
 
@@ -458,15 +457,12 @@ export default function CommunityPage() {
                   <p className="text-xs font-black text-slate-900 mt-0.5">128.4 km</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400">크루 파티 버프</p>
-                  <p className="text-xs font-black text-violet-700 mt-0.5">+15% XP</p>
+                  <p className="text-[10px] font-bold text-slate-400">크루원 수</p>
+                  <p className="text-xs font-black text-violet-700 mt-0.5">4명 활동 중</p>
                 </div>
               </div>
             )}
           </div>
-
-          {/* 마카티 vs BGC 주간 대규모 진영전 */}
-          <FactionWarsCard />
 
           {/* 도시 챔피언 길드 배너 */}
           {topGuild && (

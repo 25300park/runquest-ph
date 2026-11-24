@@ -2,13 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getCharacterProfile, subscribeToCharacterUpdates } from '../services/characterService';
 import { subscribeToAvatarRealtime } from '../services/aiAvatarService';
-import {
-  getCharacterVitalStats,
-  getSavedGearDurability,
-  repairEquipmentItem,
-  subscribeToEquipmentEconomy,
-  type EquipmentDurability
-} from '../services/equipmentEconomyService';
 import type { CharacterProfile } from '../types/rpgCharacter';
 import {
   getGameProgress,
@@ -23,12 +16,12 @@ import {
   getEquippedLevelGears,
   getExplorerOutfitTier,
   getExplorerOutfitTierByNumber,
+  LEVEL_EQUIPMENT_PROGRESSION,
 } from '../services/aiCharacterService';
 import {
   getPreferredCharacterDisplayMode,
   loadCustomCharacterVideoUrl,
 } from '../utils/customMediaStorage';
-import VideoAdInterstitial from '../components/ads/VideoAdInterstitial';
 import WearableSyncModal from '../components/wearable/WearableSyncModal';
 
 function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: string; isToday: boolean }> {
@@ -62,7 +55,6 @@ function getCurrentWeekdays(): Array<{ day: string; date: number; fullDate: stri
 export default function CharacterDashboardPage() {
   const [profile, setProfile] = useState<CharacterProfile | null>(null);
   const [status, setStatus] = useState('');
-  const [showAd, setShowAd] = useState(false);
   const [showGpxModal, setShowGpxModal] = useState(false);
   const [totalXpOverride, setTotalXpOverride] = useState<number | null>(null);
   const [customRunnerName, setCustomRunnerName] = useState(() => getRunnerName());
@@ -71,8 +63,6 @@ export default function CharacterDashboardPage() {
     return saved ? normalizeAvatarUrl(saved) : '';
   });
   const [selectedClass, setSelectedClass] = useState(() => getSelectedCharacterClass());
-  const [gearList, setGearList] = useState<EquipmentDurability[]>(() => getSavedGearDurability());
-  const [repairingGearId, setRepairingGearId] = useState<string | null>(null);
   const [customVideoUrl, setCustomVideoUrl] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState<'video' | 'image'>(() =>
     getPreferredCharacterDisplayMode()
@@ -102,7 +92,6 @@ export default function CharacterDashboardPage() {
 
           try { unsubscribers.push(subscribeToCharacterUpdates(charId, refresh)); } catch { /* ignore */ }
           try { unsubscribers.push(subscribeToAvatarRealtime(charId, refresh)); } catch { /* ignore */ }
-          try { unsubscribers.push(subscribeToEquipmentEconomy(charId, refresh)); } catch { /* ignore */ }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unable to load character.';
@@ -118,7 +107,6 @@ export default function CharacterDashboardPage() {
         const latestAvatar = window.localStorage.getItem('runquest-selected-avatar');
         if (latestAvatar) setCustomAvatarUrl(normalizeAvatarUrl(latestAvatar));
         setSelectedClass(getSelectedCharacterClass());
-        setGearList(getSavedGearDurability());
         setDisplayMode(getPreferredCharacterDisplayMode());
         void loadCustomCharacterVideoUrl().then((url) => setCustomVideoUrl(url));
       }
@@ -127,7 +115,6 @@ export default function CharacterDashboardPage() {
     function handleWearableSynced() {
       const nextProgress = getGameProgress();
       setTotalXpOverride(nextProgress.totalXp);
-      setGearList(getSavedGearDurability());
     }
 
     syncAvatarState();
@@ -153,10 +140,6 @@ export default function CharacterDashboardPage() {
   const effectiveTotalXp = totalXpOverride ?? progress.totalXp;
   const currentLevel = calculateLevelFromXp(effectiveTotalXp);
   const rankTitle = getRankTitleForLevel(currentLevel);
-  const vitalStats = useMemo(
-    () => getCharacterVitalStats(currentLevel, gearList),
-    [currentLevel, gearList]
-  );
   const nextLevelXp = getNextLevelXp(effectiveTotalXp);
   const currentLevelBaseXp = getCurrentLevelBaseXp(effectiveTotalXp);
   const xpProgressPercent =
@@ -186,30 +169,10 @@ export default function CharacterDashboardPage() {
   const isAnimeExplorerArt =
     avatarUrl.startsWith('/images/explorer-tiers/') || avatarUrl.startsWith('data:image/');
   const equippedGrowthGears = getEquippedLevelGears(currentLevel);
-
-  function handleQuickRepair(gear: EquipmentDurability) {
-    if (gear.durability >= 100) return;
-    setRepairingGearId(gear.id);
-    setTimeout(() => {
-      const { updatedList } = repairEquipmentItem(gear.id);
-      setGearList(updatedList);
-      setRepairingGearId(null);
-    }, 350);
-  }
+  const nextLevelGear = LEVEL_EQUIPMENT_PROGRESSION.find((g) => g.level === currentLevel + 1);
 
   return (
-    <div className="min-h-full bg-slate-50 text-slate-900 font-sans pb-12 select-none relative">
-      {/* 0. 동영상 광고 모달 (사용자가 Ad Test 버튼을 누르거나 보상형으로 요청 시에만 로드) */}
-      {showAd && (
-        <VideoAdInterstitial
-          onClose={() => setShowAd(false)}
-          videoSrc="/videos/ads/ad.mp4"
-          sponsorName="BGC Urban Sports & Nike Manila"
-          sponsorUrl="https://runquest-ph.vercel.app"
-          skipDelaySeconds={5}
-        />
-      )}
-
+    <div className="min-h-full bg-slate-50 text-slate-900 font-sans pb-16 select-none relative">
       {/* 1. 상단 프로필 헤더 */}
       <header className="pt-4 px-5 flex items-center justify-between">
         <div>
@@ -254,16 +217,6 @@ export default function CharacterDashboardPage() {
             <span>워치 연동</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowAd(true)}
-            className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-[10px] font-black shadow-xs active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
-            title="동영상 광고 테스트 열기"
-          >
-            <span>📢</span>
-            <span>Ad Test</span>
-          </button>
-
           <Link
             to="/leaderboard"
             className="w-10 h-10 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-200/80 text-amber-700 flex items-center justify-center text-lg shadow-sm active:scale-95 transition-all"
@@ -273,15 +226,15 @@ export default function CharacterDashboardPage() {
           </Link>
           <Link
             to="/profile"
-            className="w-10 h-10 rounded-2xl bg-emerald-100 border-2 border-emerald-300 flex items-center justify-center shadow-md active:scale-95 transition-all overflow-hidden p-0.5"
+            className="w-10 h-10 rounded-2xl bg-emerald-100 border-2 border-emerald-300 flex items-center justify-center shadow-md active:scale-95 transition-all overflow-hidden"
           >
             <img
-              src={getAvatarThumbnail(avatarUrl)}
+              src={getAvatarThumbnail(avatarUrl, currentLevel)}
               alt={runnerName}
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/images/avatars/1.png';
+                (e.target as HTMLImageElement).src = outfitTier.fallbackImage;
               }}
-              className="w-full h-full object-contain filter drop-shadow-sm"
+              className="w-full h-full object-cover object-top"
             />
           </Link>
         </div>
@@ -361,13 +314,13 @@ export default function CharacterDashboardPage() {
               </>
             )}
 
-            {/* 상단 오버레이: 실시간 연동 HP 및 장비 내구도 기반 Stamina 배지 */}
+            {/* 상단 오버레이: 현재 레벨 & 누적 거리 배지 */}
             <div className="relative z-20 flex items-center justify-between gap-1.5">
-              <span className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-white/80 text-[10px] font-black text-rose-500 flex items-center gap-1 shadow-sm">
-                <span>❤️</span> HP {vitalStats.currentHp}/{vitalStats.maxHp}
+              <span className="px-2.5 py-1 rounded-full bg-slate-950/75 backdrop-blur-md border border-white/25 text-[10px] font-black text-amber-300 flex items-center gap-1 shadow-sm">
+                <span>🏅</span> Lv.{currentLevel} • {rankTitle}
               </span>
-              <span className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-white/80 text-[10px] font-black text-emerald-600 flex items-center gap-1 shadow-sm">
-                <span>⚡</span> Stamina {vitalStats.staminaPercent}%
+              <span className="px-2.5 py-1 rounded-full bg-slate-950/75 backdrop-blur-md border border-white/25 text-[10px] font-black text-emerald-300 flex items-center gap-1 shadow-sm">
+                <span>🏃</span> {progress.totalDistanceKm.toFixed(1)} km 누적
               </span>
             </div>
 
@@ -483,125 +436,32 @@ export default function CharacterDashboardPage() {
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 bg-emerald-400/20 px-2 py-0.5 rounded-full border border-emerald-400/30">
-                  Crew Town Plaza & Hub
+                  Crew Run Lobby
                 </span>
                 <h3 className="text-sm font-black text-white mt-1">
-                  조깅 크루 집결 광장 · 크루 관리
+                  BGC 조깅 크루 로비 · 함께 달리기
                 </h3>
                 <p className="text-[11px] text-emerald-100/90 mt-0.5">
-                  마을 광장 2D 캐릭터 집결 · 진영전 · 오프라인 레이드 한곳에서 보기
+                  크루원 AI 캐릭터 집결 · 주간 공동 목표 · 원터치 응원
                 </p>
               </div>
             </div>
             <span className="text-xs font-black text-emerald-300 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-500/40 shrink-0">
-              광장 입장 →
+              로비 입장 →
             </span>
           </div>
         </Link>
       </section>
 
-      {/* 4. 스와이프 가능한 서브 퀘스트 섹션 (Step 3) */}
-      <section className="px-5 pt-4 pb-2">
-        <div className="flex items-center justify-between mb-2.5">
-          <h2 className="text-sm font-black text-slate-900">Available Quests & UGC Bounties</h2>
-          <Link to="/bounties" className="text-xs font-bold text-violet-600 hover:underline">
-            의뢰소 보기 →
-          </Link>
-        </div>
-
-        {/* 가로 스와이프 카드 컨테이너 */}
-        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar snap-x">
-          {/* 의뢰소 퀘스트 0 */}
-          <div className="min-w-[210px] bg-gradient-to-br from-violet-50 to-indigo-50/60 rounded-2xl p-3.5 shadow-sm border border-violet-200 snap-start flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xl">📜</span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-violet-600 text-white">
-                  +100 Gold 로열티
-                </span>
-              </div>
-              <h3 className="font-black text-xs text-slate-900 mt-2">UGC Bounty Board</h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">유저 제작 코스 탐험</p>
-            </div>
-            <Link
-              to="/bounties"
-              className="mt-3 block w-full py-2 text-center rounded-xl bg-violet-600 hover:bg-violet-700 text-xs font-black text-white shadow-xs active:scale-95 transition-all"
-            >
-              의뢰소 입장
-            </Link>
-          </div>
-
-          {/* 퀘스트 1 */}
-          <div className="min-w-[210px] bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 snap-start flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xl">🏃</span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                  +150 XP
-                </span>
-              </div>
-              <h3 className="font-black text-xs text-slate-900 mt-2">Morning 3km Dash</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">3.0 km • Easy Pace</p>
-            </div>
-            <Link
-              to="/course-builder"
-              className="mt-3 block w-full py-2 text-center rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 active:scale-95 transition-all"
-            >
-              Start Run
-            </Link>
-          </div>
-
-          {/* 퀘스트 2 */}
-          <div className="min-w-[210px] bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 snap-start flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xl">📍</span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">
-                  +300 XP
-                </span>
-              </div>
-              <h3 className="font-black text-xs text-slate-900 mt-2">BGC Route Pioneer</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">Record new route</p>
-            </div>
-            <Link
-              to="/course-builder"
-              className="mt-3 block w-full py-2 text-center rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 active:scale-95 transition-all"
-            >
-              Build Course
-            </Link>
-          </div>
-
-          {/* 퀘스트 3 */}
-          <div className="min-w-[210px] bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 snap-start flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xl">⚔️</span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
-                  Crew Battle
-                </span>
-              </div>
-              <h3 className="font-black text-xs text-slate-900 mt-2">Makati Sprint 5km</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">Ranked multiplayer</p>
-            </div>
-            <Link
-              to="/community"
-              className="mt-3 block w-full py-2 text-center rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 active:scale-95 transition-all"
-            >
-              Join Crew
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. 🗺️ 전장의 안개 & 도시 탐험도 섹션 (Fog of War & City Exploration) */}
+      {/* 4. 🗺️ 도시 탐험 진행도 (City Exploration) */}
       <section className="px-5 pt-3 pb-1">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-            <span>🗺️</span> City Exploration & Fog of War
+            <span>🗺️</span> City Exploration
           </h2>
-          <span className="text-[10px] font-black text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
-            Live Scout
-          </span>
+          <Link to="/map" className="text-[10px] font-black text-violet-600 hover:underline">
+            지도 보기 →
+          </Link>
         </div>
 
         <div className="grid gap-2.5">
@@ -629,68 +489,51 @@ export default function CharacterDashboardPage() {
         </div>
       </section>
 
-      {/* 5. 장착 장비 및 실시간 내구도 퀵 슬롯 (ProfilePage와 100% 동일 데이터 연동) */}
+      {/* 5. 현재 장착 장비 & 다음 레벨 해금 목표 (단순화된 성장 루프) */}
       <section className="px-5 pt-3">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-            <span>👟</span> Equipped Gear & Durability ({gearList.length})
+            <span>✨</span> 착용 장비 & 성장 목표 ({equippedGrowthGears.length}종)
           </h2>
-          <Link to="/profile" className="text-[10px] font-black text-violet-600 hover:underline">
-            장비 정비소 →
+          <Link to="/character/create" className="text-[10px] font-black text-emerald-700 hover:underline">
+            장비·복장 관리 →
           </Link>
         </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          {gearList.map((gear) => {
-            const isFull = gear.durability >= 100;
-            const isLow = gear.durability <= 30;
-            return (
-              <div
+
+        <div className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm space-y-3">
+          <div className="flex flex-wrap gap-1.5">
+            {equippedGrowthGears.map((gear) => (
+              <span
                 key={gear.id}
-                className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm flex flex-col justify-between gap-2"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] font-bold text-slate-800"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-xl shrink-0">{gear.icon}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-black text-slate-800 truncate">{gear.name}</p>
-                    <p className="text-[9px] font-extrabold text-violet-600 uppercase">
-                      {gear.rarity} • {gear.buff}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        isLow
-                          ? 'bg-rose-500'
-                          : gear.durability <= 70
-                          ? 'bg-amber-400'
-                          : 'bg-emerald-500'
-                      }`}
-                      style={{ width: `${gear.durability}%` }}
-                    />
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-500">
-                      내구도 <strong className={isLow ? 'text-rose-600' : 'text-slate-800'}>{gear.durability}%</strong>
-                    </span>
-                    <button
-                      type="button"
-                      disabled={isFull || repairingGearId === gear.id}
-                      onClick={() => handleQuickRepair(gear)}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
-                        isFull
-                          ? 'bg-slate-100 text-slate-400 cursor-default'
-                          : 'bg-violet-600 text-white hover:bg-violet-700 active:scale-95'
-                      }`}
-                    >
-                      {repairingGearId === gear.id ? '수리중' : isFull ? '최상' : `🔧 ${gear.repairCostGold}G`}
-                    </button>
-                  </div>
-                </div>
+                <span>{gear.slotIcon}</span>
+                <span>Lv.{gear.level} {gear.itemName}</span>
+              </span>
+            ))}
+          </div>
+
+          {nextLevelGear && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-amber-800 uppercase">
+                  🎯 다음 해금 목표 (Lv.{nextLevelGear.level})
+                </p>
+                <p className="text-xs font-black text-slate-900 truncate mt-0.5">
+                  {nextLevelGear.slotIcon} {nextLevelGear.itemName}
+                </p>
+                <p className="text-[10px] text-slate-600 truncate">
+                  {nextLevelGear.acquisitionMethod}
+                </p>
               </div>
-            );
-          })}
+              <Link
+                to="/character/create"
+                className="px-2.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-[10px] font-black shrink-0"
+              >
+                보기
+              </Link>
+            </div>
+          )}
         </div>
       </section>
     </div>

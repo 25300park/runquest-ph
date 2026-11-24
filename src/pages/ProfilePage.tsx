@@ -12,13 +12,8 @@ import { getCurrentAdminProfile } from '../admin/adminService';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { isVideoAvatar, normalizeAvatarUrl } from '../utils/avatarUtils';
 import TrophyRoomModal from '../components/profile/TrophyRoomModal';
-import GearDurabilityCard from '../components/profile/GearDurabilityCard';
 import {
-  getCharacterVitalStats,
-  getSavedGearDurability,
-  type EquipmentDurability,
-} from '../services/equipmentEconomyService';
-import {
+  getEquippedLevelGears,
   getExplorerOutfitTier,
   getExplorerOutfitTierByNumber,
 } from '../services/aiCharacterService';
@@ -46,8 +41,7 @@ export default function ProfilePage() {
 
   const [runnerName, setRunnerName] = useState(() => getRunnerName());
   const [selectedClass, setSelectedClass] = useState(() => getSelectedCharacterClass());
-  const [gearList, setGearList] = useState<EquipmentDurability[]>(() => getSavedGearDurability());
-  const vitalStats = getCharacterVitalStats(currentLevel, gearList);
+  const equippedGrowthGears = getEquippedLevelGears(currentLevel);
   const [savedTierNum, setSavedTierNum] = useState(() => {
     return typeof window !== 'undefined'
       ? Number(window.localStorage.getItem('runquest-selected-outfit-tier'))
@@ -81,7 +75,6 @@ export default function ProfilePage() {
       if (typeof window !== 'undefined') {
         setRunnerName(getRunnerName());
         setSelectedClass(getSelectedCharacterClass());
-        setGearList(getSavedGearDurability());
         setDisplayMode(getPreferredCharacterDisplayMode());
         void loadCustomCharacterVideoUrl().then((url) => setCustomVideoUrl(url));
         const nextTierNum = Number(window.localStorage.getItem('runquest-selected-outfit-tier'));
@@ -227,11 +220,11 @@ export default function ProfilePage() {
               </span>
             </div>
             <div className="flex flex-col items-end gap-1">
-              <span className="rounded-full bg-slate-950/65 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-400/40">
-                ❤️ HP {vitalStats.currentHp}/{vitalStats.maxHp}
+              <span className="rounded-full bg-slate-950/65 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-400/40">
+                🏅 Lv.{currentLevel} {rankTitle}
               </span>
-              <span className="rounded-full bg-slate-950/65 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-sky-300 border border-sky-400/40">
-                ⚡ Stamina {vitalStats.staminaPercent}%
+              <span className="rounded-full bg-slate-950/65 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-400/40">
+                🏃 {progress.totalDistanceKm.toFixed(1)} km 누적
               </span>
             </div>
           </div>
@@ -324,8 +317,28 @@ export default function ProfilePage() {
         </div>
       </Link>
 
-      {/* 2.5 👟 장비 내구도 및 수리 카드 */}
-      <GearDurabilityCard />
+      {/* 2.5 ✨ 현재 착용 중인 레벨별 성장 장비 */}
+      <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+            <span>👕</span> 착용 장비 & 복장 진화 ({equippedGrowthGears.length}종)
+          </h2>
+          <Link to="/character/create" className="text-[10px] font-black text-emerald-700 hover:underline">
+            장비·복장 변경 →
+          </Link>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {equippedGrowthGears.map((gear) => (
+            <span
+              key={gear.id}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] font-bold text-slate-800"
+            >
+              <span>{gear.slotIcon}</span>
+              <span>Lv.{gear.level} {gear.itemName}</span>
+            </span>
+          ))}
+        </div>
+      </div>
 
       {/* 3. 🏆 트로피 룸 & 특별 스킨 진열장 그리드 */}
       <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm space-y-3">
@@ -470,23 +483,23 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* 5. 24종 아바타 변경 CTA 카드 */}
+      {/* 5. 내 AI 캐릭터 & 달리는 영상 스튜디오 CTA 카드 */}
       <Link
         to="/character/create"
-        className="block rounded-2xl border border-violet-100 bg-white p-4 shadow-sm active:scale-98 transition-all"
+        className="block rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm active:scale-98 transition-all"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center text-xl">
-              🎨
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xl">
+              📸
             </div>
             <div>
-              <h3 className="text-xs font-black text-slate-900">Change Runner Avatar</h3>
-              <p className="text-[10px] text-slate-400 font-bold mt-0.5">Choose from 24 unique runner styles</p>
+              <h3 className="text-xs font-black text-slate-900">AI 캐릭터 · 달리는 영상 스튜디오</h3>
+              <p className="text-[10px] text-slate-500 font-bold mt-0.5">내 얼굴 사진 캐릭터화 & 레벨별 복장 업그레이드</p>
             </div>
           </div>
-          <span className="text-xs font-black text-violet-600 bg-violet-50 px-2.5 py-1 rounded-full border border-violet-100">
-            24 Avatars →
+          <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 shrink-0">
+            열기 →
           </span>
         </div>
       </Link>
